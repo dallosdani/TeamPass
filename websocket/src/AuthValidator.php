@@ -167,6 +167,13 @@ class AuthValidator
             }
         }
 
+        // session_decode() requires an active session; in the WebSocket daemon
+        // no session_start() is ever called, so skip this path entirely.
+        // TeamPass sessions are also encrypted at rest, making decode useless anyway.
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return null;
+        }
+
         // Try standard PHP session decode
         $oldSession = $_SESSION ?? [];
         session_decode($sessionData);
@@ -193,11 +200,9 @@ class AuthValidator
         }
 
         try {
-            // Find a valid, unused token in database with user info and actual permissions
+            // Find a valid, unused token in database with user info
             $tokenData = \DB::queryFirstRow(
-                'SELECT wt.*, u.login, u.admin,
-                        u.api_allowed_to_create, u.api_allowed_to_read,
-                        u.api_allowed_to_update, u.api_allowed_to_delete
+                'SELECT wt.*, u.login, u.admin
                  FROM %l wt
                  JOIN %l u ON wt.user_id = u.id
                  WHERE wt.token = %s AND wt.used = 0 AND wt.expires_at > NOW() AND u.disabled = 0',

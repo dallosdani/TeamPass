@@ -3779,6 +3779,88 @@ case 'get_system_health':
     break;
 
 // ========================================
+// BROWSER EXTENSION LICENCE STATUS
+// ========================================
+
+case 'get_extension_licence_info':
+    /**
+     * Check browser extension licence server status and consumption.
+     * Called asynchronously from the admin dashboard after page load.
+     *
+     * @return array {
+     *   error: bool,
+     *   server_online: bool,
+     *   server_version: string,
+     *   licence_status: string,     -- 'VALID'|'EXPIRED'|'INVALID'|''
+     *   consumed: int,
+     *   max_users: int
+     * }
+     */
+    $licenceKey  = $SETTINGS['browser_extension_key'] ?? '';
+    $licenceFqdn = $SETTINGS['browser_extension_fqdn'] ?? '';
+
+    if (empty($licenceKey)) {
+        echo prepareExchangedData(['error' => true, 'message' => 'no_licence_key'], 'encode');
+        break;
+    }
+
+    // 1. Check licence server availability
+    $serverOnline  = false;
+    $serverVersion = '';
+    $serverCtx = stream_context_create(['http' => ['timeout' => 3]]);
+    $serverRaw = @file_get_contents('https://licence.teampass.net', false, $serverCtx);
+    if ($serverRaw !== false) {
+        $serverData = json_decode($serverRaw, true);
+        $serverOnline  = ($serverData['status'] ?? '') === 'online';
+        $serverVersion = $serverData['version'] ?? '';
+    }
+
+    if (!$serverOnline) {
+        echo prepareExchangedData([
+            'error'           => false,
+            'server_online'   => false,
+            'server_version'  => '',
+            'licence_status'  => '',
+            'expiration_date' => '',
+            'consumed'        => 0,
+            'max_users'       => 0,
+        ], 'encode');
+        break;
+    }
+
+    // 2. Retrieve licence consumption info
+    $adminEmail = DB::queryFirstField(
+        'SELECT email FROM ' . prefixTable('users') . ' WHERE id=%i',
+        (int) $session->get('user-id')
+    ) ?? '';
+
+    $postData = (string) json_encode([
+        'instance_fqdn' => $licenceFqdn,
+        'license_token' => $licenceKey,
+    ]);
+    $infoCtx = stream_context_create([
+        'http' => [
+            'method'  => 'POST',
+            'header'  => "Content-Type: application/json\r\nContent-Length: " . strlen($postData) . "\r\n",
+            'content' => $postData,
+            'timeout' => 5,
+        ],
+    ]);
+    $infoRaw = @file_get_contents('https://licence.teampass.net/api/v1.1/info.php', false, $infoCtx);
+    $licenceInfo = ($infoRaw !== false) ? json_decode($infoRaw, true) : null;
+
+    echo prepareExchangedData([
+        'error'           => false,
+        'server_online'   => true,
+        'server_version'  => $serverVersion,
+        'licence_status'  => $licenceInfo['status'] ?? '',
+        'expiration_date' => $licenceInfo['expiration_date'] ?? '',
+        'consumed'        => (int) ($licenceInfo['consumed_this_month'] ?? 0),
+        'max_users'       => (int) ($licenceInfo['max_users'] ?? 0),
+    ], 'encode');
+    break;
+
+// ========================================
 // WEBSOCKET STATUS & CONTROL
 // ========================================
 
@@ -4857,8 +4939,8 @@ function queryWebSocketStats(string $host, int $port, int $userId): ?array
             }
         }
 
-        // Send close frame and clean up
-        fwrite($socket, wsEncodeFrame('', 0x88));
+        // Send close frame and clean up (server may have already closed the connection)
+        @fwrite($socket, wsEncodeFrame('', 0x88));
         fclose($socket);
 
         return $stats;

@@ -727,8 +727,84 @@ function loadSystemHealth() {
 }
 
 /**
+ * Load browser extension licence status asynchronously.
+ * Updates #extension-licence-status if present (i.e. a licence key is configured).
+ *
+ * @return {void}
+ */
+function loadExtensionLicenceInfo() {
+    const $block = $('#extension-licence-status')
+    if ($block.length === 0) return
+
+    $.post(
+        'sources/admin.queries.php', {
+            type: 'get_extension_licence_info',
+            key: '<?php echo $session->get('key'); ?>'
+        },
+        function(data) {
+            try {
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+            } catch (e) {
+                $block.html('<i class="fas fa-exclamation-triangle text-warning mr-1"></i><small class="text-muted"><?php echo $lang->get('error'); ?></small>')
+                return
+            }
+
+            if (data.error) {
+                $block.html('')
+                return
+            }
+
+            // If licence server is unreachable, fall back to the promo text
+            if (!data.server_online) {
+                $block.removeClass('small').addClass('small text-light').html(
+                    '<?php echo addslashes($lang->get('extension_promo_text')); ?>'
+                    + '<br><a href="https://documentation.teampass.net/#/misc/extension" target="_blank" class="ml-1">'
+                    + '<?php echo addslashes($lang->get('learn_more')); ?> <i class="fas fa-external-link-alt fa-xs"></i>'
+                    + '</a>'
+                )
+                return
+            }
+
+            // Server status line (online only)
+            const versionHtml = data.server_version
+                ? ' (' + $('<span>').text(data.server_version).html() + ')'
+                : ''
+
+            let html = '<span>'
+                + '<i class="fas fa-circle text-success mr-1"></i>'
+                + '<?php echo $lang->get('licence_server'); ?>: <strong><?php echo $lang->get('online'); ?></strong>'
+                + versionHtml
+                + '</span>'
+
+            // Consumption, expiration and progress bar (only when server is online and info available)
+            if (data.server_online && data.max_users > 0) {
+                const badgeClass = data.licence_status === 'VALID' ? 'success' : 'warning'
+
+                // Status badge + users ratio
+                html += '<br><span class="badge badge-' + badgeClass + ' mr-1">'
+                    + $('<span>').text(data.licence_status).html()
+                    + '</span>'
+                    + '<i class="fas fa-users mr-1"></i>'
+                    + data.consumed + ' / ' + data.max_users + ' <?php echo $lang->get('users'); ?>'
+
+                // Expiration date
+                if (data.expiration_date) {
+                    html += '<br><span>'
+                        + '<i class="fas fa-calendar-alt mr-1"></i>'
+                        + '<?php echo $lang->get('valid_until'); ?>: <strong>'
+                        + $('<span>').text(data.expiration_date).html()
+                        + '</strong></span>'
+                }
+            }
+
+            $block.html(html)
+        }
+    )
+}
+
+/**
  * Update health badge
- * 
+ *
  * @param {string} id - Element ID (without #)
  * @param {string} status - Badge status class
  * @param {string|number} text - Badge text
@@ -882,11 +958,19 @@ $(document).on('click', '#btn-websocket-refresh', function() {
  */
 function initDashboardTab() {
     
+    // Internet connectivity badge (instant, no network call)
+    const online = navigator.onLine
+    $('#internet-status-icon').toggleClass('text-success', online).toggleClass('text-danger', !online)
+    $('#internet-status-badge').toggleClass('badge-success', online).toggleClass('badge-danger', !online)
+    $('#internet-status-check').toggleClass('fa-check', online).toggleClass('fa-times', !online)
+    $('#internet-status-text').text(online ? 'Connected' : 'Disconnected')
+
     // Load initial data
     loadDashboardStats()
     loadLiveActivity()
     loadSystemStatus()
     loadSystemHealth()
+    loadExtensionLicenceInfo()
     
     // Start auto-refresh timers
     AdminRefreshManager.start('dashboard_stats', loadDashboardStats, 30000, 'stats-refresh-countdown')

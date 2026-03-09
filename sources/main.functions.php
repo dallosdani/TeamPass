@@ -6871,9 +6871,10 @@ function generateWebSocketToken(int $userId, int $validitySeconds = 60): ?string
     $token = bin2hex(random_bytes(32)); // 64 characters
 
     try {
-        // Delete all existing tokens for this user (one token per user is enough)
+        // Remove expired or used tokens for this user, but keep valid reconnect tokens
+        // so that other open tabs are not invalidated by a new page load.
         DB::query(
-            'DELETE FROM %l WHERE user_id = %i',
+            'DELETE FROM %l WHERE user_id = %i AND (used = 1 OR expires_at < NOW())',
             prefixTable('websocket_tokens'),
             $userId
         );

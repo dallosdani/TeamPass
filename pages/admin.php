@@ -80,6 +80,10 @@ date_default_timezone_set($SETTINGS['timezone'] ?? 'UTC');
 header('Content-type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
+// Show the licence block whenever a key is configured; internet check is done async via JS
+$extensionLicenceKey = $SETTINGS['browser_extension_key'] ?? '';
+$extensionHasLicence = $extensionLicenceKey !== '';
+
 ?>
 
 <!-- Content Header (Page header) -->
@@ -129,15 +133,22 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                 <div class="alert alert-primary border">                                                                                
                     <div class="d-flex align-items-center">                                                                           
                         <i class="fas fa-puzzle-piece fa-2x text-alert mr-3"></i>                                                   
-                        <div>                                                                                                         
-                            <strong><?php echo $lang->get('browser_extension'); ?></strong>                                           
-                            <p class="mb-0 small text-light">                                                                         
-                                <?php echo $lang->get('extension_promo_text'); ?> 
-                                <br>                                                    
-                                <a href="https://documentation.teampass.net/#/misc/extension" target="_blank" class="ml-1">           
-                                    <?php echo $lang->get('learn_more'); ?> <i class="fas fa-external-link-alt fa-xs"></i>            
-                                </a>                                                                                                  
-                            </p>                                                                                                      
+                        <div>
+                            <strong><?php echo $lang->get('browser_extension'); ?></strong>
+                            <?php if ($extensionHasLicence): ?>
+                            <p class="mb-0 small" id="extension-licence-status">
+                                <i class="fas fa-spinner fa-spin mr-1"></i>
+                                <small class="text-muted"><?php echo $lang->get('loading'); ?></small>
+                            </p>
+                            <?php else: ?>
+                            <p class="mb-0 small text-light">
+                                <?php echo $lang->get('extension_promo_text'); ?>
+                                <br>
+                                <a href="https://documentation.teampass.net/#/misc/extension" target="_blank" class="ml-1">
+                                    <?php echo $lang->get('learn_more'); ?> <i class="fas fa-external-link-alt fa-xs"></i>
+                                </a>
+                            </p>
+                            <?php endif; ?>
                         </div>                                                                                                        
                     </div>                                                                                                            
                 </div> 
@@ -654,12 +665,6 @@ $osInfo = php_uname('s') . ' ' . php_uname('r');
 $timezone = date_default_timezone_get();
 $serverTime = date('H:i:s');
 
-// Check internet connection (optional)
-$internetStatus = @fsockopen("www.google.com", 80, $errno, $errstr, 3);
-$internetConnected = ($internetStatus !== false);
-if ($internetStatus) {
-    fclose($internetStatus);
-}
 ?>
 
                         <!-- Server Information Row -->
@@ -685,12 +690,12 @@ if ($internetStatus) {
                                                     <span class="float-right"><strong><?php echo $osInfo; ?></strong></span>
                                                 </div>
                                                 <div class="mb-2">
-                                                    <i class="fas fa-globe text-<?php echo $internetConnected ? 'success' : 'danger'; ?>"></i>
+                                                    <i class="fas fa-globe" id="internet-status-icon"></i>
                                                     <small class="text-muted">Internet:</small>
                                                     <span class="float-right">
-                                                        <span class="badge badge-<?php echo $internetConnected ? 'success' : 'danger'; ?>">
-                                                            <i class="fas fa-<?php echo $internetConnected ? 'check' : 'times'; ?>"></i> 
-                                                            <?php echo $internetConnected ? 'Connected' : 'Disconnected'; ?>
+                                                        <span class="badge" id="internet-status-badge">
+                                                            <i class="fas" id="internet-status-check"></i>
+                                                            <span id="internet-status-text">...</span>
                                                         </span>
                                                     </span>
                                                 </div>

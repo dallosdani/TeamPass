@@ -417,7 +417,9 @@ class WebSocketServer implements MessageComponentInterface
      */
     private function isAuthRateLimited(string $ip): bool
     {
-        if ($ip === '') {
+        // Connections from localhost are always from the reverse proxy —
+        // rate limiting by IP would block all users at once.
+        if ($ip === '' || $ip === '127.0.0.1' || $ip === '::1') {
             return false;
         }
 

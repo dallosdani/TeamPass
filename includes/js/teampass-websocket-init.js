@@ -351,9 +351,20 @@
       showNotification('warning', L.maintenance, data.message)
     })
 
-    // Reconnection failed
+    // Reconnection failed: offer the user a way to restore the connection
+    // without requiring a full page reload (clicking the notification reloads).
     tpWs.on('reconnect_failed', function() {
-      showNotification('error', L.connection_lost, L.unable_to_reconnect)
+      if (typeof toastr !== 'undefined') {
+        toastr.error(
+          (L.unable_to_reconnect || 'Unable to reconnect') +
+          ' — <a href="javascript:window.location.reload()" style="color:#fff;text-decoration:underline">' +
+          (L.click_to_reload || 'Click to reload') + '</a>',
+          L.connection_lost || 'Connection lost',
+          { timeOut: 0, closeButton: true, allowHtml: true }
+        )
+      } else {
+        showNotification('error', L.connection_lost, L.unable_to_reconnect)
+      }
     })
 
     // Debug: log all events

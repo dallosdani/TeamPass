@@ -1975,6 +1975,9 @@ return array(
     'ws_item_now_available' => 'Item available',
     'ws_item_edition_released' => 'Item is now available for editing',
     'ws_item_reloading' => 'Item was modified by another user and is being reloaded',
+    'ws_item_moved_away' => 'has been moved to another folder by',
+    'ws_item_moved_by' => 'moved by',
+    'ws_item_moved' => 'Item moved',
 
     // WebSocket admin panel
     'ws_status_disabled' => 'Disabled',
@@ -1992,6 +1995,7 @@ return array(
     'ws_server_not_running_msg' => 'WebSocket server is not running',
     'ws_server_stopped' => 'WebSocket server stopped',
     'ws_server_stop_failed' => 'Failed to stop WebSocket server',
+    'ws_systemd_sudo_required' => 'Service is managed by systemd (Restart=always). Configure sudoers so www-data can stop/start it: www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop teampass-websocket, /bin/systemctl start teampass-websocket',
     'websocket' => 'Websocket',
     'decryption_failed_for_some_fields' => 'Some custom fields could not be decrypted. They may be corrupted or encrypted with an outdated key.',
     'settings_websocket_title' => 'Websocket',

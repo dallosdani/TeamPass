@@ -3804,11 +3804,52 @@ case 'get_extension_licence_info':
         break;
     }
 
+    // Cache TTL: 60 min when server was online last time, 10 min when it was offline
+    $cacheRaw = $SETTINGS['extension_licence_cache'] ?? '';
+    $cacheAt  = (int) ($SETTINGS['extension_licence_cache_at'] ?? 0);
+    $cached   = $cacheRaw !== '' ? json_decode($cacheRaw, true) : null;
+    $ttl      = ($cached !== null && ($cached['server_online'] ?? false)) ? 3600 : 600;
+
+    if ($cached !== null && (time() - $cacheAt) < $ttl) {
+        // Serve from cache — no network call
+        echo prepareExchangedData($cached, 'encode');
+        break;
+    }
+
+    // Helper: perform a cURL request with strict connection + read timeouts
+    $curlGet = static function (string $url, int $connectTimeout = 2, int $totalTimeout = 4): string|false {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+            CURLOPT_TIMEOUT        => $totalTimeout,
+            CURLOPT_FAILONERROR    => true,
+        ]);
+        $result = curl_exec($ch);
+        curl_close($ch);
+        return $result;
+    };
+
+    $curlPost = static function (string $url, string $jsonBody, int $connectTimeout = 2, int $totalTimeout = 5): string|false {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+            CURLOPT_TIMEOUT        => $totalTimeout,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonBody,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Content-Length: ' . strlen($jsonBody)],
+            CURLOPT_FAILONERROR    => true,
+        ]);
+        $result = curl_exec($ch);
+        curl_close($ch);
+        return $result;
+    };
+
     // 1. Check licence server availability
     $serverOnline  = false;
     $serverVersion = '';
-    $serverCtx = stream_context_create(['http' => ['timeout' => 3]]);
-    $serverRaw = @file_get_contents('https://licence.teampass.net', false, $serverCtx);
+    $serverRaw = $curlGet('https://licence.teampass.net');
     if ($serverRaw !== false) {
         $serverData = json_decode($serverRaw, true);
         $serverOnline  = ($serverData['status'] ?? '') === 'online';
@@ -3816,7 +3857,7 @@ case 'get_extension_licence_info':
     }
 
     if (!$serverOnline) {
-        echo prepareExchangedData([
+        $result = [
             'error'           => false,
             'server_online'   => false,
             'server_version'  => '',
@@ -3824,32 +3865,31 @@ case 'get_extension_licence_info':
             'expiration_date' => '',
             'consumed'        => 0,
             'max_users'       => 0,
-        ], 'encode');
+        ];
+        // Cache the offline result for 10 min to avoid repeated network attempts
+        DB::query(
+            'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+             ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+            'admin', 'extension_licence_cache', (string) json_encode($result)
+        );
+        DB::query(
+            'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+             ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+            'admin', 'extension_licence_cache_at', (string) time()
+        );
+        echo prepareExchangedData($result, 'encode');
         break;
     }
 
     // 2. Retrieve licence consumption info
-    $adminEmail = DB::queryFirstField(
-        'SELECT email FROM ' . prefixTable('users') . ' WHERE id=%i',
-        (int) $session->get('user-id')
-    ) ?? '';
-
     $postData = (string) json_encode([
         'instance_fqdn' => $licenceFqdn,
         'license_token' => $licenceKey,
     ]);
-    $infoCtx = stream_context_create([
-        'http' => [
-            'method'  => 'POST',
-            'header'  => "Content-Type: application/json\r\nContent-Length: " . strlen($postData) . "\r\n",
-            'content' => $postData,
-            'timeout' => 5,
-        ],
-    ]);
-    $infoRaw = @file_get_contents('https://licence.teampass.net/api/v1.1/info.php', false, $infoCtx);
+    $infoRaw     = $curlPost('https://licence.teampass.net/api/v1.1/info.php', $postData);
     $licenceInfo = ($infoRaw !== false) ? json_decode($infoRaw, true) : null;
 
-    echo prepareExchangedData([
+    $result = [
         'error'           => false,
         'server_online'   => true,
         'server_version'  => $serverVersion,
@@ -3857,7 +3897,21 @@ case 'get_extension_licence_info':
         'expiration_date' => $licenceInfo['expiration_date'] ?? '',
         'consumed'        => (int) ($licenceInfo['consumed_this_month'] ?? 0),
         'max_users'       => (int) ($licenceInfo['max_users'] ?? 0),
-    ], 'encode');
+    ];
+
+    // Cache the successful result for 60 min
+    DB::query(
+        'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+         ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+        'admin', 'extension_licence_cache', (string) json_encode($result)
+    );
+    DB::query(
+        'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+         ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+        'admin', 'extension_licence_cache_at', (string) time()
+    );
+
+    echo prepareExchangedData($result, 'encode');
     break;
 
 // ========================================
@@ -3950,6 +4004,17 @@ case 'websocket_start':
     /**
      * Start the WebSocket server process
      */
+    if (PHP_OS_FAMILY === 'Windows') {
+        echo prepareExchangedData(
+            array(
+                'error' => true,
+                'message' => 'WebSocket service management is not supported on Windows.',
+            ),
+            'encode'
+        );
+        break;
+    }
+
     $wsEnabled = $SETTINGS['websocket_enabled'] ?? '0';
 
     if ($wsEnabled !== '1') {
@@ -3980,7 +4045,47 @@ case 'websocket_start':
         break;
     }
 
-    // Start the server in background
+    // Detect if the service is managed by systemd
+    // 'not-found' means systemd doesn't know about this service at all
+    $sysOut = [];
+    @exec('systemctl is-active teampass-websocket 2>/dev/null', $sysOut, $sysRet);
+    $sysState = trim($sysOut[0] ?? '');
+    $systemdManaged = ($sysState !== '' && $sysState !== 'not-found');
+
+    if ($systemdManaged) {
+        // Use systemctl to start (requires sudoers: www-data ALL=(ALL) NOPASSWD: /bin/systemctl start teampass-websocket)
+        $startOut = [];
+        @exec('sudo systemctl start teampass-websocket 2>&1', $startOut, $startRet);
+        if ($startRet !== 0) {
+            echo prepareExchangedData(
+                array(
+                    'error' => true,
+                    'message' => $lang->get('ws_systemd_sudo_required'),
+                    'systemd_managed' => true,
+                ),
+                'encode'
+            );
+            break;
+        }
+        usleep(500000);
+        $socket = @fsockopen($wsHost, $wsPort, $errno, $errstr, 3);
+        $started = false;
+        if ($socket) {
+            fclose($socket);
+            $started = true;
+        }
+        echo prepareExchangedData(
+            array(
+                'error' => !$started,
+                'message' => $started ? $lang->get('ws_server_started') : $lang->get('ws_server_start_failed'),
+                'started' => $started,
+            ),
+            'encode'
+        );
+        break;
+    }
+
+    // Not systemd-managed: start directly in background
     $serverScript = dirname(__DIR__) . '/websocket/bin/server.php';
     if (!file_exists($serverScript)) {
         echo prepareExchangedData(
@@ -4023,12 +4128,65 @@ case 'websocket_start':
 
 case 'websocket_stop':
     /**
-     * Stop the WebSocket server process
+     * Stop the WebSocket server process.
+     * When managed by systemd (Restart=always), a raw SIGTERM is immediately overridden
+     * by the service manager. We must use systemctl in that case.
      */
+    if (PHP_OS_FAMILY === 'Windows') {
+        echo prepareExchangedData(
+            array(
+                'error' => true,
+                'message' => 'WebSocket service management is not supported on Windows.',
+            ),
+            'encode'
+        );
+        break;
+    }
+
     $wsHost = $SETTINGS['websocket_host'] ?? '127.0.0.1';
     $wsPort = (int) ($SETTINGS['websocket_port'] ?? 8080);
 
-    // Find PID via port (reliable method)
+    // Detect if the service is managed by systemd
+    $sysOut = [];
+    @exec('systemctl is-active teampass-websocket 2>/dev/null', $sysOut, $sysRet);
+    $sysState = trim($sysOut[0] ?? '');
+    $systemdManaged = in_array($sysState, ['active', 'activating', 'deactivating'], true);
+
+    if ($systemdManaged) {
+        // Must stop via systemctl – a direct SIGTERM would be overridden by Restart=always
+        // Requires sudoers: www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop teampass-websocket
+        $stopOut = [];
+        @exec('sudo systemctl stop teampass-websocket 2>&1', $stopOut, $stopRet);
+        if ($stopRet !== 0) {
+            echo prepareExchangedData(
+                array(
+                    'error' => true,
+                    'message' => $lang->get('ws_systemd_sudo_required'),
+                    'systemd_managed' => true,
+                ),
+                'encode'
+            );
+            break;
+        }
+        usleep(800000);
+        $socket = @fsockopen($wsHost, $wsPort, $errno, $errstr, 2);
+        $stillRunning = false;
+        if ($socket) {
+            fclose($socket);
+            $stillRunning = true;
+        }
+        echo prepareExchangedData(
+            array(
+                'error' => $stillRunning,
+                'message' => !$stillRunning ? $lang->get('ws_server_stopped') : $lang->get('ws_server_stop_failed'),
+                'stopped' => !$stillRunning,
+            ),
+            'encode'
+        );
+        break;
+    }
+
+    // Not systemd-managed: find PID via port and send SIGTERM
     $pidOutput = @exec(sprintf('lsof -ti tcp:%d -sTCP:LISTEN 2>/dev/null | head -1', $wsPort));
     if (empty($pidOutput)) {
         echo prepareExchangedData(
@@ -4042,11 +4200,9 @@ case 'websocket_stop':
         break;
     }
 
-    // Kill the process gracefully (SIGTERM)
     $pid = (int) trim($pidOutput);
     posix_kill($pid, 15); // SIGTERM
 
-    // Wait and verify via port check
     usleep(800000); // 800ms
     $socket = @fsockopen($wsHost, $wsPort, $errno, $errstr, 2);
     $stillRunning = false;

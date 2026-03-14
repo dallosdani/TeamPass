@@ -1426,9 +1426,10 @@ if (null !== $post_type) {
             if (count($arrData['functions']) > 0) {
                 // refine folders based upon roles
                 $rows = DB::query(
-                    'SELECT rv.folder_id, rv.type
+                    'SELECT rv.folder_id, rv.type, rv.role_id, rt.title AS role_title
                     FROM ' . prefixTable('roles_values') . ' as rv
                     INNER JOIN ' . prefixTable('nested_tree') . ' as nt ON rv.folder_id = nt.id
+                    INNER JOIN ' . prefixTable('roles_title') . ' as rt ON rv.role_id = rt.id
                     WHERE rv.role_id IN %ls AND nt.personal_folder = 0
                     ORDER BY rv.folder_id ASC',
                     $arrData['functions']
@@ -1438,21 +1439,33 @@ if (null !== $post_type) {
                     $x = 0;
                     foreach ($arrFolders as $fld) {
                         if ($fld['id'] === $record['folder_id']) {
-                            // get the level of access on the folder
+                            // Resolve effective permission (most permissive wins)
                             $arrFolders[$x]['type'] = evaluateFolderAccesLevel($record['type'], $arrFolders[$x]['type']);
+                            // Accumulate all roles contributing to this folder
+                            $arrFolders[$x]['roles'][] = ['title' => $record['role_title'], 'type' => $record['type']];
                             $bFound = true;
                             break;
                         }
                         ++$x;
                     }
                     if ($bFound === false && in_array($record['folder_id'], $arrData['denied_folders']) === false) {
-                        array_push($arrFolders, array('id' => $record['folder_id'], 'type' => $record['type'], 'special' => false));
+                        array_push($arrFolders, [
+                            'id'     => $record['folder_id'],
+                            'type'   => $record['type'],
+                            'special'=> false,
+                            'roles'  => [['title' => $record['role_title'], 'type' => $record['type']]],
+                        ]);
                     }
                 }
 
-                // add allowed folders
+                // add allowed folders (direct user assignment, not role-based)
                 foreach($arrData['allowed_folders'] as $Fld) {
-                    array_push($arrFolders, array('id' => $Fld, 'type' => 'W', 'special' => true));
+                    array_push($arrFolders, [
+                        'id'     => $Fld,
+                        'type'   => 'W',
+                        'special'=> true,
+                        'roles'  => [],
+                    ]);
                 }
                 
                 $tree_desc = $tree->getDescendants();
@@ -1472,11 +1485,12 @@ if (null !== $post_type) {
                             );
 
                             $foldersData[] = [
-                                'id' => $row['id'],
-                                'title' => $row['title'],
+                                'id'     => $row['id'],
+                                'title'  => $row['title'],
                                 'nlevel' => $row['nlevel'],
-                                'type' => $fld['type'],
-                                'special' => $fld['special']
+                                'type'   => $fld['type'],
+                                'special'=> $fld['special'],
+                                'roles'  => $fld['roles'],
                             ];
 
                             break;
@@ -4613,37 +4627,4 @@ function purgeOldDeletedUsers($daysRetention = 90): array
     ];
 }*/
 
-/**
- * Return the level of access on a folder.
- *
- * @param string $new_val      New value
- * @param string $existing_val Current value
- *
- * @return string Returned index
- */
-function evaluateFolderAccesLevel($new_val, $existing_val)
-{
-    $levels = array(
-        'W' => 30,
-        'ND' => 20,
-        'NE' => 15,
-        'NDNE' => 10,
-        'R' => 10,
-    );
-
-    $current_level_points = empty($existing_val) === true ? 0 : $levels[$existing_val];
-    $new_level_points = empty($new_val) === true ? 0 : $levels[$new_val];
-
-    // check if new is > to current one (always keep the highest level)
-    if (($new_val === 'ND' && $existing_val === 'NE')
-        || ($new_val === 'NE' && $existing_val === 'ND')
-    ) {
-        return 'NDNE';
-    } else {
-        if ($current_level_points > $new_level_points) {
-            return $existing_val;
-        } else {
-            return $new_val;
-        }
-    }
-}
+// evaluateFolderAccesLevel() is defined in main.functions.php (loaded via core.php)

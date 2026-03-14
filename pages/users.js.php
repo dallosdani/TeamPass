@@ -85,7 +85,8 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         userTemporaryCode = '',
         userClipboard,
         ProcessInProgress = false,
-        debugJavascript = false;
+        debugJavascript = false,
+        allFolderData = [];
 
     // Prepare tooltips
     $('.infotip').tooltip();
@@ -774,7 +775,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         }
 
         var action = $(this).data('action');
-        var trackedActions = ['edit', 'new', 'logs', 'visible-folders', 'propagate', 'inactive-users', 'deleted-users', 'refresh', 'ldap-sync', 'oauth2-sync'];
+        var trackedActions = ['edit', 'new', 'logs', 'propagate', 'inactive-users', 'deleted-users', 'refresh', 'ldap-sync', 'oauth2-sync'];
         
         // Show relevant content
         if (trackedActions.includes(action)) {
@@ -1419,16 +1420,29 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             });
             
         } else if ($(this).data('action') === 'visible-folders') {
-            $('#row-folders-title').text(
-                $(this).data('fullname')
-            )
-            var userID = $(this).data('id');
+            $('#row-folders-title').text($(this).data('fullname'))
+            var userID = $(this).data('id')
 
-            // Show spinner
-            toastr.remove();
-            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>');
+            // Reset state and open modal
+            $('#row-folders-filter-bar').hide()
+            $('#row-folders-results').html('')
+            $('.folder-type-filter').addClass('active')
+            $('#modal-folders-rights').modal('show')
 
-            $('#row-folders-results').html('');
+            // Start progress bar
+            var folderLoadProgress = 10
+            var folderLoadTimer = null
+            $('#row-folders-progress-bar').css('width', folderLoadProgress + '%')
+            $('#row-folders-progress').show()
+            folderLoadTimer = setInterval(function() {
+                // Slow down as we approach 90%
+                folderLoadProgress += Math.max(1, Math.floor((90 - folderLoadProgress) / 8))
+                if (folderLoadProgress >= 90) {
+                    folderLoadProgress = 90
+                    clearInterval(folderLoadTimer)
+                }
+                $('#row-folders-progress-bar').css('width', folderLoadProgress + '%')
+            }, 200)
 
             // Send query
             $.post(
@@ -1438,75 +1452,35 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                     key: '<?php echo $session->get('key'); ?>'
                 },
                 function(data) {
-                    data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
-                    if (debugJavascript === true) console.log(data);
+                    // Complete and hide progress bar
+                    clearInterval(folderLoadTimer)
+                    $('#row-folders-progress-bar').css('width', '100%')
+                    setTimeout(function() { $('#row-folders-progress').hide() }, 300)
+
+                    data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+                    if (debugJavascript === true) console.log(data)
 
                     if (data.error !== false) {
-                        // Show error
-                        toastr.remove();
+                        toastr.remove()
                         toastr.error(
                             data.message,
                             '<?php echo $lang->get('caution'); ?>', {
                                 timeOut: 5000,
                                 progressBar: true
                             }
-                        );
+                        )
                     } else {
-                        // Generate HTML from data
-                        let html = '<table id="table-folders" class="table table-bordered table-striped dt-responsive nowrap" style="width:100%"><tbody>';
-                        
-                        data.folders.forEach(folder => {
-                            // Manage indentation
-                            let ident = '';
-                            for (let y = 1; y < folder.nlevel; ++y) {
-                                ident += '<i class="fas fa-long-arrow-alt-right mr-2"></i>';
-                            }
+                        // Store full data for client-side filtering
+                        allFolderData = data.folders
 
-                            // Manage right icon
-                            let label = '';
-                            if (folder.type === 'W') {
-                                label = '<i class="fas fa-indent infotip text-success mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
-                                        '<i class="fas fa-edit infotip text-success mr-2" title="<?php echo $lang->get('edit'); ?>"></i>' +
-                                        '<i class="fas fa-eraser infotip text-success" title="<?php echo $lang->get('delete'); ?>"></i>';
-                            } else if (folder.type === 'ND') {
-                                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
-                                        '<i class="fas fa-edit infotip text-success mr-2" title="<?php echo $lang->get('edit'); ?>"></i>' +
-                                        '<i class="fas fa-eraser infotip text-danger" title="<?php echo $lang->get('no_delete'); ?>"></i>';
-                            } else if (folder.type === 'NE') {
-                                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
-                                        '<i class="fas fa-edit infotip text-danger mr-2" title="<?php echo $lang->get('no_edit'); ?>"></i>' +
-                                        '<i class="fas fa-eraser infotip text-success" title="<?php echo $lang->get('delete'); ?>"></i>';
-                            } else if (folder.type === 'NDNE') {
-                                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
-                                        '<i class="fas fa-edit infotip text-danger mr-2" title="<?php echo $lang->get('no_edit'); ?>"></i>' +
-                                        '<i class="fas fa-eraser infotip text-danger" title="<?php echo $lang->get('no_delete'); ?>"></i>';
-                            } else if (folder.type === '') {
-                                label = '<i class="fas fa-eye-slash infotip text-danger mr-2" title="<?php echo $lang->get('no_access'); ?>"></i>';
-                            } else {
-                                label = '<i class="fas fa-eye infotip text-info mr-2" title="<?php echo $lang->get('read'); ?>"></i>';
-                            }
+                        // Render table (all types visible by default)
+                        renderFolderRightsTable(allFolderData)
 
-                            html += '<tr><td>' + ident + folder.title +
-                                ' <small class="text-info">[' + folder.id + ']</small>' +
-                                (folder.special === true ? '<i class="fas fa-user-tag infotip text-primary ml-5" title="<?php echo $lang->get('user_specific_right'); ?>"></i>' : '') +
-                                '</td><td>' + label + '</td></tr>';
-                        });
+                        // Show filter bar
+                        $('#row-folders-filter-bar').show()
 
-                        html += '</tbody></table>';
-
-                        // Show table
-                        $('#row-folders-results').html(html);
-
-                        // Prepare tooltips
-                        $('.infotip').tooltip();
-                        // Inform user
-                        toastr.remove();
-                        toastr.success(
-                            '<?php echo $lang->get('done'); ?>',
-                            '', {
-                                timeOut: 1000
-                            }
-                        );
+                        toastr.remove()
+                        toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
                     }
                 }
             );
@@ -4042,6 +4016,101 @@ function refreshListInactiveUsers(filterValue) {
         });
 
 
+
+
+    /**
+     * Render the folder rights table, applying the currently active type filters.
+     * @param {Array} folders - Full folder list as returned by user_folders_rights
+     */
+    function renderFolderRightsTable(folders) {
+        // Collect active permission types from filter buttons
+        const activeTypes = $('.folder-type-filter.active').map(function() {
+            return $(this).data('type')
+        }).get()
+
+        // Keep folders whose type is in the active set (unknown types always shown)
+        const visible = folders.filter(f => activeTypes.length === 0 || activeTypes.includes(f.type) || f.type === '')
+
+        // Badge color per permission type
+        const typeBadgeClass = {
+            'W':    'badge-success',
+            'ND':   'badge-warning',
+            'NE':   'badge-warning',
+            'NDNE': 'badge-warning',
+            'R':    'badge-info',
+        }
+
+        let html = '<table class="table table-bordered table-striped dt-responsive nowrap" style="width:100%">' +
+            '<thead><tr>' +
+            '<th><?php echo $lang->get('folder'); ?></th>' +
+            '<th><?php echo $lang->get('accesses'); ?></th>' +
+            '<th><?php echo $lang->get('roles'); ?></th>' +
+            '</tr></thead><tbody>'
+
+        visible.forEach(folder => {
+            // Indentation
+            let ident = ''
+            for (let y = 1; y < folder.nlevel; ++y) {
+                ident += '<i class="fas fa-long-arrow-alt-right mr-2"></i>'
+            }
+
+            // Permission icons
+            let label = ''
+            if (folder.type === 'W') {
+                label = '<i class="fas fa-indent infotip text-success mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
+                        '<i class="fas fa-edit infotip text-success mr-2" title="<?php echo $lang->get('edit'); ?>"></i>' +
+                        '<i class="fas fa-eraser infotip text-success" title="<?php echo $lang->get('delete'); ?>"></i>'
+            } else if (folder.type === 'ND') {
+                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
+                        '<i class="fas fa-edit infotip text-success mr-2" title="<?php echo $lang->get('edit'); ?>"></i>' +
+                        '<i class="fas fa-eraser infotip text-danger" title="<?php echo $lang->get('no_delete'); ?>"></i>'
+            } else if (folder.type === 'NE') {
+                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
+                        '<i class="fas fa-edit infotip text-danger mr-2" title="<?php echo $lang->get('no_edit'); ?>"></i>' +
+                        '<i class="fas fa-eraser infotip text-success" title="<?php echo $lang->get('delete'); ?>"></i>'
+            } else if (folder.type === 'NDNE') {
+                label = '<i class="fas fa-indent infotip text-warning mr-2" title="<?php echo $lang->get('write'); ?>"></i>' +
+                        '<i class="fas fa-edit infotip text-danger mr-2" title="<?php echo $lang->get('no_edit'); ?>"></i>' +
+                        '<i class="fas fa-eraser infotip text-danger" title="<?php echo $lang->get('no_delete'); ?>"></i>'
+            } else if (folder.type === '') {
+                label = '<i class="fas fa-eye-slash infotip text-danger mr-2" title="<?php echo $lang->get('no_access'); ?>"></i>'
+            } else {
+                label = '<i class="fas fa-eye infotip text-info mr-2" title="<?php echo $lang->get('read'); ?>"></i>'
+            }
+
+            // Role badges: one per contributing role, showing its individual type
+            let rolesBadges = ''
+            if (folder.special === true) {
+                // Direct user assignment, not role-based
+                rolesBadges = '<span class="badge badge-primary"><?php echo $lang->get('user_specific_right'); ?></span>'
+            } else if (Array.isArray(folder.roles) && folder.roles.length > 0) {
+                folder.roles.forEach(role => {
+                    const cls = typeBadgeClass[role.type] || 'badge-secondary'
+                    rolesBadges += '<span class="badge ' + cls + ' mr-1 infotip" title="' + role.type + '">' +
+                        role.title + '</span>'
+                })
+            }
+
+            html += '<tr data-folder-type="' + folder.type + '">' +
+                '<td>' + ident + folder.title +
+                ' <small class="text-info">[' + folder.id + ']</small></td>' +
+                '<td>' + label + '</td>' +
+                '<td>' + rolesBadges + '</td>' +
+                '</tr>'
+        })
+
+        html += '</tbody></table>'
+        $('#row-folders-results').html(html)
+        $('.infotip').tooltip()
+    }
+
+    // Toggle permission type filter and re-render table
+    $(document).on('click', '.folder-type-filter', function() {
+        $(this).toggleClass('active')
+        if (allFolderData.length > 0) {
+            renderFolderRightsTable(allFolderData)
+        }
+    })
 
     //]]>
 </script>

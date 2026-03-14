@@ -7806,53 +7806,35 @@ function buildVisibleFoldersOnTheFly(int $userId): array
  */
 function getRoleBasedAccess($session, int $treeId): array
 {
-    $edit = $delete = false;
-    
     // Retrieve all role IDs assigned to the user
     $roles = array_column($session->get('system-array_roles'), 'id');
 
-    // Query the access rights for the given roles and folder
+    // Query the distinct access types defined for these roles on this folder
     $accessTypes = DB::queryFirstColumn(
-        'SELECT DISTINCT type FROM ' . prefixTable('roles_values') . ' WHERE role_id IN %ls AND folder_id = %i', 
-        $roles, 
+        'SELECT DISTINCT type FROM ' . prefixTable('roles_values') . ' WHERE role_id IN %ls AND folder_id = %i',
+        $roles,
         $treeId
     );
-    // Values ​​to be checked
-    $check_value = 'W';
-    // Values ​​to be deleted
-    $delete_value = 'R';
-    
-    // Check if $check_value exists
-    if (in_array($check_value, $accessTypes)) {
-        // Find the index of $delete_value in the array
-        $key = array_search($delete_value, $accessTypes);
 
-        // If the value is found, delete
-        if ($key !== false) {
-            unset($accessTypes[$key]);
-        }
+    if (empty($accessTypes)) {
+        return [false, false];
     }
-    // Determine access rights based on the retrieved types
-    foreach ($accessTypes as $access) {
-        switch ($access) {
-            case 'ND': // No Delete
-                $edit = true;
-                $delete = false;
-                break;
-            case 'NE': // No Edit
-                $edit = false;
-                $delete = true;
-                break;
-            case 'NDNE':
-            case 'R': // Read only
-                $edit = $delete = false;
-                break;
-            case 'W': // Write access
-                $edit = $delete = true;
-                break;
-        }
+
+    // Resolve multiple types using the shared priority function (most permissive wins):
+    // W > ND > NE > NDNE = R ; special case ND+NE → NDNE
+    $resolvedType = '';
+    foreach ($accessTypes as $type) {
+        $resolvedType = evaluateFolderAccesLevel($type, $resolvedType);
     }
-    return [$edit, $delete];
+
+    switch ($resolvedType) {
+        case 'W':    return [true, true];   // full write: edit + delete
+        case 'ND':   return [true, false];  // no delete
+        case 'NE':   return [false, true];  // no edit
+        case 'NDNE': return [false, false]; // no edit, no delete
+        case 'R':    return [false, false]; // read only
+        default:     return [false, false];
+    }
 }
 
 /**

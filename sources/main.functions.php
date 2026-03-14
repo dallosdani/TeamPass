@@ -459,13 +459,45 @@ function identUser(
 }
 
 /**
+ * Resolve the effective access level when a user has multiple roles on the same folder.
+ * The most permissive type wins (W > ND > NE > NDNE = R).
+ * Special case: ND + NE combine into NDNE (both restrictions apply).
+ *
+ * @param string $new_val      New permission type to evaluate
+ * @param string $existing_val Current resolved permission type
+ * @return string              Resolved permission type
+ */
+function evaluateFolderAccesLevel(string $new_val, string $existing_val): string
+{
+    $levels = [
+        'W'    => 30,
+        'ND'   => 20,
+        'NE'   => 15,
+        'NDNE' => 10,
+        'R'    => 10,
+    ];
+
+    // ND + NE together means no edit AND no delete
+    if (($new_val === 'ND' && $existing_val === 'NE')
+        || ($new_val === 'NE' && $existing_val === 'ND')
+    ) {
+        return 'NDNE';
+    }
+
+    $current_points = empty($existing_val) ? 0 : ($levels[$existing_val] ?? 0);
+    $new_points     = empty($new_val)      ? 0 : ($levels[$new_val] ?? 0);
+
+    return $current_points >= $new_points ? $existing_val : $new_val;
+}
+
+/**
  * Get list of folders depending on Roles
- * 
+ *
  * @param array $userRoles
  * @param array $allowedFoldersByRoles
  * @param array $readOnlyFolders
  * @param array $allowedFolders
- * 
+ *
  * @return array
  */
 function identUserGetFoldersFromRoles(array $userRoles, array $allowedFoldersByRoles = [], array $readOnlyFolders = [], array $allowedFolders = []) : array

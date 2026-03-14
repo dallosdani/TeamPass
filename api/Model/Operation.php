@@ -30,10 +30,8 @@ class Operation
 {
     public function verifyJwt($jwt)
     {
-        $JWT = new JWT();
-
         try {
-            $JWT->decode($jwt, new Key(DB_PASSWD, 'HS256'));
+            JWT::decode($jwt, new Key(DB_PASSWD, 'HS256'));
     
             // Access is granted.    
             return array(

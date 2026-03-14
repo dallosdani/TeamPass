@@ -79,7 +79,9 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 
 <script type='text/javascript'>
     // Globals
-    var currentThis = '';
+    var currentThis = ''
+    var _matrixGeneration = 0
+    var _sidebarFolderId = ''
 
     // Preapre select drop list
     $('#roles-list.select2').select2({
@@ -96,12 +98,20 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 
 
     $('#form-complexity-list.select2').select2({
-        language: '<?php echo $session->get('user-language_code'); ?>'
+        language: '<?php echo $session->get('user-language_code'); ?>',
+        dropdownParent: $('#modal-role-definition')
     });
 
-    //iCheck for checkbox and radio inputs
-    $('input[type="checkbox"]').iCheck({
+    //iCheck for checkbox and radio inputs (exclude sidebar which uses orange style)
+    $('input[type="checkbox"]').not('#role-edit-sidebar input').iCheck({
         checkboxClass: 'icheckbox_flat-blue'
+    });
+    // Sidebar elements: orange style, initialized once at page load
+    $('#role-edit-sidebar input[type="checkbox"]').iCheck({
+        checkboxClass: 'icheckbox_flat-orange'
+    });
+    $('#role-edit-sidebar input[type="radio"]').iCheck({
+        radioClass: 'iradio_flat-orange'
     });
 
     // On role selection
@@ -135,19 +145,69 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     });
 
     /**
+     * Build the HTML string for a single row of the permissions matrix.
+     */
+    function buildMatrixRowHtml(value) {
+        var access = ''
+        if (value.access === 'W') {
+            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
+                '<i class="fas fa-pen mr-2 text-success infotip" title="<?php echo $lang->get('edit_allowed'); ?>"></i>' +
+                '<i class="fas fa-eraser mr-2 text-success infotip" title="<?php echo $lang->get('delete_allowed'); ?>"></i>'
+        } else if (value.access === 'ND') {
+            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
+                '<i class="fas fa-pen mr-2 text-success infotip" title="<?php echo $lang->get('edit_allowed'); ?>"></i>' +
+                '<i class="fas fa-eraser mr-2 text-danger infotip" title="<?php echo $lang->get('delete_not_allowed'); ?>"></i>'
+        } else if (value.access === 'NE') {
+            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
+                '<i class="fas fa-pen mr-2 text-danger infotip" title="<?php echo $lang->get('edit_not_allowed'); ?>"></i>' +
+                '<i class="fas fa-eraser mr-2 text-success infotip" title="<?php echo $lang->get('delete_allowed'); ?>"></i>'
+        } else if (value.access === 'NDNE') {
+            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
+                '<i class="fas fa-pen mr-2 text-danger infotip" title="<?php echo $lang->get('edit_not_allowed'); ?>"></i>' +
+                '<i class="fas fa-eraser mr-2 text-danger infotip" title="<?php echo $lang->get('delete_not_allowed'); ?>"></i>'
+        } else if (value.access === 'R') {
+            access = '<i class="fas fa-book-reader mr-2 text-warning infotip" title="<?php echo $lang->get('read_only'); ?>"></i>'
+        } else {
+            access = '<i class="fas fa-ban mr-2 text-danger infotip" title="<?php echo $lang->get('no_access'); ?>"></i>'
+        }
+
+        var path = ''
+        $(value.path).each(function(j, valuePath) {
+            path = path === '' ? valuePath : path + ' / ' + valuePath
+        })
+
+        var indent = (parseInt(value.ident) - 1) * 16
+        var folderIcon = value.ident === 1
+            ? '<i class="fas fa-folder text-warning mr-1"></i>'
+            : '<i class="fas fa-folder-open text-warning mr-1" style="opacity:.7"></i>'
+
+        return '<tr data-level="' + value.ident + '" class="' + (value.ident === 1 ? 'parent' : 'descendant') + '" data-id="' + value.id + '">' +
+            '<td width="35px"><input type="checkbox" id="cb-' + value.id + '" data-id="' + value.id + '" class="folder-select"></td>' +
+            '<td class="pointer modify folder-name" data-id="' + value.id + '" data-access="' + value.access + '" style="padding-left:' + indent + 'px">' + folderIcon + value.title + '</td>' +
+            '<td class="font-italic pointer modify" data-id="' + value.id + '" data-access="' + value.access + '"><small class="text-muted">' + path + '</small></td>' +
+            '<td class="pointer modify td-100 text-center" data-id="' + value.id + '" data-access="' + value.access + '">' + access + '</td>' +
+            '<td class="hidden compare tp-borders td-100 text-center"></td>' +
+            '</tr>'
+    }
+
+    /**
+     * Load and render the permissions matrix for a role, using batch rendering
+     * so the browser can paint the progress bar between batches.
      */
     function refreshMatrix(selectedRoleId) {
-        // Show
-        $('#card-role-details').removeClass('hidden');
+        const BATCH_SIZE = 25
+        const myGeneration = ++_matrixGeneration
 
-        // 
-        $('#role-details').html('');
+        $('#card-role-details').removeClass('hidden')
+        $('#role-details').html('')
+        closeRightsSidebar()
 
-        // Show spinner
-        toastr.remove();
-        toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>');
+        // Show progress bar, clear any previous toast
+        $('#roles-load-progress').show()
+        $('#roles-load-progress .progress-bar').css('width', '0%').attr('aria-valuenow', 0)
+        $('#roles-load-progress .roles-load-text').text('')
+        toastr.remove()
 
-        // Build matrix
         $.post(
             'sources/roles.queries.php', {
                 type: 'build_matrix',
@@ -155,112 +215,80 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 key: '<?php echo $session->get('key'); ?>'
             },
             function(data) {
-                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
-                console.log(data);
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+
                 if (data.error === true) {
-                    // Show error
-                    toastr.remove();
-                    toastr.error(
-                        data.message,
-                        '', {
-                            timeOut: 5000,
-                            progressBar: true
-                        }
-                    );
-                } else {
-                    // Build html
-                    var newHtml = '',
-                        ident = '',
-                        path = '',
-                        max_folder_depth = 1;
-                    $(data.matrix).each(function(i, value) {
-                        // Access
-                        access = '';
-                        if (value.access === 'W') {
-                            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
-                                '<i class="fas fa-pen mr-2 text-success infotip" title="<?php echo $lang->get('edit_allowed'); ?>"></i>' +
-                                '<i class="fas fa-eraser mr-2 text-success infotip" title="<?php echo $lang->get('delete_allowed'); ?>"></i>';
-                        } else if (value.access === 'ND') {
-                            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
-                                '<i class="fas fa-pen mr-2 text-success infotip" title="<?php echo $lang->get('edit_allowed'); ?>"></i>' +
-                                '<i class="fas fa-eraser mr-2 text-danger infotip" title="<?php echo $lang->get('delete_not_allowed'); ?>"></i>';
-                        } else if (value.access === 'NE') {
-                            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
-                                '<i class="fas fa-pen mr-2 text-danger infotip" title="<?php echo $lang->get('edit_not_allowed'); ?>"></i>' +
-                                '<i class="fas fa-eraser mr-2 text-success infotip" title="<?php echo $lang->get('delete_allowed'); ?>"></i>';
-                        } else if (value.access === 'NDNE') {
-                            access = '<i class="fas fa-indent mr-2 text-success infotip" title="<?php echo $lang->get('add_allowed'); ?>"></i>' +
-                                '<i class="fas fa-pen mr-2 text-danger infotip" title="<?php echo $lang->get('edit_not_allowed'); ?>"></i>' +
-                                '<i class="fas fa-eraser mr-2 text-danger infotip" title="<?php echo $lang->get('delete_not_allowed'); ?>"></i>';
-                        } else if (value.access === 'R') {
-                            access = '<i class="fas fa-book-reader mr-2 text-warning infotip" title="<?php echo $lang->get('read_only'); ?>"></i>';
-                        } else {
-                            access = '<i class="fas fa-ban mr-2 text-danger infotip" title="<?php echo $lang->get('no_access'); ?>"></i>';
-                        }
+                    toastr.remove()
+                    toastr.error(data.message, '', { timeOut: 5000, progressBar: true })
+                    $('#roles-load-progress').hide()
+                    return
+                }
 
-                        // Build path
-                        path = '';
-                        $(value.path).each(function(j, valuePath) {
-                            if (path === '') {
-                                path = valuePath;
-                            } else {
-                                path += ' / ' + valuePath;
-                            }
-                        });
+                const matrix = data.matrix
+                const total = matrix.length
+                let offset = 0
+                let max_folder_depth = 1
 
-                        // Max depth
+                // Insert empty table structure up front
+                $('#role-details').html(
+                    '<table id="table-role-details" class="table table-hover table-striped table-responsive" style="width:100%">' +
+                    '<tbody></tbody></table>'
+                )
+                const tableBody = $('#table-role-details > tbody')
+
+                function renderBatch() {
+                    // A newer refreshMatrix() call has started — discard this stale loop
+                    if (_matrixGeneration !== myGeneration) return
+
+                    const end = Math.min(offset + BATCH_SIZE, total)
+                    let batchHtml = ''
+
+                    for (let i = offset; i < end; i++) {
+                        const value = matrix[i]
+                        batchHtml += buildMatrixRowHtml(value)
                         if (parseInt(value.ident) > max_folder_depth) {
-                            max_folder_depth = parseInt(value.ident);
+                            max_folder_depth = parseInt(value.ident)
                         }
-
-                        // Finalize
-                        newHtml += '<tr data-level="' + value.ident + '" class="' + (value.ident === 1 ? 'parent' : 'descendant') + '" data-id="' + value.id + '">' +
-                            '<td width="35px"><input type="checkbox" id="cb-' + value.id + '" data-id="' + value.id + '" class="folder-select"></td>' +
-                            '<td class="pointer modify folder-name" data-id="' + value.id + '" data-access="' + value.access + '">' + value.title + '</td>' +
-                            '<td class="font-italic pointer modify" data-id="' + value.id + '" data-access="' + value.access + '"><small class="text-muted">' + path + '</small></td>' +
-                            '<td class="pointer modify td-100 text-center" data-id="' + value.id + '" data-access="' + value.access + '">' + access + '</td>' +
-                            '<td class="hidden compare tp-borders td-100 text-center"></td>'
-                        '</tr>'
-                    });
-
-                    // Show result
-                    $('#role-details').html(
-                        '<table id="table-role-details" class="table table-hover table-striped table-responsive" style="width:100%"><tbody>' +
-                        newHtml +
-                        '</tbody></table>'
-                    );
-
-                    //iCheck for checkbox and radio inputs
-                    $('#role-details input[type="checkbox"]').iCheck({
-                        checkboxClass: 'icheckbox_flat-blue'
-                    });
-
-                    $('.infotip').tooltip();
-
-                    // Adapt select
-                    $('#folders-depth').empty().change();
-                    $('#folders-depth').append('<option value="all"><?php echo $lang->get('all'); ?></option>');
-                    for (x = 1; x < max_folder_depth; x++) {
-                        $('#folders-depth').append('<option value="' + x + '">' + x + '</option>');
                     }
-                    $('#folders-depth').val('all').change();
 
-                    // Inform user
-                    toastr.remove();
-                    toastr.info(
-                        '<?php echo $lang->get('done'); ?>',
-                        '', {
-                            timeOut: 1000
+                    tableBody.append(batchHtml)
+                    offset = end
+
+                    // Update progress bar
+                    const pct = total > 0 ? Math.round((offset / total) * 100) : 100
+                    $('#roles-load-progress .progress-bar').css('width', pct + '%').attr('aria-valuenow', pct)
+                    $('#roles-load-progress .roles-load-text').text(offset + ' / ' + total)
+
+                    if (offset < total) {
+                        // Yield to browser so it can paint the progress update
+                        setTimeout(renderBatch, 0)
+                    } else {
+                        // All rows rendered — finalize
+                        $('#role-details input[type="checkbox"]').iCheck({
+                            checkboxClass: 'icheckbox_flat-blue'
+                        })
+                        $('.infotip').tooltip()
+
+                        $('#folders-depth').empty().change()
+                        $('#folders-depth').append('<option value="all"><?php echo $lang->get('all'); ?></option>')
+                        for (let x = 1; x < max_folder_depth; x++) {
+                            $('#folders-depth').append('<option value="' + x + '">' + x + '</option>')
                         }
-                    );
+                        $('#folders-depth').val('all').change()
 
-                    // Now check if role comparision is enabled
-                    if ($('#folders-compare').val() !== '') {
-                        buildRoleCompare(store.get('teampassUser').compareRole);
+                        $('#roles-load-progress').hide()
+                        toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 2000, closeButton: true })
+
+                        // Re-apply comparison column if one is selected
+                        if ($('#folders-compare').val() !== '') {
+                            buildRoleCompare(store.get('teampassUser').compareRole)
+                        }
                     }
                 }
+
+                renderBatch()
             }
-        );
+        )
     }
 
     var operationOngoin = false;
@@ -360,430 +388,297 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
      * Handle the form for folder access rights change
      */
     var currentFolderEdited = '';
+    // Open the rights sidebar when the user clicks any cell of a matrix row
     $(document).on('click', '.modify', function() {
-        // Manage edition of rights card
-        if (currentFolderEdited !== '' && currentFolderEdited !== $(this).data('id')) {
-            $('.temp-row').remove();
-        } else if (currentFolderEdited === $(this).data('id')) {
-            $('.temp-row').remove();
-            currentFolderEdited = '';
-            return false;
-        }
-
-        // Init
-        var currentRow = $(this).closest('tr'),
-            folderAccess = $(this).data('access');
-        currentFolderEdited = $(this).data('id');
-
-        // Now show
-        $(currentRow).after(
-            '<tr class="temp-row"><td colspan="' + $(currentRow).children('td').length + '">' +
-            '<div class="card card-warning card-outline">' +
-            '<div class="card-body">' +
-            '<div class="form-group ml-2 mt-2"><?php echo $lang->get('right_types_label'); ?></div>' +
-            '<div class="form-group ml-2">' +
-            '<input type="radio" class="form-radio-input form-control ml-1" id="right-write" name="right" data-type="W">' +
-            '<label class="form-radio-label pointer mr-2" for="right-write"><?php echo $lang->get('write'); ?></label>' +
-            '<input type="radio" class="form-radio-input form-control ml-1" id="right-read" name="right" data-type="R">' +
-            '<label class="form-radio-label pointer mr-2" for="right-read"><?php echo $lang->get('read'); ?></label>' +
-            '<input type="radio" class="form-radio-input form-control ml-1" id="right-noaccess" name="right" data-type="">' +
-            '<label class="form-radio-label pointer" for="right-noaccess"><?php echo $lang->get('no_access'); ?></label>' +
-            '</div>' +
-            '<div class="form-group ml-2" id="folder-rights-tuned">' +
-            '<div class="form-check">' +
-            '<input type="checkbox" class="form-check-input form-control cb-right" id="right-no-delete">' +
-            '<label class="form-check-label pointer ml-2" for="right-no-delete"><?php echo $lang->get('role_cannot_delete_item'); ?></label>' +
-            '</div>' +
-            '<div class="form-check">' +
-            '<input type="checkbox" class="form-check-input form-control cb-right" id="right-no-edit">' +
-            '<label class="form-check-label pointer ml-2" for="right-no-edit"><?php echo $lang->get('role_cannot_edit_item'); ?></label>' +
-            '</div>' +
-            '</div>' +
-            '<div class="callout callout-danger">' +
-            '<div class="form-group mt-2">' +
-            '<input type="checkbox" class="form-check-input form-item-control" id="propagate-rights-to-descendants">' +
-            '<label class="form-check-label ml-2" for="propagate-rights-to-descendants">' +
-            '<?php echo $lang->get('propagate_rights_to_descendants'); ?>' +
-            '</label>' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-            '<div class="card-footer">' +
-            '<button type="button" class="btn btn-warning tp-action" data-action="submit" data-id="' + currentFolderEdited + '"><?php echo $lang->get('submit'); ?></button>' +
-            '<button type="button" class="btn btn-default float-right tp-action" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>' +
-            '</div>' +
-            '</div>' +
-            '</td></tr>'
-        );
-
-        // Prepare iCheck format for checkboxes
-        $('input[type="checkbox"].form-check-input, input[type="radio"].form-radio-input').iCheck({
-            radioClass: 'iradio_flat-orange',
-            checkboxClass: 'icheckbox_flat-orange',
-        });
-
-        // Uncheck the checkboxes
-        $('#right-no-delete').iCheck('uncheck');
-        $('#right-no-edit').iCheck('uncheck');
-
-        // Prepare radio and checkboxes depending on existing right on selected folder
-        if (folderAccess === 'R') {
-            $('#right-read').iCheck('check');
-            $('.cb-right').iCheck('disable');
-        } else if (folderAccess === 'none') {
-            $('#right-noaccess').iCheck('check');
-            $('.cb-right').iCheck('disable');
-        } else if (folderAccess === 'W') {
-            $('#right-write').iCheck('check');
-        } else if (folderAccess === 'ND') {
-            $('#right-write').iCheck('check');
-            $('#right-no-delete').iCheck('check');
-        } else if (folderAccess === 'NE') {
-            $('#right-write').iCheck('check');
-            $('#right-no-edit').iCheck('check');
-        } else if (folderAccess === 'NDNE') {
-            $('#right-write').iCheck('check');
-            $('#right-no-edit, #right-no-delete').iCheck('check');
-        }
-    });
+        var folderId = $(this).data('id')
+        var folderAccess = $(this).data('access')
+        var folderTitle = $(this).closest('tr').find('.folder-name').text()
+        openRightsSidebar(folderId, folderAccess, folderTitle)
+    })
 
     /**
-     * Handle the rights change buttons
+     * Open the rights edit sidebar for a given folder.
+     */
+    function openRightsSidebar(folderId, folderAccess, folderTitle) {
+        _sidebarFolderId = folderId
+
+        // Highlight the row being edited
+        $('#table-role-details tbody tr').removeClass('editing-active')
+        $('tr[data-id="' + folderId + '"]').addClass('editing-active')
+
+        // Header: show folder name or count when multi-selection is active
+        var checkedCount = $('input.folder-select:checked').not('#cb-all-selection').length
+        if (checkedCount > 1) {
+            $('#sidebar-role-icon').removeClass('fa-graduation-cap').addClass('fa-layer-group')
+            $('#sidebar-role-info').text(checkedCount + ' <?php echo $lang->get('folders'); ?>')
+        } else {
+            $('#sidebar-role-icon').removeClass('fa-layer-group').addClass('fa-graduation-cap')
+            $('#sidebar-role-info').text(folderTitle)
+        }
+
+        // Reset all controls to a clean state
+        $('#sb-right-no-delete, #sb-right-no-edit').iCheck('uncheck')
+        $('#sb-right-no-delete, #sb-right-no-edit').iCheck('disable')
+        $('#sb-propagate-rights').iCheck('uncheck')
+
+        // Pre-fill based on current access level
+        if (folderAccess === 'R') {
+            $('#sb-right-read').iCheck('check')
+        } else if (folderAccess === 'none' || folderAccess === '') {
+            $('#sb-right-noaccess').iCheck('check')
+        } else if (folderAccess === 'W') {
+            $('#sb-right-write').iCheck('check')
+            $('#sb-right-no-delete, #sb-right-no-edit').iCheck('enable')
+        } else if (folderAccess === 'ND') {
+            $('#sb-right-write').iCheck('check')
+            $('#sb-right-no-delete, #sb-right-no-edit').iCheck('enable')
+            $('#sb-right-no-delete').iCheck('check')
+        } else if (folderAccess === 'NE') {
+            $('#sb-right-write').iCheck('check')
+            $('#sb-right-no-delete, #sb-right-no-edit').iCheck('enable')
+            $('#sb-right-no-edit').iCheck('check')
+        } else if (folderAccess === 'NDNE') {
+            $('#sb-right-write').iCheck('check')
+            $('#sb-right-no-delete, #sb-right-no-edit').iCheck('enable')
+            $('#sb-right-no-delete, #sb-right-no-edit').iCheck('check')
+        }
+
+        // Slide in
+        $('#role-edit-overlay').fadeIn(200)
+        $('#role-edit-sidebar').addClass('open')
+    }
+
+    /**
+     * Close the rights edit sidebar.
+     */
+    function closeRightsSidebar() {
+        $('#role-edit-sidebar').removeClass('open')
+        $('#role-edit-overlay').fadeOut(200)
+        $('#table-role-details tbody tr').removeClass('editing-active')
+        _sidebarFolderId = ''
+    }
+
+    // Sidebar close triggers
+    $('#sidebar-role-close, #sidebar-role-cancel').on('click', closeRightsSidebar)
+    $('#role-edit-overlay').on('click', closeRightsSidebar)
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $('#role-edit-sidebar').hasClass('open')) {
+            closeRightsSidebar()
+        }
+    })
+
+    // Sidebar submit
+    $('#sidebar-role-submit').on('click', function() {
+        toastr.remove()
+        toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>')
+
+        // Collect selected folder IDs; fall back to the clicked folder if none selected
+        var selectedFolders = []
+        $('input.folder-select:checked').not('#cb-all-selection').each(function() {
+            selectedFolders.push($(this).data('id'))
+        })
+        if (selectedFolders.length === 0) {
+            selectedFolders.push(_sidebarFolderId)
+        }
+
+        // Determine access type
+        var access = $('input[name=sb-right]:checked').data('type')
+        if ($('#sb-right-no-delete').is(':checked') === true && $('#sb-right-no-edit').is(':checked') === true) {
+            access = 'NDNE'
+        } else if ($('#sb-right-no-delete').is(':checked') === true) {
+            access = 'ND'
+        } else if ($('#sb-right-no-edit').is(':checked') === true) {
+            access = 'NE'
+        }
+
+        var postData = {
+            'roleId': $('#roles-list').val(),
+            'selectedFolders': selectedFolders,
+            'access': access,
+            'propagate': $('#sb-propagate-rights').is(':checked') === true ? 1 : 0,
+        }
+
+        closeRightsSidebar()
+
+        $.post(
+            'sources/roles.queries.php', {
+                type: 'change_access_right_on_folder',
+                data: prepareExchangedData(JSON.stringify(postData), 'encode', '<?php echo $session->get('key'); ?>'),
+                key: '<?php echo $session->get('key'); ?>'
+            },
+            function(data) {
+                data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>')
+                if (data.error === true) {
+                    toastr.remove()
+                    toastr.error(data.message, '', { timeOut: 5000, progressBar: true })
+                } else {
+                    refreshMatrix($('#roles-list').val())
+                    toastr.remove()
+                }
+            }
+        )
+    })
+
+    // Focus label input when the role definition modal opens
+    $('#modal-role-definition').on('shown.bs.modal', function() {
+        $('#form-role-label').trigger('focus')
+    })
+    // Reset delete checkbox when deletion modal is hidden
+    $('#modal-role-deletion').on('hidden.bs.modal', function() {
+        $('#form-role-delete').iCheck('uncheck')
+    })
+
+    /**
+     * Handle toolbar and form buttons
      */
     $(document).on('click', 'button', function() {
-        // Init
-        var selectedFolderText = $('#roles-list').find(':selected').text();
-        console.log("Click: "+$(this).data('action'));
+        var selectedFolderText = $('#roles-list').find(':selected').text()
 
-        if ($(this).data('action') === 'cancel-edition') {
-            $('#card-role-definition').addClass('hidden');
-            $('#card-role-details, #card-role-selection').removeClass('hidden');
-            $('#form-role-label').val('');
-            $('#form-role-delete').iCheck('uncheck');
+        if ($(this).data('action') === 'new') {
+            // Open modal for new role (blank form)
+            $('#modal-role-definition-header').text('<?php echo $lang->get('new'); ?>')
+            $('#form-role-label').val('')
+            $('#form-role-privilege').iCheck('uncheck')
+            $('#form-complexity-list').val('').trigger('change')
+            store.update('teampassApplication', function(app) { app.formUserAction = 'add_role' })
+            $('#modal-role-definition').modal('show')
 
-        } else if ($(this).data('action') === 'cancel-deletion') {
-            $('#card-role-details, #card-role-selection').removeClass('hidden');
-            $('#card-role-deletion').addClass('hidden');
-            $('#form-role-delete').iCheck('uncheck');
-            $('#form-role-delete').iCheck('uncheck');
+        } else if ($(this).data('action') === 'edit' && $('#button-edit').hasClass('disabled') === false) {
+            // Open modal pre-filled with current role values
+            $('#modal-role-definition-header').text('<?php echo $lang->get('edit'); ?> - ' + selectedFolderText)
+            $('#form-role-label').val(selectedFolderText)
+            $('#form-complexity-list').val($('#roles-list').find(':selected').data('complexity')).trigger('change')
+            if (parseInt($('#roles-list').find(':selected').data('allow-edit-all')) === 1) {
+                $('#form-role-privilege').iCheck('check')
+            } else {
+                $('#form-role-privilege').iCheck('uncheck')
+            }
+            store.update('teampassApplication', function(app) { app.formUserAction = 'edit_role' })
+            $('#modal-role-definition').modal('show')
 
-        } else if ($(this).data('action') === 'cancel-ldap') {
-            $('#card-role-selection').removeClass('hidden');
-            $('#card-roles-ldap-sync').addClass('hidden');
-            //$('#form-role-delete').iCheck('uncheck');
-            //$('#form-role-delete').iCheck('uncheck');
+        } else if ($(this).data('action') === 'delete' && $('#button-delete').hasClass('disabled') === false) {
+            // Open deletion confirmation modal
+            var safeText = $('<div>').text(selectedFolderText).html()
+            $('#span-role-delete').html('<b>' + safeText + '</b>')
+            $('#modal-role-deletion').modal('show')
+
+        } else if ($(this).data('action') === 'ldap') {
+            // Open LDAP sync modal and load groups
+            $('#modal-roles-ldap-sync').modal('show')
+            refreshLdapGroups()
+
+        } else if ($(this).data('action') === 'ldap-refresh') {
+            refreshLdapGroups()
 
         } else if ($(this).data('action') === 'submit-edition') {
-            // STORE ROLE CHANGES
+            // Save new or edited role
+            toastr.remove()
+            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>')
 
-            // Show spinner
-            toastr.remove();
-            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>');
+            var value = fieldDomPurifierWithWarning('#form-role-label')
+            if (value === false) { return false }
+            $('#form-role-label').val(value)
 
-            // Sanitize value
-            value = fieldDomPurifierWithWarning('#form-role-label');
-            if (value === false) {
-                return false;
-            }
-            $('#form-role-label').val(value);
-
-            // Prepare data
             var data = {
                 'label': value,
                 'complexity': $('#form-complexity-list').val() === null ? 0 : $('#form-complexity-list').val(),
                 'folderId': $('#roles-list').find(':selected').val(),
-                'allowEdit': $('#form-role-privilege').is(":checked") === true ? 1 : 0,
+                'allowEdit': $('#form-role-privilege').is(':checked') === true ? 1 : 0,
                 'action': store.get('teampassApplication').formUserAction
             }
-            var oldLabel = selectedFolderText;
-            console.log(data);
 
-            // Launch action
             $.post(
                 'sources/roles.queries.php', {
                     type: 'change_role_definition',
-                    data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>"),
-                    key: '<?php echo $session->get('key'); ?>'
-                },
-                function(data) { //decrypt data
-                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>');                    
-                    console.log('DID CHANGES')
-                    console.log(data);
-
-                    if (data.error === true) {
-                        // ERROR
-                        toastr.remove();
-                        toastr.error(
-                            data.message,
-                            '', {
-                                timeOut: 5000,
-                                progressBar: true
-                            }
-                        );
-                    } else {
-                        if (store.get('teampassApplication').formUserAction === 'edit_role') {
-                            // Adapt card header
-                            $('#role-detail-header').html(
-                                $('#form-role-label').val() +
-                                '<i class="' + data.icon + ' infotip ml-3" ' +
-                                'title="<?php echo $lang->get('complexity'); ?>: ' +
-                                $('#form-complexity-list').find(':selected').text() + '"></i>' +
-                                (parseInt(data.allow_pw_change) === 1 ?
-                                    '<i class="ml-3 fas fa-exclamation-triangle text-warning infotip" ' +
-                                    'title="<?php echo $lang->get('role_can_edit_any_visible_item'); ?>"></i>' :
-                                    '')
-                            );
-                            $('.infotip').tooltip();
-                        } else {
-                            // Add new folder to roles listbox
-                            var newOption = new Option(
-                                $('#form-role-label').val(),
-                                data.new_role_id,
-                                false,
-                                true
-                            );
-                            $('#roles-list').append(newOption).trigger('change');
-                        }
-
-                        // Manage change in select
-                        $("#roles-list").select2("destroy");
-                        var selectedOption = $('#roles-list option[value=' + $('#roles-list').find(':selected').val() + ']');
-                        selectedOption.text($('#form-role-label').val());
-                        selectedOption.data('allow-edit-all', data.allow_pw_change);
-                        selectedOption.data('complexity-text', data.text);
-                        selectedOption.data('complexity-icon', data.icon);
-                        selectedOption.data('complexity', data.value);
-                        $("#roles-list").select2();
-
-                        // Misc
-                        $('#card-role-definition').addClass('hidden');
-                        $('#card-role-details, #card-role-selection').removeClass('hidden');
-                        $('#form-role-label').val('');
-
-                        // OK
-                        toastr.remove();
-                        toastr.info(
-                            '<?php echo $lang->get('done'); ?>',
-                            '', {
-                                timeOut: 1000
-                            }
-                        );
-                    }
-                }
-            );
-            //---
-        } else if ($(this).data('action') === 'edit' && $('#button-edit').hasClass('disabled') === false) {
-            // SHOW ROLE EDITION FORM
-            if ($('#card-role-details').hasClass('hidden') === false) {
-                $('#form-role-label').val(selectedFolderText);
-                $('#form-complexity-list').val($('#roles-list').find(':selected').data('complexity')).trigger('change');
-
-                if (parseInt($('#roles-list').find(':selected').data('allow-edit-all')) === 1) {
-                    $('#form-role-privilege').iCheck('check');
-                } else {
-                    $('#form-role-privilege').iCheck('uncheck');
-                }
-
-                // What type of form? Edit or new user
-                store.update(
-                    'teampassApplication',
-                    function(teampassApplication) {
-                        teampassApplication.formUserAction = 'edit_role';
-                    }
-                );
-
-                // Show form
-                $('#card-role-definition').removeClass('hidden');                
-                $('#card-role-deletion, #card-role-details, #card-role-selection').addClass('hidden');
-                $('#form-role-label').focus();
-            }
-            //---
-        } else if ($(this).data('action') === 'delete' && $('#button-delete').hasClass('disabled') === false) {
-            // SHOW ROLE DELETION FORM
-            if ($('#card-role-details').hasClass('hidden') === false) {
-                selectedFolderText = $('<div>').text(selectedFolderText).html();
-                $('#span-role-delete').html('- <?php echo $lang->get('role'); ?> <b>' + selectedFolderText + '</b>');
-
-                $('#card-role-deletion').removeClass('hidden');
-                $('#card-role-definition, #card-role-details, #card-role-selection').addClass('hidden');
-            }
-        
-        } else if ($(this).data('action') === 'ldap') {
-            // SHOW LDAP SYNC FORM
-            console.log('LDAP SYNC');
-            if ($('#card-roles-ldap-sync').hasClass('hidden') === true) {
-                //$('#span-role-delete').html('- <?php echo $lang->get('role'); ?> <b>' + selectedFolderText + '</b>');
-
-                $('#card-roles-ldap-sync').removeClass('hidden');
-                $('#card-role-definition, #card-role-details, #card-role-selection').addClass('hidden');
-
-                refreshLdapGroups();
-            }
-
-        } else if ($(this).data('action') === 'ldap-refresh') {
-            // REFRESH LDAP GROUPS LIST
-            refreshLdapGroups();
-
-        } else if ($(this).data('action') === 'new') {
-            // SHOW NEW FOLDER DEFINITION
-            $('#form-role-label').val('');
-            $('#form-role-privilege').iCheck('uncheck');
-            $("#form-complexity-list").val('').trigger('change');
-
-            // What type of form? Edit or new user
-            store.update(
-                'teampassApplication',
-                function(teampassApplication) {
-                    teampassApplication.formUserAction = 'add_role';
-                }
-            );
-
-            $('#card-role-definition').removeClass('hidden');
-            $('#card-role-deletion, #card-role-details, #card-role-selection').addClass('hidden');
-            $('#form-role-label').focus();
-            //---
-        } else if ($(this).data('action') === 'cancel') {
-            $('.temp-row').remove();
-            //---
-        } else if ($(this).data('action') === 'submit') {
-            // Store the new access rights for the selected folder(s)
-
-            // Show spinner
-            toastr.remove();
-            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>');
-
-            // Get list of selected folders
-            var selectedFolders = [];
-            $("input:checkbox[class=folder-select]:checked").each(function() {
-                selectedFolders.push($(this).data('id'));
-            });
-            if (selectedFolders.length === 0) {
-                selectedFolders.push($(this).data('id'));
-            }
-
-            // Get defined rights
-            var access = $('input[name=right]:checked').data('type');
-            if ($('#right-no-delete').is(':checked') === true &&
-                $('#right-no-edit').is(':checked') === true
-            ) {
-                access = 'NDNE';
-            } else if ($('#right-no-delete').is(':checked') === true &&
-                $('#right-no-edit').is(':checked') === false
-            ) {
-                access = 'ND';
-            } else if ($('#right-no-delete').is(':checked') === false &&
-                $('#right-no-edit').is(':checked') === true
-            ) {
-                access = 'NE';
-            }
-
-            // Prepare data
-            var data = {
-                'roleId': $('#roles-list').val(),
-                'selectedFolders': selectedFolders,
-                'access': access,
-                'propagate': $('#propagate-rights-to-descendants').is(':checked') === true ? 1 : 0,
-            }
-            console.log(data)
-            // Launch action
-            $.post(
-                'sources/roles.queries.php', {
-                    type: 'change_access_right_on_folder',
-                    data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>"),
-                    key: '<?php echo $session->get('key'); ?>'
-                },
-                function(data) { //decrypt data
-                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>');
-
-                    if (data.error === true) {
-                        // ERROR
-                        toastr.remove();
-                        toastr.error(
-                            data.message,
-                            '', {
-                                timeOut: 5000,
-                                progressBar: true
-                            }
-                        );
-                    } else {
-                        refreshMatrix($('#roles-list').val());
-
-                        // OK
-                        toastr.remove();
-                        toastr.info(
-                            '<?php echo $lang->get('done'); ?>',
-                            '', {
-                                timeOut: 1000
-                            }
-                        );
-                    }
-                }
-            );
-        } else if ($(this).data('action') === 'submit-deletion') {
-            // DELETE SELECTED ROLE
-
-            if ($('#form-role-delete').is(':checked') === false) {
-                return false;
-            }
-
-            // Show spinner
-            toastr.remove();
-            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>');
-
-            // Prepare data
-            var data = {
-                'roleId': $('#roles-list').find(':selected').val(),
-            }
-
-            // Launch action
-            $.post(
-                'sources/roles.queries.php', {
-                    type: 'delete_role',
-                    data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>"),
+                    data: prepareExchangedData(JSON.stringify(data), 'encode', '<?php echo $session->get('key'); ?>'),
                     key: '<?php echo $session->get('key'); ?>'
                 },
                 function(data) {
-                    //decrypt data
-                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>');
+                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>')
 
                     if (data.error === true) {
-                        // ERROR
-                        toastr.remove();
-                        toastr.error(
-                            data.message,
-                            '', {
-                                timeOut: 5000,
-                                progressBar: true
-                            }
-                        );
+                        toastr.remove()
+                        toastr.error(data.message, '', { timeOut: 5000, progressBar: true })
                     } else {
-                        // Manage change in select
-                        $("#roles-list").select2("destroy");
-                        var selectedOption = $('#roles-list option[value=' + $('#roles-list').find(':selected').val() + ']');
-                        selectedOption.remove();
-                        $("#roles-list").select2({
+                        $('#modal-role-definition').modal('hide')
+
+                        if (store.get('teampassApplication').formUserAction === 'edit_role') {
+                            $('#role-detail-header').html(
+                                $('#form-role-label').val() +
+                                '<i class="' + data.icon + ' infotip ml-3" title="<?php echo $lang->get('complexity'); ?>: ' +
+                                $('#form-complexity-list').find(':selected').text() + '"></i>' +
+                                (parseInt(data.allow_pw_change) === 1 ?
+                                    '<i class="ml-3 fas fa-exclamation-triangle text-warning infotip" title="<?php echo $lang->get('role_can_edit_any_visible_item'); ?>"></i>' : '')
+                            )
+                            $('.infotip').tooltip()
+                        } else {
+                            var newOption = new Option($('#form-role-label').val(), data.new_role_id, false, true)
+                            $('#roles-list').append(newOption).trigger('change')
+                        }
+
+                        // Update the select2 option metadata
+                        $('#roles-list').select2('destroy')
+                        var selectedOption = $('#roles-list option[value=' + $('#roles-list').find(':selected').val() + ']')
+                        selectedOption.text($('#form-role-label').val())
+                        selectedOption.data('allow-edit-all', data.allow_pw_change)
+                        selectedOption.data('complexity-text', data.text)
+                        selectedOption.data('complexity-icon', data.icon)
+                        selectedOption.data('complexity', data.value)
+                        $('#roles-list').select2({
                             language: '<?php echo $session->get('user-language_code'); ?>',
                             placeholder: '<?php echo $lang->get('select_a_role'); ?>',
                             allowClear: true
-                        });
+                        })
 
-                        // Misc
-                        $('#card-role-deletion, #card-role-details').addClass('hidden');
-                        $('#card-role-selection').removeClass('hidden');
-                        $('#form-role-delete').iCheck('uncheck');
-
-                        // OK
-                        toastr.remove();
-                        toastr.info(
-                            '<?php echo $lang->get('done'); ?>',
-                            '', {
-                                timeOut: 1000
-                            }
-                        );
+                        toastr.remove()
+                        toastr.info('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
                     }
                 }
-            );
-            //---
+            )
+
+        } else if ($(this).data('action') === 'submit-deletion') {
+            // Delete the selected role
+            if ($('#form-role-delete').is(':checked') === false) { return false }
+
+            toastr.remove()
+            toastr.info('<?php echo $lang->get('in_progress'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>')
+
+            var data = { 'roleId': $('#roles-list').find(':selected').val() }
+
+            $.post(
+                'sources/roles.queries.php', {
+                    type: 'delete_role',
+                    data: prepareExchangedData(JSON.stringify(data), 'encode', '<?php echo $session->get('key'); ?>'),
+                    key: '<?php echo $session->get('key'); ?>'
+                },
+                function(data) {
+                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>')
+
+                    if (data.error === true) {
+                        toastr.remove()
+                        toastr.error(data.message, '', { timeOut: 5000, progressBar: true })
+                    } else {
+                        $('#modal-role-deletion').modal('hide')
+
+                        // Remove deleted role from select and hide matrix
+                        $('#roles-list').select2('destroy')
+                        $('#roles-list option[value=' + $('#roles-list').find(':selected').val() + ']').remove()
+                        $('#roles-list').select2({
+                            language: '<?php echo $session->get('user-language_code'); ?>',
+                            placeholder: '<?php echo $lang->get('select_a_role'); ?>',
+                            allowClear: true
+                        })
+                        $('#card-role-details').addClass('hidden')
+                        $('#button-edit, #button-delete').addClass('disabled')
+
+                        toastr.remove()
+                        toastr.info('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
+                    }
+                }
+            )
+
+        } else if ($(this).data('action') === 'cancel') {
+            $('.temp-row').remove()
 
         } else if ($(this).data('action') === 'do-adgroup-role-mapping') {
             var groupId = $(this).data('id'),
@@ -966,16 +861,16 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     });
 
     /**
-     * Handle the user rights choices
+     * Enable/disable granular right checkboxes based on selected radio (W vs R/none)
      */
     $(document).on('ifChecked', '.form-radio-input', function() {
         if ($(this).data('type') === 'W') {
-            $('.cb-right').iCheck('enable');
+            $('.cb-sb-right').iCheck('enable')
         } else {
-            $('.cb-right').iCheck('disable');
-            $('.cb-right').iCheck('uncheck');
+            $('.cb-sb-right').iCheck('disable')
+            $('.cb-sb-right').iCheck('uncheck')
         }
-    });
+    })
 
     /**
      * Handle option when role is displayed

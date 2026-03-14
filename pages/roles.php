@@ -124,7 +124,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                         
                     </div><!-- /.card-header -->
                     <div class="card-body">
-                        <div class="form-group" id="card-role-selection">
+                        <div class="form-group mb-0" id="card-role-selection">
                             <select id="roles-list" class="form-control form-item-control select2" style="width:100%;">
                                 <option></option>
                                 <?php
@@ -146,98 +146,6 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                                 ?>
                             </select>
                         </div>
-
-                        <div class="card hidden card-info" id="card-role-definition">
-                            <div class="card-header">
-                                <h5><?php echo $lang->get('role_definition'); ?></h5>
-                            </div><!-- /.card-header -->
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label for="form-role-label"><?php echo $lang->get('label'); ?></label>
-                                    <input type="text" class="form-control" id="form-role-label" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="form-complexity-list"><?php echo $lang->get('complexity'); ?></label>
-                                    <select id="form-complexity-list" class="form-control form-item-control select2" style="width:100%;">
-                                        <?php
-                                        foreach (TP_PW_COMPLEXITY as $entry) {
-                                            echo '
-                                        <option value="' . $entry[0] . '">' . addslashes($entry[1]) . '</option>';
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-                                <div class="form-group mt-2">
-                                    <input type="checkbox" class="form-check-input form-item-control" id="form-role-privilege">
-                                    <label class="form-check-label ml-2" for="form-role-privilege">
-                                        <?php echo $lang->get('role_can_edit_any_visible_item'); ?>
-                                    </label>
-                                    <small class='form-text text-muted'>
-                                        <?php echo $lang->get('role_can_edit_any_visible_item_tip'); ?>
-                                    </small>
-                                </div>
-                            </div>
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-info tp-action" data-action="submit-edition"><?php echo $lang->get('submit'); ?></button>
-                                <button type="button" class="btn btn-default float-right tp-action" data-action="cancel-edition"><?php echo $lang->get('cancel'); ?></button>
-                            </div>
-                        </div>
-
-                        <div class="card hidden card-danger" id="card-role-deletion">
-                            <div class="card-header">
-                                <h5><?php echo $lang->get('caution'); ?></h5>
-                            </div><!-- /.card-header -->
-                            <div class="card-body">
-                                <div class="form-group mt-2">
-                                    <input type="checkbox" class="form-check-input form-item-control" id="form-role-delete">
-                                    <label class="form-check-label ml-2" for="form-role-delete">
-                                        <?php echo $lang->get('please_confirm_deletion'); ?><span class="ml-2" id="span-role-delete"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-danger tp-action" data-action="submit-deletion"><?php echo $lang->get('submit'); ?></button>
-                                <button type="button" class="btn btn-default float-right tp-action" data-action="cancel-deletion"><?php echo $lang->get('cancel'); ?></button>
-                            </div>
-                        </div>
-
-                        <!-- LDAP SYNC FORM -->
-                        <?php
-                        if (isset($SETTINGS['enable_ad_users_with_ad_groups']) === true && (int) $SETTINGS['enable_ad_users_with_ad_groups'] === 1 && (int) $session->get('user-admin') === 1) {
-                            ?>
-                        <div class="card hidden card-info" id="card-roles-ldap-sync">
-                            <div class="card-header">
-                                <h5>
-                                    <?php echo $lang->get('ad_groupe_and_roles_mapping'); ?>
-                                    <button type="button" class="btn btn-primary btn-sm tp-action ml-2" data-action="ldap-refresh">
-                                        <i class="fa-solid fa-sync-alt mr-2"></i><?php echo $lang->get('refresh'); ?>
-                                    </button>
-                                </h5>
-                            </div><!-- /.card-header -->
-                            <div class="card-body">
-                                
-                                <div class="card-body table-responsive p-0" id="ldap-groups-table">
-                                    <table class="table table-hover table-responsive">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 25%;"><i class="fa-solid fa-people-group mr-1"></i><?php echo $lang->get('ad_group'); ?></th>
-                                                <th style="width: 25pw;"></th>
-                                                <th><i class="fa-solid fa-graduation-cap mr-1"></i><?php echo $lang->get('mapped_with_role'); ?></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="row-ldap-body">
-                                        </tbody>
-                                    </table>
-                                </div>
-                            
-                            </div>
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-default float-right tp-action" data-action="cancel-ldap"><?php echo $lang->get('cancel'); ?></button>
-                            </div>
-                        </div>
-                            <?php
-                        } ?>
-
                     </div>
                 </div>
             </div>
@@ -287,6 +195,14 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                             </div>
                         </div>
                     </div>
+                    <!-- Matrix loading progress bar -->
+                    <div id="roles-load-progress" class="mt-2 mb-0 px-3" style="display:none">
+                        <div class="progress" style="height:18px">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <small class="text-muted roles-load-text mt-1 d-block"></small>
+                    </div>
                     <div class="card-body">
                         <div class="table-responsive" id="role-details">
                             &nbsp;
@@ -298,3 +214,247 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
         </div>
     </div>
 </section>
+
+<!-- Modal: New / Edit role definition -->
+<div class="modal fade" id="modal-role-definition" tabindex="-1" role="dialog" aria-labelledby="modal-role-definition-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info">
+                <h5 class="modal-title text-white" id="modal-role-definition-title">
+                    <i class="fas fa-graduation-cap mr-2"></i>
+                    <span id="modal-role-definition-header"><?php echo $lang->get('role_definition'); ?></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="<?php echo $lang->get('close'); ?>">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="form-role-label"><?php echo $lang->get('label'); ?></label>
+                    <input type="text" class="form-control" id="form-role-label" required>
+                </div>
+                <div class="form-group">
+                    <label for="form-complexity-list"><?php echo $lang->get('complexity'); ?></label>
+                    <select id="form-complexity-list" class="form-control form-item-control select2" style="width:100%;">
+                        <?php
+                        foreach (TP_PW_COMPLEXITY as $entry) {
+                            echo '<option value="' . $entry[0] . '">' . addslashes($entry[1]) . '</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div class="form-group mt-2">
+                    <input type="checkbox" class="form-check-input form-item-control" id="form-role-privilege">
+                    <label class="form-check-label ml-2" for="form-role-privilege">
+                        <?php echo $lang->get('role_can_edit_any_visible_item'); ?>
+                    </label>
+                    <small class="form-text text-muted">
+                        <?php echo $lang->get('role_can_edit_any_visible_item_tip'); ?>
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-info tp-action" data-action="submit-edition">
+                    <i class="fas fa-save mr-1"></i><?php echo $lang->get('submit'); ?>
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Delete role confirmation -->
+<div class="modal fade" id="modal-role-deletion" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger">
+                <h5 class="modal-title text-white">
+                    <i class="fas fa-exclamation-triangle mr-2"></i><?php echo $lang->get('caution'); ?>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="<?php echo $lang->get('close'); ?>">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group mt-2">
+                    <input type="checkbox" class="form-check-input form-item-control" id="form-role-delete">
+                    <label class="form-check-label ml-2" for="form-role-delete">
+                        <?php echo $lang->get('please_confirm_deletion'); ?>
+                        <span class="ml-1 font-weight-bold" id="span-role-delete"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger tp-action" data-action="submit-deletion">
+                    <i class="fas fa-trash mr-1"></i><?php echo $lang->get('submit'); ?>
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if (isset($SETTINGS['enable_ad_users_with_ad_groups']) === true && (int) $SETTINGS['enable_ad_users_with_ad_groups'] === 1 && (int) $session->get('user-admin') === 1): ?>
+<!-- Modal: LDAP synchronization -->
+<div class="modal fade" id="modal-roles-ldap-sync" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-info">
+                <h5 class="modal-title text-white">
+                    <i class="fa-solid fa-address-card mr-2"></i><?php echo $lang->get('ad_groupe_and_roles_mapping'); ?>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="<?php echo $lang->get('close'); ?>">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-2 border-bottom">
+                    <button type="button" class="btn btn-primary btn-sm tp-action" data-action="ldap-refresh">
+                        <i class="fa-solid fa-sync-alt mr-2"></i><?php echo $lang->get('refresh'); ?>
+                    </button>
+                </div>
+                <div class="table-responsive" id="ldap-groups-table">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:35%"><i class="fa-solid fa-people-group mr-1"></i><?php echo $lang->get('ad_group'); ?></th>
+                                <th style="width:8%"></th>
+                                <th><i class="fa-solid fa-graduation-cap mr-1"></i><?php echo $lang->get('mapped_with_role'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody id="row-ldap-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('close'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Role rights edit sidebar -->
+<div id="role-edit-sidebar">
+    <div class="d-flex align-items-center justify-content-between p-3 sidebar-header">
+        <h6 class="mb-0">
+            <i class="fas fa-graduation-cap mr-2 text-warning" id="sidebar-role-icon"></i>
+            <span id="sidebar-role-info" class="font-weight-bold"></span>
+        </h6>
+        <button type="button" id="sidebar-role-close" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="p-3">
+        <div class="form-group">
+            <label><?php echo $lang->get('right_types_label'); ?></label>
+            <div class="mt-1">
+                <input type="radio" class="form-radio-input" id="sb-right-write" name="sb-right" data-type="W">
+                <label class="form-radio-label pointer mr-3" for="sb-right-write"><?php echo $lang->get('write'); ?></label>
+                <input type="radio" class="form-radio-input" id="sb-right-read" name="sb-right" data-type="R">
+                <label class="form-radio-label pointer mr-3" for="sb-right-read"><?php echo $lang->get('read'); ?></label>
+                <input type="radio" class="form-radio-input" id="sb-right-noaccess" name="sb-right" data-type="">
+                <label class="form-radio-label pointer" for="sb-right-noaccess"><?php echo $lang->get('no_access'); ?></label>
+            </div>
+        </div>
+        <div class="form-group mt-3" id="sb-folder-rights-tuned">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input cb-sb-right" id="sb-right-no-delete">
+                <label class="form-check-label ml-2" for="sb-right-no-delete"><?php echo $lang->get('role_cannot_delete_item'); ?></label>
+            </div>
+            <div class="form-check mt-1">
+                <input type="checkbox" class="form-check-input cb-sb-right" id="sb-right-no-edit">
+                <label class="form-check-label ml-2" for="sb-right-no-edit"><?php echo $lang->get('role_cannot_edit_item'); ?></label>
+            </div>
+        </div>
+        <div class="callout callout-danger mt-3">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="sb-propagate-rights">
+                <label class="form-check-label ml-2" for="sb-propagate-rights">
+                    <?php echo $lang->get('propagate_rights_to_descendants'); ?>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="p-3 sidebar-footer border-top">
+        <button type="button" class="btn btn-warning" id="sidebar-role-submit">
+            <i class="fas fa-save mr-1"></i><?php echo $lang->get('submit'); ?>
+        </button>
+        <button type="button" class="btn btn-default float-right" id="sidebar-role-cancel">
+            <?php echo $lang->get('cancel'); ?>
+        </button>
+    </div>
+</div>
+<div id="role-edit-overlay"></div>
+
+<style>
+/* Progress bar: no transition so bar stays in sync with counter */
+#roles-load-progress .progress-bar { transition: none; }
+
+#role-edit-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 390px;
+    height: 100vh;
+    background: #fff;
+    color: #212529;
+    border-left: 3px solid #ffc107;
+    box-shadow: -4px 0 20px rgba(0,0,0,.15);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+}
+#role-edit-sidebar.open { transform: translateX(0); }
+#role-edit-sidebar .sidebar-header { background: #fffbf0; border-bottom: 1px solid #fde8a0; flex-shrink: 0; }
+#role-edit-sidebar .p-3:nth-child(2) { overflow-y: auto; flex: 1; }
+#role-edit-sidebar .sidebar-footer { flex-shrink: 0; background: #f8f9fa; border-top-color: #dee2e6 !important; }
+#role-edit-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.25);
+    z-index: 1049;
+}
+#table-role-details tbody tr.editing-active { background-color: #fffbf0 !important; }
+
+/* iCheck elements inside sidebar: flex layout so label and widget align */
+#role-edit-sidebar .form-check {
+    display: flex;
+    align-items: center;
+    padding-left: 0;
+    gap: 0.5rem;
+}
+#role-edit-sidebar .form-check .icheckbox_flat-orange,
+#role-edit-sidebar .form-check .iradio_flat-orange { flex-shrink: 0; }
+#role-edit-sidebar .form-check label { margin-bottom: 0; }
+
+/* Dark mode overrides */
+.dark-mode #role-edit-sidebar {
+    background: #343a40;
+    color: #fff;
+    border-left-color: #f39c12;
+    box-shadow: -4px 0 20px rgba(0,0,0,.4);
+}
+.dark-mode #role-edit-sidebar .sidebar-header {
+    background: #3a3f47;
+    border-bottom-color: #4c5158 !important;
+}
+.dark-mode #role-edit-sidebar .sidebar-footer {
+    background: #2d3238;
+    border-top-color: #4c5158 !important;
+}
+.dark-mode #role-edit-sidebar label { color: #ced4da; }
+.dark-mode #role-edit-sidebar .btn-outline-secondary {
+    color: #adb5bd;
+    border-color: #6c757d;
+}
+.dark-mode #role-edit-sidebar .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: #fff;
+}
+.dark-mode #table-role-details tbody tr.editing-active { background-color: #3d3a28 !important; }
+</style>

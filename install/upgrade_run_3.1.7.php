@@ -153,6 +153,29 @@ mysqli_query(
 );
 // --->
 
+
+// <---
+// ==========================================
+// Options page: Favorites storage for administrators
+// ==========================================
+mysqli_query(
+    $db_link,
+    'CREATE TABLE IF NOT EXISTS `' . $pre . "users_options_favorites` (
+            `id` INT(12) NOT NULL AUTO_INCREMENT,
+            `user_id` INT(12) NOT NULL,
+            `option_key` VARCHAR(100) NOT NULL,
+            `position` INT(12) NOT NULL DEFAULT 1,
+            `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_user_option` (`user_id`, `option_key`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_user_position` (`user_id`, `position`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='Options page favorites stored per administrator';"
+);
+// --->
+
 // <---
 // ==========================================
 // roles_values: Clean up duplicates and add UNIQUE constraint

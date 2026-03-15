@@ -460,7 +460,7 @@ function identUser(
 
 /**
  * Resolve the effective access level when a user has multiple roles on the same folder.
- * The most permissive type wins (W > ND > NE > NDNE = R).
+ * The least permissive type wins (R > NDNE > {ND, NE} > W).
  * Special case: ND + NE combine into NDNE (both restrictions apply).
  *
  * @param string $new_val      New permission type to evaluate
@@ -470,11 +470,11 @@ function identUser(
 function evaluateFolderAccesLevel(string $new_val, string $existing_val): string
 {
     $levels = [
-        'W'    => 30,
+        'W'    => 10,
         'ND'   => 20,
-        'NE'   => 15,
-        'NDNE' => 10,
-        'R'    => 10,
+        'NE'   => 20,
+        'NDNE' => 30,
+        'R'    => 40,
     ];
 
     // ND + NE together means no edit AND no delete
@@ -527,11 +527,11 @@ function identUserGetFoldersFromRoles(array $userRoles, array $allowedFoldersByR
     $allowedFoldersByRoles = array_unique($allowedFoldersByRoles);
     $readOnlyFolders = array_unique($readOnlyFolders);
     
-    // Clean arrays
-    foreach ($allowedFoldersByRoles as $value) {
-        $key = array_search($value, $readOnlyFolders);
+    // Clean arrays — least permissive wins: R overrides W/ND/NE/NDNE on the same folder
+    foreach ($readOnlyFolders as $value) {
+        $key = array_search($value, $allowedFoldersByRoles);
         if ($key !== false) {
-            unset($readOnlyFolders[$key]);
+            unset($allowedFoldersByRoles[$key]);
         }
     }
     return [

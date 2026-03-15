@@ -39,33 +39,33 @@ Each role defines one permission type per folder it covers:
 
 When a user has exactly one role, their access to a folder is simply the permission type defined on that role for that folder. If the role has no entry for a given folder, the user has no access to it.
 
-### Multiple roles — the "most permissive wins" rule
+### Multiple roles — the "least permissive wins" rule
 
 A user can have several roles simultaneously (manually assigned by an administrator, or inherited from LDAP/AD groups — see [Authentication](authentication.md)).
 
 When two or more roles define a permission on the **same folder**, Teampass applies a deterministic resolution rule:
 
-> **The most permissive permission type always wins.**
+> **The least permissive permission type always wins.**
 
-The priority order is: `W` > `ND` > `NE` > `NDNE` = `R`
+The priority order is: `R` > `NDNE` > `NE` = `ND` > `W`
 
-**Special case — `ND` + `NE`:** if one role grants `ND` (no delete) and another grants `NE` (no edit) on the same folder, the result is `NDNE` (no edit, no delete). Both restrictions are combined because neither role alone grants full write access.
+**Special case — `ND` + `NE`:** if one role grants `ND` (no delete) and another grants `NE` (no edit) on the same folder, the result is `NDNE` (no edit, no delete). Both restrictions are combined.
 
 #### Examples
 
 | Role A on folder X | Role B on folder X | Effective access |
 |--------------------|-------------------|-----------------|
-| `W`                | `R`               | `W` — write wins |
-| `ND`               | `R`               | `ND` — ND wins |
+| `W`                | `R`               | `R` — read only wins |
+| `ND`               | `R`               | `R` — read only wins |
 | `ND`               | `NE`              | `NDNE` — both restrictions apply |
 | `R`                | `R`               | `R` — read only |
-| `W`                | `ND`              | `W` — write wins |
+| `W`                | `ND`              | `ND` — restriction wins |
 
 #### Practical implication
 
-> 🔔 **A read-only role cannot restrict a user who already has a write role on the same folder.** If a user belongs to a broad group that grants `W` and a more specific group that grants `R`, the effective access will be `W`.
+> 🔔 **A write role cannot override a more restrictive role on the same folder.** If a user belongs to a broad group that grants `W` and a more specific group that grants `R`, the effective access will be `R`.
 
-To enforce read-only access, you must ensure that **none** of the user's roles grants a more permissive type (`W`, `ND`, or `NE`) on that folder.
+To grant write access, you must ensure that **none** of the user's roles grants a more restrictive type (`R`, `NDNE`, `NE`, or `ND`) on that folder.
 
 ---
 
@@ -115,8 +115,8 @@ User
  ├── Role A  ──► Folder 1: W,  Folder 2: R
  └── Role B  ──► Folder 1: R,  Folder 3: ND
                       │                │
-                  Folder 1: W      Folder 3: ND
-                  (W beats R)      (only one role)
+                  Folder 1: R      Folder 3: ND
+                  (R beats W)      (only one role)
 ```
 
-The effective permission on each folder is calculated independently. Adding a restrictive role to a user **cannot reduce** their access on a folder where another role already grants a higher permission.
+The effective permission on each folder is calculated independently. Adding a restrictive role to a user **will reduce** their access on any folder where that role defines a less permissive type.

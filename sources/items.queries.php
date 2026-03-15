@@ -4058,8 +4058,8 @@ switch ($inputData['type']) {
                         array_push($arrTmp, $isInAccessibleFolders ? 50 : 0);
                     }
                 }
-                // 3.0.0.0 - changed  MIN to MAX
-                $accessLevel = count($arrTmp) > 0 ? max($arrTmp) : $accessLevel;
+                // least permissive wins: use min() so the most restrictive role score applies
+                $accessLevel = count($arrTmp) > 0 ? min($arrTmp) : $accessLevel;
             } else {
                 $accessLevel = 30;
             }
@@ -7820,8 +7820,8 @@ function getRoleBasedAccess($session, int $treeId): array
         return [false, false];
     }
 
-    // Resolve multiple types using the shared priority function (most permissive wins):
-    // W > ND > NE > NDNE = R ; special case ND+NE → NDNE
+    // Resolve multiple types using the shared priority function (least permissive wins):
+    // R > NDNE > {ND, NE} > W ; special case ND+NE → NDNE
     $resolvedType = '';
     foreach ($accessTypes as $type) {
         $resolvedType = evaluateFolderAccesLevel($type, $resolvedType);

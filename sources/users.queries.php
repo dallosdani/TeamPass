@@ -1439,7 +1439,7 @@ if (null !== $post_type) {
                     $x = 0;
                     foreach ($arrFolders as $fld) {
                         if ($fld['id'] === $record['folder_id']) {
-                            // Resolve effective permission (most permissive wins)
+                            // Resolve effective permission (least permissive wins)
                             $arrFolders[$x]['type'] = evaluateFolderAccesLevel($record['type'], $arrFolders[$x]['type']);
                             // Accumulate all roles contributing to this folder
                             $arrFolders[$x]['roles'][] = ['title' => $record['role_title'], 'type' => $record['type']];

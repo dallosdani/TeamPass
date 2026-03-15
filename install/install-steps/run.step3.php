@@ -103,13 +103,7 @@ function checks($inputData)
     DB::$dbName = $inputData['dbName'];
     DB::$port = $inputData['dbPort'];
     DB::$encoding = 'utf8';
-    DB::$ssl = array(
-        "key" => "",
-        "cert" => "",
-        "ca_cert" => "",
-        "ca_path" => "",
-        "cipher" => ""
-    );
+    DB::$ssl = null; // Only set SSL when actual certificates are provided 
     DB::$connect_options = array(
         MYSQLI_OPT_CONNECT_TIMEOUT => 10
     );

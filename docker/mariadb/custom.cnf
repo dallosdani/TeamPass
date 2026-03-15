@@ -19,7 +19,8 @@ max_heap_table_size = 64M
 innodb_buffer_pool_size = 256M
 innodb_log_file_size = 64M
 innodb_flush_log_at_trx_commit = 2
-innodb_flush_method = O_DIRECT
+# O_DIRECT is not supported on WSL2, use fsync instead
+innodb_flush_method = fsync
 
 # Query cache (disabled in MariaDB 10.6+)
 # query_cache_type = 0
@@ -32,7 +33,7 @@ innodb_flush_method = O_DIRECT
 
 # Slow query log (for debugging)
 slow_query_log = 0
-slow_query_log_file = /var/log/mysql/slow-query.log
+# slow_query_log_file = /var/log/mysql/slow-query.log
 long_query_time = 2
 
 [client]

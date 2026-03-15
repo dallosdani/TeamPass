@@ -4058,8 +4058,8 @@ switch ($inputData['type']) {
                         array_push($arrTmp, $isInAccessibleFolders ? 50 : 0);
                     }
                 }
-                // 3.0.0.0 - changed  MIN to MAX
-                $accessLevel = count($arrTmp) > 0 ? max($arrTmp) : $accessLevel;
+                // least permissive wins: use min() so the most restrictive role score applies
+                $accessLevel = count($arrTmp) > 0 ? min($arrTmp) : $accessLevel;
             } else {
                 $accessLevel = 30;
             }
@@ -6482,7 +6482,6 @@ switch ($inputData['type']) {
 
         if (empty($userData) === false) {
             identifyUserRights(
-                $userData['groupes_visibles'] ?? [],
                 $userData['groupes_interdits'] ?? [],
                 $userData['admin'],
                 is_null($userData['roles_from_ad_groups']) === true
@@ -7704,19 +7703,25 @@ function isProcessOnGoing(int $itemId): bool
  */
 function getUserVisibleFolders(int $userId): array
 {
-    // Query to retrieve visible folders for the user
-    $data = DB::queryFirstRow('SELECT visible_folders FROM ' . prefixTable('cache_tree') . ' WHERE user_id = %i', $userId);
+    // Query to retrieve visible folders for the user, including invalidation state
+    $data = DB::queryFirstRow(
+        'SELECT visible_folders, timestamp, IFNULL(invalidated_at, 0) AS invalidated_at
+        FROM ' . prefixTable('cache_tree') . ' WHERE user_id = %i',
+        $userId
+    );
 
     // Decode JSON data into an array
     $visibleFolders = json_decode($data['visible_folders'] ?? '', true);
 
-    // If cache exists and is valid, return it
-    if (!empty($visibleFolders) && is_array($visibleFolders)) {
+    // Return cache only if it exists, is valid JSON, and has not been invalidated
+    // (invalidated_at > timestamp means the cache was marked stale after last rebuild)
+    if (!empty($visibleFolders) && is_array($visibleFolders)
+        && (int) ($data['invalidated_at'] ?? 0) <= (int) ($data['timestamp'] ?? 0)
+    ) {
         return $visibleFolders;
     }
 
-    // FALLBACK: Build visible folders on-the-fly if cache is empty
-    // This handles the case where user_build_cache_tree hasn't run yet
+    // FALLBACK: Build visible folders on-the-fly if cache is empty or invalidated
     return buildVisibleFoldersOnTheFly($userId);
 }
 
@@ -7806,53 +7811,35 @@ function buildVisibleFoldersOnTheFly(int $userId): array
  */
 function getRoleBasedAccess($session, int $treeId): array
 {
-    $edit = $delete = false;
-    
     // Retrieve all role IDs assigned to the user
     $roles = array_column($session->get('system-array_roles'), 'id');
 
-    // Query the access rights for the given roles and folder
+    // Query the distinct access types defined for these roles on this folder
     $accessTypes = DB::queryFirstColumn(
-        'SELECT DISTINCT type FROM ' . prefixTable('roles_values') . ' WHERE role_id IN %ls AND folder_id = %i', 
-        $roles, 
+        'SELECT DISTINCT type FROM ' . prefixTable('roles_values') . ' WHERE role_id IN %ls AND folder_id = %i',
+        $roles,
         $treeId
     );
-    // Values ​​to be checked
-    $check_value = 'W';
-    // Values ​​to be deleted
-    $delete_value = 'R';
-    
-    // Check if $check_value exists
-    if (in_array($check_value, $accessTypes)) {
-        // Find the index of $delete_value in the array
-        $key = array_search($delete_value, $accessTypes);
 
-        // If the value is found, delete
-        if ($key !== false) {
-            unset($accessTypes[$key]);
-        }
+    if (empty($accessTypes)) {
+        return [false, false];
     }
-    // Determine access rights based on the retrieved types
-    foreach ($accessTypes as $access) {
-        switch ($access) {
-            case 'ND': // No Delete
-                $edit = true;
-                $delete = false;
-                break;
-            case 'NE': // No Edit
-                $edit = false;
-                $delete = true;
-                break;
-            case 'NDNE':
-            case 'R': // Read only
-                $edit = $delete = false;
-                break;
-            case 'W': // Write access
-                $edit = $delete = true;
-                break;
-        }
+
+    // Resolve multiple types using the shared priority function (least permissive wins):
+    // R > NDNE > {ND, NE} > W ; special case ND+NE → NDNE
+    $resolvedType = '';
+    foreach ($accessTypes as $type) {
+        $resolvedType = evaluateFolderAccesLevel($type, $resolvedType);
     }
-    return [$edit, $delete];
+
+    switch ($resolvedType) {
+        case 'W':    return [true, true];   // full write: edit + delete
+        case 'ND':   return [true, false];  // no delete
+        case 'NE':   return [false, true];  // no edit
+        case 'NDNE': return [false, false]; // no edit, no delete
+        case 'R':    return [false, false]; // read only
+        default:     return [false, false];
+    }
 }
 
 /**

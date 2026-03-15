@@ -1994,7 +1994,8 @@ if (
             $('#items_list').html('<ul class="liste_items" id="full_items_list"></ul>');
             Details(itemDefinition, 'show');
             if (itemDefinition.data().itemTreeId !== $('#open_folder').val()) {
-                ListerItems(itemDefinition.data().itemTreeId, '', 0);
+                console.log("ici30");
+                ListerItems(itemDefinition.data().itemTreeId, '', 0, 0, true);
             }
 
             // Hide sidebar-mini

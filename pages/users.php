@@ -553,21 +553,57 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
         </div>
     </div>
 
-    <!-- USER VISIBLE FOLDERS -->
-    <div class="row hidden extra-form user-content" id="row-visible-folders" data-content="visible-folders">
-        <div class="col-12">
-            <div class="card card-primary">
-                <div class="card-header">
-                    <h3 class="card-title"><?php echo $lang->get('access_rights_for_user'); ?> <b><span id="row-folders-title"></span></b></h3>
+    <!-- USER VISIBLE FOLDERS — modal -->
+    <div class="modal fade" id="modal-folders-rights" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <?php echo $lang->get('access_rights_for_user'); ?> &mdash; <b><span id="row-folders-title"></span></b>
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
 
-                <!-- /.card-header -->
-                <!-- table start -->
-                <div class="card-body" id="row-folders-results"></div>
+                <div class="modal-body p-0">
+                    <!-- Loading progress bar -->
+                    <div id="row-folders-progress" class="progress" style="height:4px;display:none;border-radius:0;margin:0">
+                        <div id="row-folders-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                             role="progressbar" style="width:0%"></div>
+                    </div>
 
-                <div class="card-footer">
-                    <button type="button" class="btn btn-default float-right tp-action" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>
+                    <!-- Permission type filter bar (shown after data loads) -->
+                    <div id="row-folders-filter-bar" class="border-bottom px-3 py-2" style="display:none">
+                        <small class="text-muted mr-2"><?php echo $lang->get('filter'); ?> :</small>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="W">
+                                W &mdash; <?php echo $lang->get('write'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="ND">
+                                ND &mdash; <?php echo $lang->get('no_delete'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NE">
+                                NE &mdash; <?php echo $lang->get('no_edit'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NDNE">
+                                NDNE
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="R">
+                                R &mdash; <?php echo $lang->get('read'); ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results table -->
+                    <div id="row-folders-results" class="p-3"></div>
                 </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+                </div>
+
             </div>
         </div>
     </div>

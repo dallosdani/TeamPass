@@ -304,12 +304,21 @@ if (null !== $post_type) {
                 break;
             }
 
-            // Notify connected users with this role via WebSocket
+            // Retrieve all users assigned to this role
             $usersWithRole = DB::queryFirstColumn(
                 'SELECT DISTINCT user_id FROM ' . prefixTable('users_roles') . '
                 WHERE role_id = %i',
                 $post_roleId
             );
+
+            // Invalidate cache_tree for every affected folder and every user with this role.
+            // We pass $usersWithRole explicitly so that users whose roles_values entry was
+            // just deleted (access set to '') are still covered by the invalidation.
+            foreach ($allFolderIds as $invalidateFolderId) {
+                invalidateCacheForFolderUsers($invalidateFolderId, $usersWithRole);
+            }
+
+            // Notify connected users with this role via WebSocket
             $currentUserId = (int) $session->get('user-id');
             foreach ($usersWithRole as $userId) {
                 if ((int) $userId === $currentUserId) {

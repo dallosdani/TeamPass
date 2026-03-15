@@ -1998,5 +1998,9 @@ return array(
     'health_apache_log_fix_hint' => 'Pour autoriser l’accès, exécute les commandes ci-dessous puis réessaie.',
     'health_apache_log_fix_hint_missing' => 'Vérifie le chemin ErrorLog de ton vhost Apache et le nom du fichier de log.',
     'ws_click_to_reload' => 'Cliquer pour recharger',
+    'ws_item_moved_away' => 'a été déplacé vers un autre répertoire par',
+    'ws_item_moved_by' => 'déplacé vers',
+    'ws_item_moved' => 'Objet déplacé',
+    'ws_systemd_sudo_required' => 'Service géré par systemd (Restart=always). Configurer sudoers de façon à ce que www-data puisse le démarrer/arrêter : www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop teampass-websocket, /bin/systemctl start teampass-websocket',
 
 );

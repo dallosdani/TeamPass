@@ -830,7 +830,6 @@ function buildUserSession(
     $session->set('user-last_connection', empty($userInfo['last_connexion']) === false ? (int) $userInfo['last_connexion'] : (int) time());
     $session->set('user-latest_items', empty($userInfo['latest_items']) === false ? explode(';', $userInfo['latest_items']) : []);
     $session->set('user-favorites', empty($userInfo['favourites']) === false ? explode(';', $userInfo['favourites']) : []);
-    $session->set('user-accessible_folders', empty($userInfo['groupes_visibles']) === false ? explode(';', $userInfo['groupes_visibles']) : []);
     $session->set('user-no_access_folders', empty($userInfo['groupes_interdits']) === false ? explode(';', $userInfo['groupes_interdits']) : []);
 
     return [
@@ -929,7 +928,6 @@ function performPostLoginTasks(
         $session->set('user-nb_roles', 1);
     } else {
         identifyUserRights(
-            $userInfo['groupes_visibles'],
             $session->get('user-no_access_folders'),
             $userInfo['admin'],
             $userInfo['fonction_id'],

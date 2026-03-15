@@ -1380,7 +1380,9 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
             item_now_available: <?php echo json_encode($lang->get('ws_item_now_available')); ?>,
             item_edition_released: <?php echo json_encode($lang->get('ws_item_edition_released')); ?>,
             item_reloading: <?php echo json_encode($lang->get('ws_item_reloading')); ?>,
-            click_to_reload: <?php echo json_encode($lang->get('ws_click_to_reload')); ?>
+            click_to_reload: <?php echo json_encode($lang->get('ws_click_to_reload')); ?>,
+            item_moved_away: <?php echo json_encode($lang->get('ws_click_to_reload')); ?>,
+            item_moved: <?php echo json_encode($lang->get('ws_item_moved')); ?>
         };
     </script>
     <script type="text/javascript" src="includes/js/teampass-websocket.js?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>"></script>

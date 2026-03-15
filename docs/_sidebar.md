@@ -15,7 +15,10 @@
 - [Import](features/import.md)
 - [Export](features/export.md)
 - [Keys](features/keys.md)
+- [Rights](features/rights.md)
 - [Roles](features/roles.md)
+- [Folders](features/folders.md)
+- [Users](features/users.md)
 - **Manage**
 - [Settings](manage/settings.md)
 - [Tasks](manage/tasks.md)

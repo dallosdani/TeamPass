@@ -161,112 +161,6 @@ foreach ($tst as $t) {
                     </h3>
                 </div>
 
-                <div class="card-body form hidden" id="folder-new">
-                    <div class="card card-primary">
-                        <div class="card-header">
-                            <h3 class="card-title"><?php echo $lang->get('add_new_folder'); ?></h3>
-                        </div>
-                        <!-- /.card-header -->
-                        <!-- form start -->
-                        <form role="form">
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label for="new-title"><?php echo $lang->get('label'); ?></label>
-                                    <input type="text" class="form-control clear-me purify" id="new-title" data-field="title">
-                                </div>
-                                <div class="form-group">
-                                    <label for="new-parent"><?php echo $lang->get('parent'); ?></label>
-                                    <select id="new-parent" class="form-control form-item-control select2 no-root" style="width:100%;">
-                                        <?php echo $droplist; ?>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="new-complexity"><?php echo $lang->get('password_minimal_complexity_target'); ?></label>
-                                    <select id="new-complexity" class="form-control form-item-control select2 no-root" style="width:100%;">
-                                        <?php echo $complexitySelect; ?>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="new-access-right"><?php echo $lang->get('access_right_for_roles'); ?></label>
-                                    <select id="new-access-right" class="form-control form-item-control select2 no-root" style="width:100%;">
-                                        <option value=""><?php echo $lang->get('no_access'); ?></option>
-                                        <option value="R"><?php echo $lang->get('read'); ?></option>
-                                        <option value="W"><?php echo $lang->get('write'); ?></option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="new-renewal"><?php echo $lang->get('renewal_delay'); ?></label>
-                                    <input type="number" class="form-control clear-me" id="new-renewal" value="0" min="0" data-bind="value:replyNumber">
-                                </div>
-                                <div class="form-group">
-                                    <label><?php echo $lang->get('icon'); ?></label>
-                                    <input type="text" class="form-control form-folder-control purify" id="new-folder-add-icon" data-field="icon">
-                                    <small class='form-text text-muted'>
-                                        <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
-                                    </small>
-                                </div>
-                                <div class="form-group">
-                                    <label><?php echo $lang->get('icon_on_selection'); ?></label>
-                                    <input type="text" class="form-control form-folder-control purify" id="new-folder-add-icon-selected" data-field="iconSelected">
-                                    <small class='form-text text-muted'>
-                                        <?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
-                                    </small>
-                                </div>
-                                <div class="form-group">
-                                    <label><?php echo $lang->get('special'); ?></label>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input form-control" id="new-add-restriction">
-                                        <label for="new-add-restriction" class="form-check-label pointer ml-2"><?php echo $lang->get('create_without_password_minimal_complexity_target'); ?></label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input type="checkbox" class="form-check-input form-control" id="new-edit-restriction">
-                                        <label for="new-edit-restriction" class="form-check-label pointer ml-2"><?php echo $lang->get('edit_without_password_minimal_complexity_target'); ?></label>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- /.card-body -->
-
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-primary tp-action" data-action="new-submit"><?php echo $lang->get('submit'); ?></button>
-                                <button type="button" class="btn btn-default float-right tp-action" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="card-body form hidden" id="folder-delete">
-                    <div class="card card-warning">
-                        <div class="card-header">
-                            <h3 class="card-title"><?php echo $lang->get('delete_folders'); ?></h3>
-                        </div>
-                        <!-- /.card-header -->
-                        <!-- form start -->
-                        <form role="form">
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <h5><i class="fas fa-warning mr-2"></i><?php echo $lang->get('next_list_to_be_deleted'); ?></h5>
-                                    <div id="delete-list" class="clear-me"></div>
-                                </div>
-                            </div>
-
-                            <div class="card-body">
-                                <div class="alert alert-danger">
-                                    <h5><i class="icon fa fa-warning mr-2"></i><?php echo $lang->get('caution'); ?></h5>
-                                    <div class="form-check mb-3">
-                                        <input type="checkbox" class="form-check-red-input form-item-control flat-red required" id="delete-confirm">
-                                        <label class="form-check-label ml-3" for="delete-confirm"><?php echo $lang->get('folder_delete_confirm'); ?></label>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- /.card-body -->
-
-                            <div class="card-footer">
-                                <button type="button" class="btn btn-danger disabled tp-action" data-action="delete-submit" id="delete-submit"><?php echo $lang->get('confirm'); ?></button>
-                                <button type="button" class="btn btn-default float-right tp-action" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
 
                 <!--<div class="card-header">
                     <h3 class="card-title" id="folders-alphabet"></h3>
@@ -276,11 +170,21 @@ foreach ($tst as $t) {
                 <div class="card-body form table-responsive1" id="folders-list">
                     <div class="callout callout-info mt-3">
                         <div class="callout-body row">
-                            <div class="input-group input-group-sm col-8">
+                            <div class="input-group input-group-sm col-4">
                                 <div class="input-group-prepend">
                                     <div class="input-group-text"><?php echo $lang->get('only_display_folders_to_depth'); ?></div>
                                 </div>
-                                <select class="form-control form-control-sm w-10" id="folders-depth">
+                                <select class="form-control form-control-sm" id="folders-depth">
+                                </select>
+                            </div>
+                            <div class="input-group input-group-sm col-4">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text">
+                                        <i class="fas fa-gavel infotip" title="<?php echo $lang->get('password_strength'); ?>"></i>
+                                    </div>
+                                </div>
+                                <select class="form-control form-control-sm" id="folders-complexity">
+                                    <option value="all"><?php echo $lang->get('all'); ?></option>
                                 </select>
                             </div>
                             <div class="input-group input-group-sm col-4">
@@ -293,6 +197,16 @@ foreach ($tst as $t) {
                             </div>
                         </div>
                     </div>
+
+                <!-- Folder loading progress bar -->
+                <div id="folders-load-progress" class="mt-2 mb-2" style="display:none">
+                    <div class="progress" style="height:18px">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                            role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-muted folders-load-text mt-1 d-block"></small>
+                </div>
+
                     <table id="table-folders" class="table table-hover table-striped table-responsive" style="width:100%">
                         <thead>
                             <tr>
@@ -316,6 +230,235 @@ foreach ($tst as $t) {
         </div>
     </div>
 </section>
+
+<!-- Modal: New folder -->
+<div class="modal fade" id="modal-folder-new" tabindex="-1" role="dialog" aria-labelledby="modal-folder-new-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary">
+                <h5 class="modal-title text-white" id="modal-folder-new-title">
+                    <i class="fas fa-folder-plus mr-2"></i><?php echo $lang->get('add_new_folder'); ?>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="<?php echo $lang->get('close'); ?>">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-title"><?php echo $lang->get('label'); ?></label>
+                    <input type="text" class="form-control clear-me purify" id="new-title" data-field="title">
+                </div>
+                <div class="form-group">
+                    <label for="new-parent"><?php echo $lang->get('parent'); ?></label>
+                    <select id="new-parent" class="form-control form-item-control no-root" style="width:100%;">
+                        <?php echo $droplist; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-complexity"><?php echo $lang->get('password_minimal_complexity_target'); ?></label>
+                    <select id="new-complexity" class="form-control form-item-control no-root" style="width:100%;">
+                        <?php echo $complexitySelect; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-access-right"><?php echo $lang->get('access_right_for_roles'); ?></label>
+                    <select id="new-access-right" class="form-control form-item-control no-root" style="width:100%;">
+                        <option value=""><?php echo $lang->get('no_access'); ?></option>
+                        <option value="R"><?php echo $lang->get('read'); ?></option>
+                        <option value="W"><?php echo $lang->get('write'); ?></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-renewal"><?php echo $lang->get('renewal_delay'); ?></label>
+                    <input type="number" class="form-control clear-me" id="new-renewal" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label><?php echo $lang->get('icon'); ?></label>
+                    <input type="text" class="form-control form-folder-control purify" id="new-folder-add-icon" data-field="icon">
+                    <small class="form-text text-muted">
+                        <?php echo $lang->get('fontawesome_icon_tip'); ?>
+                        <a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label><?php echo $lang->get('icon_on_selection'); ?></label>
+                    <input type="text" class="form-control form-folder-control purify" id="new-folder-add-icon-selected" data-field="iconSelected">
+                    <small class="form-text text-muted">
+                        <?php echo $lang->get('fontawesome_icon_tip'); ?>
+                        <a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label><?php echo $lang->get('special'); ?></label>
+                    <div class="d-flex align-items-start mb-1">
+                        <input type="checkbox" class="form-check-input form-item-control" id="new-add-restriction">
+                        <label for="new-add-restriction" class="mb-0 ml-3"><?php echo $lang->get('create_without_password_minimal_complexity_target'); ?></label>
+                    </div>
+                    <div class="d-flex align-items-start">
+                        <input type="checkbox" class="form-check-input form-item-control" id="new-edit-restriction">
+                        <label for="new-edit-restriction" class="mb-0 ml-3"><?php echo $lang->get('edit_without_password_minimal_complexity_target'); ?></label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary tp-action" data-action="new-submit">
+                    <i class="fas fa-save mr-1"></i><?php echo $lang->get('submit'); ?>
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar overlay -->
+<div id="folder-edit-overlay"></div>
+
+<!-- Sidebar: Edit folder -->
+<div id="folder-edit-sidebar">
+    <div class="sidebar-header d-flex align-items-center justify-content-between px-3 py-2">
+        <span><i class="fas fa-folder-open mr-2"></i><strong id="sidebar-folder-name"></strong></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="sidebar-close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="sidebar-body px-3 py-2">
+        <div class="form-group">
+            <label for="folder-edit-title"><?php echo $lang->get('label'); ?></label>
+            <input type="text" class="form-control purify" id="folder-edit-title" data-field="title">
+        </div>
+        <div class="form-group">
+            <label for="folder-edit-parent"><?php echo $lang->get('parent'); ?></label>
+            <select id="folder-edit-parent" class="form-control select2" style="width:100%"></select>
+        </div>
+        <div class="form-group">
+            <label for="folder-edit-complexity"><?php echo $lang->get('password_minimal_complexity_target'); ?></label>
+            <select id="folder-edit-complexity" class="form-control select2" style="width:100%"></select>
+        </div>
+        <div class="form-group">
+            <label for="folder-edit-renewal"><?php echo $lang->get('renewal_delay'); ?></label>
+            <input type="number" class="form-control" id="folder-edit-renewal" min="0" value="0">
+        </div>
+        <div class="form-group">
+            <label><?php echo $lang->get('icon'); ?></label>
+            <input type="text" class="form-control purify" id="folder-edit-icon" data-field="icon">
+            <small class="form-text text-muted">
+                <?php echo $lang->get('fontawesome_icon_tip'); ?>
+                <a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
+            </small>
+        </div>
+        <div class="form-group">
+            <label><?php echo $lang->get('icon_on_selection'); ?></label>
+            <input type="text" class="form-control purify" id="folder-edit-icon-selected" data-field="iconSelected">
+            <small class="form-text text-muted">
+                <?php echo $lang->get('fontawesome_icon_tip'); ?>
+                <a href="<?php echo FONTAWESOME_URL; ?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>
+            </small>
+        </div>
+        <div class="form-group">
+            <label><?php echo $lang->get('special'); ?></label>
+            <div class="d-flex align-items-start mb-1">
+                <input type="checkbox" class="form-check-input" id="folder-edit-add-restriction">
+                <label class="mb-0 ml-3" for="folder-edit-add-restriction">
+                    <?php echo $lang->get('create_without_password_minimal_complexity_target'); ?>
+                </label>
+            </div>
+            <div class="d-flex align-items-start">
+                <input type="checkbox" class="form-check-input" id="folder-edit-edit-restriction">
+                <label class="mb-0 ml-3" for="folder-edit-edit-restriction">
+                    <?php echo $lang->get('edit_without_password_minimal_complexity_target'); ?>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="sidebar-footer px-3 py-2 d-flex justify-content-between">
+        <button type="button" class="btn btn-warning" id="sidebar-submit">
+            <i class="fas fa-save mr-1"></i><?php echo $lang->get('submit'); ?>
+        </button>
+        <button type="button" class="btn btn-default" id="sidebar-cancel"><?php echo $lang->get('cancel'); ?></button>
+    </div>
+</div>
+
+<!-- Modal: Delete folders -->
+<div class="modal fade" id="modal-folder-delete" tabindex="-1" role="dialog" aria-labelledby="modal-folder-delete-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="modal-folder-delete-title">
+                    <i class="fas fa-trash mr-2"></i><?php echo $lang->get('delete_folders'); ?>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="<?php echo $lang->get('close'); ?>">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <h6><i class="fas fa-exclamation-triangle text-warning mr-2"></i><?php echo $lang->get('next_list_to_be_deleted'); ?></h6>
+                <div id="delete-list" class="mb-3"></div>
+
+                <div class="alert alert-danger mb-0">
+                    <h6><i class="icon fa fa-warning mr-2"></i><?php echo $lang->get('caution'); ?></h6>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-red-input form-item-control flat-red" id="delete-confirm">
+                        <label class="form-check-label ml-3" for="delete-confirm"><?php echo $lang->get('folder_delete_confirm'); ?></label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger disabled tp-action" data-action="delete-submit" id="delete-submit">
+                    <i class="fas fa-trash mr-1"></i><?php echo $lang->get('confirm'); ?>
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Progress bar: no transition so it stays in sync with the counter */
+#folders-load-progress .progress-bar { transition: none; }
+
+/* Sidebar */
+#folder-edit-sidebar {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 400px;
+    background: #fff;
+    box-shadow: -4px 0 16px rgba(0,0,0,.15);
+    z-index: 1055;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+}
+#folder-edit-sidebar.open { transform: translateX(0); }
+#folder-edit-sidebar .sidebar-header { border-bottom: 1px solid #dee2e6; flex-shrink: 0; }
+#folder-edit-sidebar .sidebar-body   { flex: 1; overflow-y: auto; }
+#folder-edit-sidebar .sidebar-footer { border-top: 1px solid #dee2e6; flex-shrink: 0; }
+
+#folder-edit-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.3);
+    z-index: 1054;
+}
+
+/* Dark mode */
+.dark-mode #folder-edit-sidebar { background: #343a40; color: #dee2e6; }
+.dark-mode #folder-edit-sidebar .sidebar-header,
+.dark-mode #folder-edit-sidebar .sidebar-footer { border-color: #495057; }
+
+/* iCheck widget inside flex rows: prevent shrink so it never clips into the label */
+#folder-edit-sidebar .d-flex > [class*="icheckbox"],
+#folder-edit-sidebar .d-flex > [class*="iradio"],
+#modal-folder-new .d-flex > [class*="icheckbox"],
+#modal-folder-new .d-flex > [class*="iradio"] {
+    flex-shrink: 0;
+}
+
+/* Edited row highlight */
+#table-folders tbody tr.editing-active { background-color: #fffbf0 !important; }
+.dark-mode #table-folders tbody tr.editing-active { background-color: #3d3a28 !important; }
+</style>
 
 <!-- hidden -->
 <?php echo $complexityHtml; ?>

@@ -1999,5 +1999,9 @@ Path: %s',
     'health_apache_log_fix_hint' => 'To allow access, run the commands below then retry.',
     'health_apache_log_fix_hint_missing' => 'Check your Apache vhost ErrorLog path and the log file name.',
     'ws_click_to_reload' => 'Click to reload',
+    'ws_item_moved_away' => 'has been moved to another folder by',
+    'ws_item_moved_by' => 'moved by',
+    'ws_item_moved' => 'Item moved',
+    'ws_systemd_sudo_required' => 'Service is managed by systemd (Restart=always). Configure sudoers so www-data can stop/start it: www-data ALL=(ALL) NOPASSWD: /bin/systemctl stop teampass-websocket, /bin/systemctl start teampass-websocket',
 
 );

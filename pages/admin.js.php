@@ -933,7 +933,7 @@ $(document).on('click', '#btn-websocket-action', function() {
             btn.prop('disabled', false)
 
             if (data.error) {
-                toastr.error(data.message)
+                toastr.error(data.message, '', {timeOut: data.systemd_managed ? 0 : 5000, extendedTimeOut: 0})
             } else {
                 toastr.success(data.message)
             }

@@ -106,7 +106,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         previousSelectedFolder = -1,
         intervalId = false,
         editionLockInterval = null,
-        debugJavascript = false,
+        debugJavascript = true,
         loadingToast = '';
 
     /**
@@ -312,7 +312,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         // Prepare list of items
         if (startedItemsListQuery === false) {
             startedItemsListQuery = true;
-            ListerItems(selectedFolderId, '', 0);
+            ListerItems(selectedFolderId, '', 0, 0, true);
         }
 
         previousSelectedFolder = selectedFolderId;
@@ -327,7 +327,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
     .bind('search.jstree', function(e, data) {
         if (data.nodes.length == 1) {
             //open the folder
-            ListerItems($('#jstree li>a.jstree-search').attr('id').split('_')[1], '', 0);
+            startedItemsListQuery = true;
+            ListerItems($('#jstree li>a.jstree-search').attr('id').split('_')[1], '', 0, 0, true);
         }
     });
 
@@ -421,7 +422,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
         // Hide/show list of subfolders
         $('#table_teampass_subfolders_list').toggleClass('hidden', store.get('teampassUser').show_subfolders !== 1);
-
         // Preload list of items
         ListerItems(store.get('teampassApplication').itemsListFolderId, '', 0);
     } else {
@@ -1333,7 +1333,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
                         // Force refresh of the tree
                         internalRefreshVisibleFolders(true)
-
+                        
                         // Reload items list
                         ListerItems(
                             store.get('teampassItem').folderId,
@@ -1806,7 +1806,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         '<?php echo $lang->get('success'); ?>',
                         { timeOut: 1000 }
                     );
-
                     // Refresh tree
                     refreshTree(folderId, true);
                     // Refresh items list to remove deleted item
@@ -3577,7 +3576,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 // Select folder of item in jstree
                                 $('#jstree').jstree('deselect_all');
                                 $('#jstree').jstree('select_node', '#li_' + $('#form-item-folder').val());
-
+                                
                                 // Refresh list of items (single call, not duplicated by jstree handler)
                                 ListerItems($('#form-item-folder').val(), '', 0);
 
@@ -4201,8 +4200,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     console.log(data);
                 }
 
-                startedItemsListQuery = false;
-
                 //check if format error
                 if (typeof data !== 'undefined' && data.error !== true) {
                     // Store in session
@@ -4255,7 +4252,26 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     );
                     return false;
                 }
-                toastr.remove();
+                // Show success toastr only when this response is still for the currently selected folder.
+                // If the user has already navigated to another folder, this is a stale response:
+                // do NOT call toastr.remove() so we don't wipe out the loading toastr of the new folder.
+                // Show success toastr only when this response is still for the currently selected folder.
+                // If the user has already navigated to another folder, this is a stale response:
+                // do NOT call toastr.remove() so we don't wipe out the loading toastr of the new folder.
+                if (action === 'update') {
+                    if (parseInt(folders) === store.get('teampassApplication').selectedFolder) {
+                        toastr.remove();
+                        toastr.info(
+                            '<?php echo $lang->get('data_refreshed'); ?>',
+                            '', {
+                                timeOut: 1000
+                            }
+                        );
+                    }
+                    // else: stale response for a folder the user already left — do nothing
+                } else {
+                    toastr.remove();
+                }
             }
         );
     }
@@ -4320,6 +4336,13 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             return false;
         }
         requestRunning = true;
+        // Inform user
+        if (showToastr === true) {
+            toastr.remove();
+            toastr.info(
+                '<?php echo $lang->get('opening_folder'); ?><i class="fa-solid fa-circle-notch fa-spin ml-2"></i>'
+            );
+        }
 
         // case where we should stop listing the items
         if (store.get('teampassApplication') !== undefined && store.get('teampassApplication').itemsListStop === 1) {
@@ -4409,14 +4432,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 $('.tr_fields, .newItemCat, .editItemCat').addClass('hidden');
             }
 
-            // Inform user
-            if (showToastr === true) {
-                toastr.remove();
-                toastr.info(
-                    '<?php echo $lang->get('opening_folder'); ?><i class="fa-solid fa-circle-notch fa-spin ml-2"></i>'
-                );
-            }
-
             // clear storage 
             store.update(
                 'teampassUser',
@@ -4459,6 +4474,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
                     // reset doubleclick prevention
                     requestRunning = false;
+                    startedItemsListQuery = false;
 
                     // manage not allowed
                     if (data.error === true) {
@@ -4868,11 +4884,16 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 }
             );
 
-            // Show
+            // Prevent duplicate ListerItems via the select_node.jstree event handler
+            startedItemsListQuery = true;
+            
+            // Show loading toastr and load items
             ListerItems(
                 $(this).data('tree-id'),
                 '',
-                0
+                0,
+                0,
+                true
             );
 
             $('#jstree').jstree('deselect_all');
@@ -4916,6 +4937,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     teampassApplication.itemsListStop = 0;
                 }
             );
+            
             // Perform listing
             ListerItems(
                 store.get('teampassApplication').itemsListFolderId,
@@ -4940,16 +4962,11 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             $('.infotip').tooltip();
 
             // Update silently the info about the folder
+            // Success toastr is shown inside the refreshFoldersInfo callback
+            // so the loading toastr stays visible until the full operation completes
             refreshFoldersInfo(
                 store.get('teampassApplication').selectedFolder,
                 'update'
-            );
-            toastr.remove();
-            toastr.info(
-                '<?php echo $lang->get('data_refreshed'); ?>',
-                '', {
-                    timeOut: 1000
-                }
             );
 
             // Do drag'n'drop for the folders
@@ -7349,8 +7366,11 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             // Only if valid id
             if (!isNaN(folder_id)) {
+                // Prevent duplicate ListerItems via the select_node.jstree event handler
+                startedItemsListQuery = true;
+                
                 // List items on folder
-                ListerItems(folder_id, '', 0);
+                ListerItems(folder_id, '', 0, 0, true);
 
                 // Update jstree selection
                 $('#jstree').jstree('deselect_all');

@@ -244,15 +244,13 @@ function db_error_handler(array $params): void
 /**
  * Identify user's rights
  *
- * @param string|array $groupesVisiblesUser  [description]
- * @param string|array $groupesInterditsUser [description]
- * @param string       $isAdmin              [description]
- * @param string|null       $idFonctions          [description]
+ * @param string|array $groupesInterditsUser Forbidden folders (from users_groups_forbidden)
+ * @param string       $isAdmin              Admin flag
+ * @param string|null  $idFonctions          Semicolon-separated role IDs
  *
  * @return bool
  */
 function identifyUserRights(
-    $groupesVisiblesUser,
     $groupesInterditsUser,
     $isAdmin,
     ?string $idFonctions,
@@ -261,7 +259,7 @@ function identifyUserRights(
     $session = SessionManager::getSession();
     $tree = new NestedTree(prefixTable('nested_tree'), 'id', 'parent_id', 'title');
 
-    // Check if user is ADMINISTRATOR    
+    // Check if user is ADMINISTRATOR
     (int) $isAdmin === 1 ?
         identAdmin(
             $idFonctions ?? ''
@@ -270,7 +268,6 @@ function identifyUserRights(
         identUser(
             $SETTINGS, /** @scrutinizer ignore-type */
             $tree,
-            $groupesVisiblesUser,
             $groupesInterditsUser,
             $idFonctions
         );
@@ -360,21 +357,22 @@ function convertToArray($element): array
 
 /**
  * Defines the rights the user has.
+ * Access is resolved from roles AND per-user direct grants (users_groups).
+ * Priority: denied (users_groups_forbidden) > direct grant (users_groups) > roles.
+ * A direct grant always gives full write access and overrides a role-based read-only.
  *
- * @param string|array $allowedFolders  Allowed folders
- * @param string|array $noAccessFolders Not allowed folders
- * @param string|array $userRoles       Roles of user
  * @param array        $SETTINGS        Teampass settings
  * @param object       $tree            Tree of folders
- * 
+ * @param string|array $noAccessFolders Forbidden folders (from users_groups_forbidden)
+ * @param string|array $userRoles       Roles of user (semicolon-separated or array)
+ *
  * @return bool
  */
 function identUser(
     array $SETTINGS,
     object $tree,
-    $allowedFolders= [],
-    $noAccessFolders= [],
-    $userRoles= []
+    $noAccessFolders = [],
+    $userRoles = []
 ) {
     $session = SessionManager::getSession();
     // Init
@@ -395,23 +393,39 @@ function identUser(
     // Ensure consistency in array format
     $noAccessFolders = convertToArray($noAccessFolders);
     $userRoles = convertToArray($userRoles);
-    $allowedFolders = [];//convertToArray($allowedFolders) ?? [];
-    $session->set('user-allowed_folders_by_definition', $allowedFolders);
-    
+
+    // Load per-user direct folder grants (admin-configured "Allowed Folders").
+    // These take priority over role-based access: an explicitly granted folder is always
+    // fully accessible (write), even if a role would give read-only on it.
+    // Denied folders (users_groups_forbidden / $noAccessFolders) still override direct grants.
+    $directGrantFolders = array_map(
+        'intval',
+        DB::queryFirstColumn(
+            'SELECT group_id FROM ' . prefixTable('users_groups') . ' WHERE user_id = %i',
+            $globalsUserId
+        )
+    );
+    $session->set('user-allowed_folders_by_definition', $directGrantFolders);
+
     // Get list of folders depending on Roles
     $arrays = identUserGetFoldersFromRoles(
         $userRoles,
         $allowedFoldersByRoles,
-        $readOnlyFolders,
-        $allowedFolders
+        $readOnlyFolders
     );
     $allowedFoldersByRoles = $arrays['allowedFoldersByRoles'];
     $readOnlyFolders = $arrays['readOnlyFolders'];
 
-    // Get list of Personal Folders
+    // Direct grants override role-based read-only: if a folder is explicitly granted,
+    // remove it from the read-only list so the user gets full write access.
+    if (!empty($directGrantFolders)) {
+        $readOnlyFolders = array_values(array_diff($readOnlyFolders, $directGrantFolders));
+    }
+
+    // Get list of Personal Folders, merging direct grants as the base allowed set
     $arrays = identUserGetPFList(
         $globalsPersonalFolders,
-        $allowedFolders,
+        $directGrantFolders,
         $globalsUserId,
         $personalFolders,
         $noAccessPersonalFolders,
@@ -496,11 +510,10 @@ function evaluateFolderAccesLevel(string $new_val, string $existing_val): string
  * @param array $userRoles
  * @param array $allowedFoldersByRoles
  * @param array $readOnlyFolders
- * @param array $allowedFolders
  *
  * @return array
  */
-function identUserGetFoldersFromRoles(array $userRoles, array $allowedFoldersByRoles = [], array $readOnlyFolders = [], array $allowedFolders = []) : array
+function identUserGetFoldersFromRoles(array $userRoles, array $allowedFoldersByRoles = [], array $readOnlyFolders = []) : array
 {
     // No roles means no role-based folder access
     if (count($userRoles) === 0) {
@@ -520,7 +533,7 @@ function identUserGetFoldersFromRoles(array $userRoles, array $allowedFoldersByR
     foreach ($rows as $record) {
         if ($record['type'] === 'R') {
             array_push($readOnlyFolders, $record['folder_id']);
-        } elseif (in_array($record['folder_id'], $allowedFolders) === false) {
+        } else {
             array_push($allowedFoldersByRoles, $record['folder_id']);
         }
     }

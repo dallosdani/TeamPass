@@ -6482,7 +6482,6 @@ switch ($inputData['type']) {
 
         if (empty($userData) === false) {
             identifyUserRights(
-                $userData['groupes_visibles'] ?? [],
                 $userData['groupes_interdits'] ?? [],
                 $userData['admin'],
                 is_null($userData['roles_from_ad_groups']) === true
@@ -7704,19 +7703,25 @@ function isProcessOnGoing(int $itemId): bool
  */
 function getUserVisibleFolders(int $userId): array
 {
-    // Query to retrieve visible folders for the user
-    $data = DB::queryFirstRow('SELECT visible_folders FROM ' . prefixTable('cache_tree') . ' WHERE user_id = %i', $userId);
+    // Query to retrieve visible folders for the user, including invalidation state
+    $data = DB::queryFirstRow(
+        'SELECT visible_folders, timestamp, IFNULL(invalidated_at, 0) AS invalidated_at
+        FROM ' . prefixTable('cache_tree') . ' WHERE user_id = %i',
+        $userId
+    );
 
     // Decode JSON data into an array
     $visibleFolders = json_decode($data['visible_folders'] ?? '', true);
 
-    // If cache exists and is valid, return it
-    if (!empty($visibleFolders) && is_array($visibleFolders)) {
+    // Return cache only if it exists, is valid JSON, and has not been invalidated
+    // (invalidated_at > timestamp means the cache was marked stale after last rebuild)
+    if (!empty($visibleFolders) && is_array($visibleFolders)
+        && (int) ($data['invalidated_at'] ?? 0) <= (int) ($data['timestamp'] ?? 0)
+    ) {
         return $visibleFolders;
     }
 
-    // FALLBACK: Build visible folders on-the-fly if cache is empty
-    // This handles the case where user_build_cache_tree hasn't run yet
+    // FALLBACK: Build visible folders on-the-fly if cache is empty or invalidated
     return buildVisibleFoldersOnTheFly($userId);
 }
 

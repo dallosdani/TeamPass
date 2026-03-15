@@ -551,7 +551,7 @@ function prepareNodeJson(
                 'a_attr' => array(
                     'id' => 'fld_' . $nodeId,
                     'class' => $nodeData['folderClass'],
-                    'onclick' => 'ListerItems(' . $nodeId . ', ' . $nodeData['restricted'] . ', 0, 1)',
+                    'onclick' => 'ListerItems(' . $nodeId . ', ' . $nodeData['restricted'] . ', 0, 1, true)',
                     'data-title' => htmlspecialchars($currentNode->title),
                 ),
                 'is_pf' => in_array($nodeId, $inputData['personalFolders']) === true ? 1 : 0,

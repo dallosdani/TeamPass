@@ -1306,6 +1306,18 @@ if (null !== $post_type) {
                         $post_id
                     );
 
+                    // Notify the affected user via WebSocket so their session rights and
+                    // jstree are refreshed in real-time, without requiring a page reload.
+                    // Skip if the admin is editing their own account (no push needed).
+                    if ($post_id !== (int) $session->get('user-id')) {
+                        emitWebSocketEvent(
+                            'folder_permission_changed',
+                            'user',
+                            $post_id,
+                            ['source' => 'direct_grant']
+                        );
+                    }
+
                     // update LOG
                     if ($oldData['email'] !== $post_email) {
                         logEvents($SETTINGS, 'user_mngt', 'at_user_email_changed:' . $oldData['email'], (string) $session->get('user-id'), $session->get('user-login'), (string) $post_id);

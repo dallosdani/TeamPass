@@ -460,7 +460,6 @@ if ($session->has('user-timezone') && empty($session->get('user-id')) === false)
 
         // get access rights
         identifyUserRights(
-            $data['groupes_visibles'] ?? [],
             $data['groupes_interdits'] ?? [],
             $data['admin'],
             is_null($data['roles_from_ad_groups']) === true ? $data['fonction_id'] : (empty($data['roles_from_ad_groups']) === true ? $data['fonction_id'] : strval($data['fonction_id']) . ';' . strval($data['roles_from_ad_groups'])),

@@ -1099,13 +1099,24 @@ switch ($inputData['type']) {
             break;
         }
 
-        // check that actual user can access this item
+        // Check whether the current user satisfies the item's access restrictions.
+        // Same logic as show_details_item: both user-level and role-level restrictions apply.
         $restrictionActive = true;
         $restrictedTo = is_null($dataItem['restricted_to']) === false ? array_filter(explode(';', $dataItem['restricted_to'])) : [];
-        if (in_array($session->get('user-id'), $restrictedTo) === true) {
+        $restrictedToRolesForUpdate = DB::queryFirstColumn(
+            'SELECT role_id FROM ' . prefixTable('restriction_to_roles') . ' WHERE item_id = %i',
+            $inputData['itemId']
+        );
+
+        if (empty($restrictedTo) && empty($restrictedToRolesForUpdate)) {
             $restrictionActive = false;
-        }
-        if (empty($dataItem['restricted_to']) === true) {
+        } elseif (
+            in_array($session->get('user-id'), $restrictedTo) === true
+            || !empty(array_intersect(
+                $restrictedToRolesForUpdate,
+                array_map('intval', array_filter(explode(';', $session->get('user-roles') ?? '')))
+            ))
+        ) {
             $restrictionActive = false;
         }
 
@@ -2750,30 +2761,35 @@ switch ($inputData['type']) {
             array_push($tags, $record['tag']);
         }
 
-        // check that actual user can access this item
+        // Check whether the current user satisfies the item's access restrictions.
+        // Restrictions come from two sources:
+        //   1. restricted_to: semicolon-separated user IDs stored on the item row.
+        //   2. restriction_to_roles: role IDs stored in a dedicated table.
+        // A user is allowed when:
+        //   - No restriction exists at all (neither user-level nor role-level).
+        //   - The user's ID appears in restricted_to.
+        //   - The user is a manager with manager_edit enabled.
+        //   - The user holds at least one role listed in restriction_to_roles.
+        // If restrictions exist but the user satisfies none, $restrictionActive stays true.
         $restrictionActive = true;
         $restrictedTo = is_null($dataItem['restricted_to']) === false ? array_filter(explode(';', $dataItem['restricted_to'])) : [];
-        if (
-            in_array($session->get('user-id'), $restrictedTo) === true
-            || ((int) $session->get('user-manager') === 1 && (int) $SETTINGS['manager_edit'] === 1)
-        ) {
-            $restrictionActive = false;
-        }
-        if (empty($dataItem['restricted_to']) === true) {
-            $restrictionActive = false;
-        }
-
-        // Check if user has a role that is accepted
-        $rows_tmp = DB::query(
-            'SELECT role_id
-            FROM ' . prefixTable('restriction_to_roles') . '
-            WHERE item_id=%i',
+        $restrictedToRoles = DB::queryFirstColumn(
+            'SELECT role_id FROM ' . prefixTable('restriction_to_roles') . ' WHERE item_id = %i',
             $inputData['id']
         );
-        foreach ($rows_tmp as $rec_tmp) {
-            if (in_array($rec_tmp['role_id'], explode(';', $session->get('user-roles')))) {
-                $restrictionActive = false;
-            }
+
+        if (empty($restrictedTo) && empty($restrictedToRoles)) {
+            // No restriction of any kind → open access
+            $restrictionActive = false;
+        } elseif (
+            in_array($session->get('user-id'), $restrictedTo) === true
+            || ((int) $session->get('user-manager') === 1 && (int) $SETTINGS['manager_edit'] === 1)
+            || !empty(array_intersect(
+                $restrictedToRoles,
+                array_map('intval', array_filter(explode(';', $session->get('user-roles') ?? '')))
+            ))
+        ) {
+            $restrictionActive = false;
         }
 
         // Uncrypt PW
@@ -7458,62 +7474,90 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
     
     // Check if the folder is in the user's allowed folders list defined by admin
     if (in_array($treeId, $session->get('user-allowed_folders_by_definition'))) {
-        return getAccessResponse(false, true, true, true);
+        return getAccessResponse(false, true, true, true, [], true);
     }
-    
+
     // Retrieve user's visible folders from the cache_tree table
     $visibleFolders = getUserVisibleFolders($userId);
-    
+
     // Check if the folder is personal to the user
     foreach ($visibleFolders as $folder) {
         if ($folder['id'] == $treeId && (int) $folder['perso'] === 1) {
-            return getAccessResponse(false, true, true, true);
+            return getAccessResponse(false, true, true, true, [], true);
         }
     }
     
     // Determine the user's access rights based on their roles for this folder
-    [$edit, $delete] = getRoleBasedAccess($session, $treeId);
-    
+    [$edit, $delete, $create] = getRoleBasedAccess($session, $treeId);
+
     // Is this folder in the list of visible folders?
     if (!in_array($treeId, array_column($visibleFolders, 'id'))) {
         // If the folder is not visible to the user, they cannot edit or delete items in it
         return getAccessResponse(false, false, false, false);
     }
-    
+
     // Log access rights information if logging is enabled
     if (LOG_TO_SERVER === true) {
-        error_log("TEAMPASS - Folder: $treeId - User: $userId - edit: $edit - delete: $delete");
+        error_log("TEAMPASS - Folder: $treeId - User: $userId - edit: $edit - delete: $delete - create: $create");
     }
-    
-    return getAccessResponse(false, true, $edit, $delete, $editionLock);
+
+    return getAccessResponse(false, true, $edit, $delete, $editionLock, $create);
 }
 
 /**
-* Get user access restriction response.
-*
-* @param int $itemId The ID of the item to check
-* @param int $userId The ID of the current user
-*
-* @return bool Restricted to user response.
-*/
-function getItemRestrictedUsersList($itemId, $userId)
+ * Check if the current user can access an item based on its user/role restrictions.
+ *
+ * Returns true when the user is allowed:
+ *   - No restriction exists at all (neither user-level nor role-level).
+ *   - The user's ID is listed in `restricted_to`.
+ *   - The user has at least one role listed in `teampass_restriction_to_roles`.
+ *
+ * Returns false when restrictions exist but the user satisfies none of them.
+ *
+ * @param int $itemId The ID of the item to check
+ * @param int $userId The ID of the current user
+ *
+ * @return bool True if access is allowed, false if blocked by restriction.
+ */
+function getItemRestrictedUsersList(int $itemId, int $userId): bool
 {
-    // Get item date
-    $itemRestrictedUsersList = DB::queryFirstRow(
-        'SELECT restricted_to
-         FROM ' . prefixTable('items') . '
-         WHERE id = %i',
+    $session = SessionManager::getSession();
+
+    // Fetch user-level restriction list
+    $itemData = DB::queryFirstRow(
+        'SELECT restricted_to FROM ' . prefixTable('items') . ' WHERE id = %i',
         $itemId
     );
-    // Check if user is in the list of restriction if the item is restricted
-    if (empty($itemRestrictedUsersList['restricted_to']) === false) {
-        $restrictedUsers = array_map('intval', explode(';', $itemRestrictedUsersList['restricted_to']));
-        if (!in_array($userId, $restrictedUsers, true)) {
-            return false;
-        }
-    }    
+    $restrictedUsers = [];
+    if (!empty($itemData['restricted_to'])) {
+        $restrictedUsers = array_map('intval', array_filter(explode(';', $itemData['restricted_to'])));
+    }
 
-    return true;
+    // Fetch role-level restrictions
+    $restrictedRoles = DB::queryFirstColumn(
+        'SELECT role_id FROM ' . prefixTable('restriction_to_roles') . ' WHERE item_id = %i',
+        $itemId
+    );
+
+    // No restrictions at all → open access
+    if (empty($restrictedUsers) && empty($restrictedRoles)) {
+        return true;
+    }
+
+    // User is explicitly listed
+    if (in_array($userId, $restrictedUsers, true)) {
+        return true;
+    }
+
+    // User has at least one of the restricted roles
+    if (!empty($restrictedRoles)) {
+        $userRoles = array_map('intval', array_filter(explode(';', $session->get('user-roles') ?? '')));
+        if (!empty(array_intersect($restrictedRoles, $userRoles))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -7822,7 +7866,7 @@ function getRoleBasedAccess($session, int $treeId): array
     );
 
     if (empty($accessTypes)) {
-        return [false, false];
+        return [false, false, false];
     }
 
     // Resolve multiple types using the shared priority function (least permissive wins):
@@ -7833,33 +7877,35 @@ function getRoleBasedAccess($session, int $treeId): array
     }
 
     switch ($resolvedType) {
-        case 'W':    return [true, true];   // full write: edit + delete
-        case 'ND':   return [true, false];  // no delete
-        case 'NE':   return [false, true];  // no edit
-        case 'NDNE': return [false, false]; // no edit, no delete
-        case 'R':    return [false, false]; // read only
-        default:     return [false, false];
+        case 'W':    return [true,  true,  true];  // full write: edit + delete + create
+        case 'ND':   return [true,  false, true];  // no delete, can create
+        case 'NE':   return [false, true,  true];  // no edit, can create
+        case 'NDNE': return [false, false, true];  // no edit, no delete, can create
+        case 'R':    return [false, false, false]; // read only: no create either
+        default:     return [false, false, false];
     }
 }
 
 /**
  * Constructs the final access response array with the given parameters.
- * 
+ *
  * @param bool $error Indicates if there was an error
  * @param bool $access Indicates if the user has access
- * @param bool $edit Indicates if the user has edit rights
+ * @param bool $edit Indicates if the user has edit rights on existing items
  * @param bool $delete Indicates if the user has delete rights
  * @param array $editionLocked Edition lock status array
- * 
+ * @param bool $create Indicates if the user can create new items (true for W/ND/NE/NDNE, false for R)
+ *
  * @return array An array containing the access rights information
  */
-function getAccessResponse(bool $error, bool $access, bool $edit, bool $delete, array $editionLocked = []): array
+function getAccessResponse(bool $error, bool $access, bool $edit, bool $delete, array $editionLocked = [], bool $create = false): array
 {
     return [
         'error' => $error,
         'access' => $access,
         'edit' => $edit,
         'delete' => $delete,
+        'create' => $create,
         'edition_locked' => $editionLocked['status'] ?? false,
         'edition_locked_delay' => $editionLocked['delay'] ?? null,
     ];

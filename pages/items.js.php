@@ -106,7 +106,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         previousSelectedFolder = -1,
         intervalId = false,
         editionLockInterval = null,
-        debugJavascript = true,
+        debugJavascript = false,
         loadingToast = '';
 
     /**
@@ -6969,8 +6969,11 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 }
                 
                 // Is the user allowed?
+                // edit===0 means new item creation: check create right (NDNE allows it, R does not).
+                // edit===1 means editing an existing item: check edit right instead.
                 if (retData.access === false
-                    || retData.edit === false
+                    || (edit === 0 && retData.create === false)
+                    || (edit !== 0 && retData.edit === false)
                 ) {
                     toastr.remove();
                     toastr.error(
@@ -7043,18 +7046,23 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 theme: "bootstrap4",
                             });
 
-                            // Show selected restricted inputs
-                            $('#form-item-restrictedto')
-                                .val(data.usersList.concat(
-                                    data.rolesList.map(i => 'role_' + i)))
-                                .change();
-
-                            // If restricted to Users then select them
-                            if (store.get('teampassItem').id_restricted_to !== undefined) {
-                                $('#form-item-restrictedto')
-                                    .val(store.get('teampassItem').id_restricted_to)
-                                    .trigger('change');
+                            // Show selected restricted inputs — use the item's actual restrictions
+                            // (id_restricted_to = user IDs, id_restricted_to_roles = role IDs)
+                            // stored by show_details_item, NOT the available-options lists.
+                            const restrictedUsers = store.get('teampassItem').id_restricted_to
+                            const restrictedRoles = store.get('teampassItem').id_restricted_to_roles
+                            const selectedValues = []
+                            if (Array.isArray(restrictedUsers)) {
+                                restrictedUsers.forEach(id => { if (id) selectedValues.push(String(id)) })
+                            } else if (restrictedUsers) {
+                                String(restrictedUsers).split(';').forEach(id => { if (id) selectedValues.push(id) })
                             }
+                            if (Array.isArray(restrictedRoles)) {
+                                restrictedRoles.forEach(id => { if (id) selectedValues.push('role_' + id) })
+                            } else if (restrictedRoles) {
+                                String(restrictedRoles).split(';').forEach(id => { if (id) selectedValues.push('role_' + id) })
+                            }
+                            $('#form-item-restrictedto').val(selectedValues).trigger('change')
                         }
 
                         store.update(
@@ -7067,8 +7075,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                     teampassItem.folderIsPersonal = data.personal === undefined ? '' : parseInt(data.personal),
                                     teampassItem.itemMinimumComplexity = data.complexity === undefined ? '' : data.complexity,
                                     teampassItem.itemVisibility = data.visibility === undefined ? '' : data.visibility,
-                                    teampassItem.id_restricted_to = data.usersList === undefined ? '' : data.usersList,
-                                    teampassItem.id_restricted_to_roles = data.rolesList === undefined ? '' : data.rolesList,
+                                    // Do NOT overwrite id_restricted_to / id_restricted_to_roles here:
+                                    // they were set by show_details_item and hold the item's actual
+                                    // restrictions. data.usersList / data.rolesList are the available
+                                    // options for the folder, not the item's current selection.
                                     teampassItem.item_rights = data.itemAccessRight === undefined ? '' : data.itemAccessRight
                             }
                         );

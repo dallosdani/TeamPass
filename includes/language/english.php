@@ -1978,8 +1978,6 @@ return array(
     'ws_item_moved_away' => 'has been moved to another folder by',
     'ws_item_moved_by' => 'moved by',
     'ws_item_moved' => 'Item moved',
-
-    // WebSocket admin panel
     'ws_status_disabled' => 'Disabled',
     'ws_status_running' => 'Running',
     'ws_status_stopped' => 'Stopped',
@@ -2006,5 +2004,22 @@ return array(
     'settings_websocket_host_tip' => 'The IP address or FQDN where the WebSocket server is running (e.g., 127.0.0.1 or ws.domain.com).',
     'settings_websocket_port' => 'Websocket port',
     'settings_websocket_port_tip' => 'The TCP port used by the WebSocket server (default is often 8080 or 8443 for SSL).',
-
+    'settings_category_favorites_title' => 'Favorite settings',
+    'settings_category_favorites_goal' => 'Pinned by administrator',
+    'settings_category_favorites_tip' => 'Pin the settings you use most often from each section. Favorites are stored per administrator account.',
+    'settings_category_favorites_empty' => 'No setting is pinned yet.',
+    'settings_favorite_add' => 'Pin this setting',
+    'settings_favorite_remove' => 'Unpin this setting',
+    'settings_favorite_added' => 'Setting added to favorites.',
+    'settings_favorite_removed' => 'Setting removed from favorites.',
+    'settings_favorite_action_goto' => 'Open setting',
+    'settings_favorite_action_remove' => 'Remove',
+    'settings_favorite_category' => 'Section',
+    'settings_favorite_invalid_key' => 'Invalid favorite setting key.',
+    'settings_navigation_title' => 'Categories',
+    'settings_category_essentials_title' => 'Essential settings',
+    'settings_category_essentials_goal' => 'Most used',
+    'settings_category_networks_title' => 'Networks',
+    'settings_category_networks_goal' => 'IP filtering and access control',
+    'settings_category_networks_under_construction' => 'Under construction',
 );

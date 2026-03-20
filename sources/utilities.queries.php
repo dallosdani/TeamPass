@@ -4049,5 +4049,125 @@ function tpGetSystemChecks(array $phpIni, array $tpSettings, Language $lang): ar
         );
     }
 
+    // OpenSSL extension — critical for phpseclib RSA performance
+    if (extension_loaded('openssl') === false) {
+        $checks[] = array(
+            'status' => 'danger',
+            'title' => $lang->get('health_check_openssl'),
+            'text' => $lang->get('health_check_openssl_missing'),
+        );
+    } else {
+        $checks[] = array(
+            'status' => 'success',
+            'title' => $lang->get('health_check_openssl'),
+            'text' => $lang->get('health_status_ok'),
+        );
+    }
+
+    // OPcache — strongly recommended to avoid per-request PHP recompilation
+    $opcacheExtLoaded = extension_loaded('Zend OPcache');
+    $opcacheEnabled   = $opcacheExtLoaded && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
+    if ($opcacheEnabled === false) {
+        $checks[] = array(
+            'status' => 'warning',
+            'title' => $lang->get('health_check_opcache'),
+            'text' => $lang->get('health_check_opcache_disabled'),
+        );
+    } else {
+        $opcacheMemMb = (int) ini_get('opcache.memory_consumption');
+        if ($opcacheMemMb > 0 && $opcacheMemMb < 128) {
+            $checks[] = array(
+                'status' => 'warning',
+                'title' => $lang->get('health_check_opcache'),
+                'text' => sprintf($lang->get('health_check_opcache_low_memory'), (string) $opcacheMemMb),
+            );
+        } else {
+            $checks[] = array(
+                'status' => 'success',
+                'title' => $lang->get('health_check_opcache'),
+                'text' => $lang->get('health_status_ok'),
+            );
+        }
+    }
+
+    // PHP-FPM — informational; recommended for high-concurrency deployments
+    $isFpm = PHP_SAPI === 'fpm-fcgi';
+    $checks[] = array(
+        'status' => $isFpm ? 'success' : 'info',
+        'title' => $lang->get('health_check_php_fpm'),
+        'text' => $isFpm
+            ? $lang->get('health_check_php_fpm_detected')
+            : sprintf($lang->get('health_check_php_fpm_info'), PHP_SAPI),
+    );
+
+    // APCu — settings cache; eliminates a full DB query for teampass_misc on every request
+    $apcuLoaded  = extension_loaded('apcu');
+    $apcuEnabled = $apcuLoaded && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN);
+    if ($apcuEnabled === false) {
+        $checks[] = array(
+            'status' => 'warning',
+            'title' => $lang->get('health_check_apcu'),
+            'text' => $lang->get('health_check_apcu_disabled'),
+        );
+    } else {
+        $checks[] = array(
+            'status' => 'success',
+            'title' => $lang->get('health_check_apcu'),
+            'text' => $lang->get('health_status_ok'),
+        );
+    }
+
+    // Redis session storage
+    $redisExtLoaded      = extension_loaded('redis');
+    $redisSessionEnabled = isset($tpSettings['redis_session_enabled']) && $tpSettings['redis_session_enabled'] === '1';
+    if ($redisSessionEnabled && $redisExtLoaded === false) {
+        $checks[] = array(
+            'status' => 'danger',
+            'title' => $lang->get('health_check_redis_session'),
+            'text' => $lang->get('health_check_redis_ext_missing'),
+        );
+    } elseif ($redisSessionEnabled) {
+        $checks[] = array(
+            'status' => 'success',
+            'title' => $lang->get('health_check_redis_session'),
+            'text' => $lang->get('health_check_redis_session_configured'),
+        );
+    } else {
+        $checks[] = array(
+            'status' => 'info',
+            'title' => $lang->get('health_check_redis_session'),
+            'text' => sprintf($lang->get('health_check_redis_session_info'), PHP_SAPI),
+        );
+    }
+
+    // WebSocket event table indexes (only relevant when WebSocket is enabled)
+    if (isset($tpSettings['websocket_enabled']) && $tpSettings['websocket_enabled'] === '1') {
+        $requiredIndexes = array('idx_unprocessed', 'idx_cleanup');
+        $missingIndexes  = array();
+        foreach ($requiredIndexes as $idxName) {
+            $rows = DB::query(
+                'SHOW INDEX FROM %l WHERE Key_name = %s',
+                prefixTable('websocket_events'),
+                $idxName
+            );
+            if (count($rows) === 0) {
+                $missingIndexes[] = $idxName;
+            }
+        }
+        if (count($missingIndexes) > 0) {
+            $checks[] = array(
+                'status' => 'warning',
+                'title' => $lang->get('health_check_ws_indexes'),
+                'text' => sprintf($lang->get('health_check_ws_indexes_missing'), implode(', ', $missingIndexes)),
+            );
+        } else {
+            $checks[] = array(
+                'status' => 'success',
+                'title' => $lang->get('health_check_ws_indexes'),
+                'text' => $lang->get('health_status_ok'),
+            );
+        }
+    }
+
     return $checks;
 }

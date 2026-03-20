@@ -121,13 +121,18 @@ Located in `/includes/libraries/teampassclasses/`, these are local packages mana
 
 **SessionManager** (`TeampassClasses\SessionManager\SessionManager`)
 - Singleton pattern: `SessionManager::getSession()`
-- Wraps Symfony Session with custom encrypted storage handler
+- Wraps Symfony Session with `EncryptedSessionProxy` — session data is always encrypted at rest
 - Encryption key loaded from `SECUREPATH/SECUREFILE`
-- Session data encrypted at rest on server
+- **Session storage backend** (selected automatically):
+  - **Redis** (opt-in): when `ext-redis` is loaded AND `redis_session_enabled=1` in settings, sessions are stored in Redis via `RedisSessionHandler` wrapped by `EncryptedSessionProxy`; 2-second connect timeout; falls back to filesystem on any failure
+  - **Filesystem** (default): `\SessionHandler` wrapped by `EncryptedSessionProxy`
+- Redis connection settings: `redis_host` (default `127.0.0.1`), `redis_port` (default `6379`), `redis_prefix` (default `teampass_sess_`)
+- `gc_maxlifetime` is set dynamically to `maximum_session_expiration_time × 60 + 1800 s` (minimum 7200 s) to prevent premature PHP garbage collection
 
 **ConfigManager** (`TeampassClasses\ConfigManager\ConfigManager`)
-- Loads all settings from `teampass_misc` database table
-- Caches in memory as `$SETTINGS` array
+- Loads all settings from `teampass_misc` database table (`type = 'admin'`)
+- **APCu caching**: when `ext-apcu` is available, settings are cached in shared memory for 60 s under the key `teampass_settings_v1`; cache is bypassed on miss and populated after every DB read
+- **Cache invalidation**: `ConfigManager::invalidateCache()` must be called after any write to `teampass_misc` (already called in `sources/admin.queries.php` `save_option_change`)
 - Usage: `$configManager->getSetting('setting_key')`
 
 **PasswordManager** (`TeampassClasses\PasswordManager\PasswordManager`)
@@ -494,7 +499,7 @@ teampass_websocket_connections:
   id, user_id, resource_id VARCHAR(50), connected_at, disconnected_at, ip_address, user_agent
 ```
 
-Tables created by `/install1/upgrade_run_3.1.7.php`. Migration script: `/install1/scripts/websocket_migration.php`.
+Tables created by `/install/upgrade_run_3.1.7.php`.
 
 #### End-to-End Event Flow Example
 
@@ -813,6 +818,7 @@ When making changes to core functionality:
    ```
 
 3. If adding during upgrade, add to appropriate `/install/upgrade_run_*.php`
+4. **Always call `ConfigManager::invalidateCache()`** after any write to `teampass_misc` so the APCu cache does not serve stale values to other requests
 
 ### Adding a New Page
 
@@ -863,6 +869,133 @@ Current version constants in `/includes/config/include.php`:
 - Full version: 3.1.5.2
 
 Version upgrades managed through `/install/upgrade_run_*.php` scripts.
+
+## Performance Optimizations
+
+This section documents the performance improvements implemented for high-concurrency deployments (~200 concurrent users).
+
+### P0 — Infrastructure checks (install & upgrade)
+
+**Required extensions** list was updated in `install/install.php`, `install/upgrade.php`, and `install/upgrade_ajax.php`:
+- Removed: `iconv`, `gd`, `gmp`, `mcrypt` (no longer needed)
+- Added: `pcntl`, `posix` (required for background task daemon)
+
+`pcntl` and `posix` are CLI-only extensions not available in the web SAPI; they are checked via `exec('php -m 2>/dev/null')` in both the installer (`install/install-steps/run.step2.php`) and the upgrade wizard (`install/upgrade_ajax.php`).
+
+**DB constants check** in `install/upgrade.php` was fixed: now uses `defined('DB_HOST')` etc. instead of `null !== DB_HOST` (correct for PHP constants).
+
+Four **optional** (non-blocking) checks were also added to both the installer and the upgrade wizard:
+
+| Check | Type | Backend case |
+|---|---|---|
+| OPcache enabled | optional | `'opcache'` |
+| PHP-FPM SAPI | optional | `'php_fpm'` |
+| APCu extension | optional | `'apcu'` |
+| ext-redis | optional | `'redis'` |
+
+- **Optional checks** show a warning icon (`fa-exclamation-triangle text-warning`) on failure but do NOT block installation/upgrade.
+- PHP-FPM detection: `PHP_SAPI === 'fpm-fcgi'` (web SAPI only); available as a recommendation, not a requirement.
+- OPcache detection: `extension_loaded('Zend OPcache') && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN)`.
+- APCu detection: `extension_loaded('apcu') && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN)`.
+
+**Installer step 5** (table creation) was extended with three new WebSocket table checks: `websocket_events` (check54), `websocket_connections` (check55), `websocket_tokens` (check56).
+
+### P0 — Admin health page checks
+
+`tpGetSystemChecks()` in `sources/utilities.queries.php` was extended with these checks (in order):
+
+1. **OpenSSL** — `extension_loaded('openssl')`; required
+2. **OPcache** — extension present + `opcache.enable=1`; recommended
+3. **PHP-FPM** — `PHP_SAPI === 'fpm-fcgi'`; recommended for high-concurrency
+4. **APCu** — extension present + `apc.enabled=1`; recommended (enables ConfigManager cache)
+5. **Redis session** — `ext-redis` loaded + `redis_session_enabled=1`; informational
+6. **WebSocket indexes** — `SHOW INDEX` on `teampass_websocket_events`; only checked when `websocket_enabled=1`
+
+### P1 — APCu settings cache (ConfigManager)
+
+`ConfigManager::loadSettingsFromDB()` now caches the full settings array in APCu shared memory:
+- Cache key: `teampass_settings_v1` (bump to invalidate across all workers)
+- TTL: 60 seconds
+- Behaviour: fetch → hit? return cached. miss? query DB, store in APCu, return.
+- When APCu is absent the code path is identical to before (no-op checks on `function_exists`).
+
+**Rule**: always call `ConfigManager::invalidateCache()` after writing to `teampass_misc`. It is already called in `sources/admin.queries.php` (`case 'save_option_change'`).
+
+```php
+// After any DB write to teampass_misc:
+ConfigManager::invalidateCache();
+```
+
+### P1 — Redis session storage (SessionManager)
+
+Sessions can optionally be stored in Redis instead of the filesystem:
+
+**Enabling Redis sessions:**
+1. Ensure `ext-redis` is installed on the server
+2. In Admin → Options → WebSocket tab, enable "Redis session storage" and configure host/port/prefix
+3. The settings are stored in `teampass_misc`: `redis_session_enabled`, `redis_host`, `redis_port`, `redis_prefix`
+
+**Architecture:**
+```
+Redis enabled?
+  ext-redis loaded + redis_session_enabled=1
+    → \Redis::connect($host, $port, timeout=2.0)
+    → RedisSessionHandler (Symfony, prefix + ttl=86400)
+    → EncryptedSessionProxy (Defuse encryption at rest)
+  On any exception → fall back to filesystem silently
+
+Redis disabled / ext-redis absent:
+  → \SessionHandler (filesystem)
+  → EncryptedSessionProxy (Defuse encryption at rest)
+```
+
+**Redis settings inserted by `install/upgrade_run_3.1.7.php`** (INSERT IGNORE):
+
+| Setting key | Default value |
+|---|---|
+| `redis_session_enabled` | `0` |
+| `redis_host` | `127.0.0.1` |
+| `redis_port` | `6379` |
+| `redis_prefix` | `teampass_sess_` |
+
+### P1 — WebSocket event table indexes
+
+The `teampass_websocket_events` table requires two indexes for efficient polling by `EventBroadcaster`:
+- `idx_unprocessed (processed, created_at)` — EventBroadcaster `SELECT` query
+- `idx_cleanup (processed, processed_at)` — periodic cleanup query
+
+These indexes are included in the `CREATE TABLE` statement in `install/upgrade_run_3.1.7.php`. The admin health check verifies their presence via `SHOW INDEX` when `websocket_enabled=1`.
+
+### upgrade_run_3.1.7.php — Full change summary
+
+`install/upgrade_run_3.1.7.php` was added to `install/upgrade_scripts_manager.php` and performs the following migrations:
+
+1. **WebSocket tables** — `CREATE TABLE IF NOT EXISTS` for `teampass_websocket_events`, `teampass_websocket_connections`, `teampass_websocket_tokens` (with their indexes).
+
+2. **Admin settings favorites** — `CREATE TABLE IF NOT EXISTS teampass_users_options_favorites` (columns: `id`, `user_id`, `option_key`, `position`, `created_at`, `updated_at`; unique key on `(user_id, option_key)`). Stores per-administrator pinned settings sections shown in the new favorites tab on `pages/options.php`.
+
+3. **`roles_values` cleanup** — four sequential steps:
+   - Delete orphan rows where `folder_id` no longer exists in `teampass_nested_tree`
+   - Delete orphan rows where `role_id` no longer exists in `teampass_roles_title`
+   - Delete duplicate `(role_id, folder_id)` pairs keeping the highest `increment_id`
+   - Delete rows with `type = ''` (no-access entries are implicit)
+   - Add `UNIQUE INDEX idx_role_folder_unique (role_id, folder_id)` to prevent future duplicates
+
+4. **`cache_tree` improvements**:
+   - Add index `idx_user_id (user_id)` for per-user cache lookups
+   - Add column `invalidated_at INT UNSIGNED DEFAULT 0` for targeted per-user cache invalidation
+
+5. **Redis session settings** — `INSERT IGNORE` of four `teampass_misc` rows (`redis_session_enabled=0`, `redis_host=127.0.0.1`, `redis_port=6379`, `redis_prefix=teampass_sess_`).
+
+6. **Structural** — rename column `agses-usercardid` → `agses_usercardid` on `teampass_users` (hyphen → underscore).
+
+### Dual-location classes
+
+`ConfigManager` and `SessionManager` exist in two locations that must be kept in sync:
+- `includes/libraries/teampassclasses/configmanager/src/ConfigManager.php` (source)
+- `vendor/teampassclasses/configmanager/src/ConfigManager.php` (Composer copy)
+
+Same for `SessionManager` and `EncryptedSessionProxy`. Always edit both locations together.
 
 ## IMPORTANT Rules
 - Always prioritize minimal modifications.

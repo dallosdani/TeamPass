@@ -20,24 +20,36 @@ This document highlights a basic setup, but you can refer to many other existing
 
 In addition to the Apache web server, the following PHP extensions are required by Teampass:
 
-* `mcrypt`
 * `mbstring`
 * `openssl`
 * `bcmath`
-* `iconv`
-* `gd`
 * `mysql`
 * `xml`
-* `gmp`
 * `curl`
+* `pcntl` *(CLI only — required for the background task daemon)*
+* `posix` *(CLI only — required for the background task daemon)*
 
 Install them by running next commands:
 
 ```
 sudo apt-get update
-sudo apt-get install php8.2-mcrypt php8.2-mbstring php8.2-fpm php8.2-common php8.2-xml php8.2-gd openssl php8.2-mysql php8.2-bcmath php8.2-gmp php8.2-curl
+sudo apt-get install php8.2-mbstring php8.2-fpm php8.2-common php8.2-xml openssl php8.2-mysql php8.2-bcmath php8.2-curl
 ```
 > :bulb: **Note:**  Adapt version to your expectation
+
+> :bulb: **Note:** `pcntl` and `posix` are CLI-only extensions. They are not loaded by Apache/FPM but must be available for the PHP CLI. On most distributions they are included in `php8.2-common`. Verify with `php -m | grep -E "(pcntl|posix)"`.
+
+### Optional — Performance extensions
+
+The following extensions are not required but are strongly recommended for production deployments:
+
+| Extension | Purpose |
+|-----------|---------|
+| `apcu` | In-memory settings cache — reduces DB reads on every request |
+| `redis` + ext-redis | Redis-based session storage — improves session performance under high concurrency |
+| `Zend OPcache` | Bytecode cache — significantly speeds up PHP execution |
+
+See the [Performance](install/performance.md) page for installation and configuration details.
 
 ### Max execution time increase
 

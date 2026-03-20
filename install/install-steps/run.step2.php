@@ -108,6 +108,34 @@ switch ($type) {
         }
         break;
 
+    case 'opcache':
+        // Check that the Zend OPcache extension is present and enabled for the web SAPI
+        if (extension_loaded('Zend OPcache') && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN)) {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'php_fpm':
+        // Check that PHP is running under PHP-FPM (fpm-fcgi SAPI)
+        if (PHP_SAPI === 'fpm-fcgi') {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'apcu':
+        // Check that APCu extension is present and enabled for the web SAPI
+        if (extension_loaded('apcu') && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN)) {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'redis':
+        // Check that ext-redis is loaded (required for Redis session storage)
+        if (extension_loaded('redis')) {
+            $response['success'] = true;
+        }
+        break;
+
     default:
         $response['error'] = 'Invalid type';
         break;

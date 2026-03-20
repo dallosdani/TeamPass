@@ -257,6 +257,26 @@ addColumnIfNotExist(
 
 //---<END 3.1.7
 
+// ==========================================
+// Redis session storage settings (optional, disabled by default)
+// INSERT IGNORE ensures idempotency on repeated upgrade runs
+// ==========================================
+$redisDefaults = [
+    'redis_session_enabled' => '0',
+    'redis_host'            => '127.0.0.1',
+    'redis_port'            => '6379',
+    'redis_prefix'          => 'teampass_sess_',
+];
+foreach ($redisDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
 
 // Close connection
 mysqli_close($db_link);

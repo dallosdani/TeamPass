@@ -44,8 +44,8 @@ class SessionManager
             // Load the encryption key
             $key = Key::loadFromAsciiSafeString(file_get_contents(SECUREPATH . "/" . SECUREFILE));
 
-            // Create an instance of EncryptedSessionProxy
-            $handler = new EncryptedSessionProxy(new \SessionHandler(), $key);
+            // Build the session handler — Redis when configured, filesystem otherwise
+            $handler = self::buildSessionHandler($key);
 
             // Create a new session with the encrypted session handler
             self::$session = new Session(new \Symfony\Component\HttpFoundation\Session\Storage\NativeSessionStorage([], $handler));
@@ -77,6 +77,46 @@ class SessionManager
         }
 
         return self::$session;
+    }
+
+    /**
+     * Build the appropriate session handler.
+     *
+     * When ext-redis is loaded and redis_session_enabled=1 in settings, sessions
+     * are stored in Redis wrapped by EncryptedSessionProxy so data remains
+     * encrypted at rest. Falls back to the filesystem handler on any failure.
+     *
+     * @param Key $key Defuse encryption key
+     * @return \SessionHandlerInterface
+     */
+    private static function buildSessionHandler(Key $key): \SessionHandlerInterface
+    {
+        if (extension_loaded('redis') === true) {
+            try {
+                $configManager = new ConfigManager();
+                if ($configManager->getSetting('redis_session_enabled') === '1') {
+                    $redis = new \Redis();
+                    $host  = (string) ($configManager->getSetting('redis_host')   ?? '127.0.0.1');
+                    $port  = (int)    ($configManager->getSetting('redis_port')   ?? 6379);
+
+                    // 2-second connect timeout to avoid blocking a page load
+                    $redis->connect($host, $port, 2.0);
+
+                    $prefix = (string) ($configManager->getSetting('redis_prefix') ?? 'teampass_sess_');
+                    $redisHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler(
+                        $redis,
+                        ['prefix' => $prefix, 'ttl' => 86400]
+                    );
+
+                    return new EncryptedSessionProxy($redisHandler, $key);
+                }
+            } catch (\Exception $e) {
+                // Redis unavailable or misconfigured — fall through to filesystem
+            }
+        }
+
+        // Default: file-based sessions with encryption at rest
+        return new EncryptedSessionProxy(new \SessionHandler(), $key);
     }
 
     /**

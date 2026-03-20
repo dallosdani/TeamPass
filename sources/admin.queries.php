@@ -2183,6 +2183,9 @@ switch ($post_type) {
             );
         }
 
+        // Invalidate APCu settings cache so the next request re-reads from DB
+        ConfigManager::invalidateCache();
+
         // Encrypt data to return
         echo prepareExchangedData(
             array(

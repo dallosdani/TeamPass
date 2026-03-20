@@ -254,7 +254,7 @@ $zones = timezone_list();
                             <a class='nav-link' id='settings-nav-general' data-toggle='pill' href='#settings-tab-general' role='tab' aria-controls='settings-tab-general' aria-selected='false' title="<?php echo $lang->get('settings_category_general_info_title'); ?>"><i class="fa-solid fa-folder-open mr-2"></i><?php echo $lang->get('settings_category_general_info_title'); ?></a>
                             <a class='nav-link' id='settings-nav-system' data-toggle='pill' href='#settings-tab-system' role='tab' aria-controls='settings-tab-system' aria-selected='false' title="<?php echo $lang->get('settings_category_system_title'); ?>"><i class="fa-solid fa-gears mr-2"></i><?php echo $lang->get('settings_category_system_title'); ?></a>
                             <a class='nav-link' id='settings-nav-security' data-toggle='pill' href='#settings-tab-security' role='tab' aria-controls='settings-tab-security' aria-selected='false' title="<?php echo $lang->get('settings_category_security_title'); ?>"><i class="fa-solid fa-shield-halved mr-2"></i><?php echo $lang->get('settings_category_security_title'); ?></a>
-                            <a class='nav-link' id='settings-nav-websocket' data-toggle='pill' href='#settings-tab-websocket' role='tab' aria-controls='settings-tab-websocket' aria-selected='false' title="<?php echo $lang->get('settings_websocket_title'); ?>"><i class="fa-solid fa-ear-listen mr-2"></i><?php echo $lang->get('settings_websocket_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-websocket' data-toggle='pill' href='#settings-tab-websocket' role='tab' aria-controls='settings-tab-websocket' aria-selected='false' title="<?php echo $lang->get('settings_realtime_title'); ?>"><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?></a>
                             <a class='nav-link' id='settings-nav-networks' data-toggle='pill' href='#settings-tab-networks' role='tab' aria-controls='settings-tab-networks' aria-selected='false' title="<?php echo $lang->get('settings_category_networks_title'); ?>"><i class="fa-solid fa-network-wired mr-2"></i><?php echo $lang->get('settings_category_networks_title'); ?></a>
                             <a class='nav-link' id='settings-nav-logging' data-toggle='pill' href='#settings-tab-logging' role='tab' aria-controls='settings-tab-logging' aria-selected='false' title="<?php echo $lang->get('settings_category_logging_title'); ?>"><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?></a>
                             <a class='nav-link' id='settings-nav-integration' data-toggle='pill' href='#settings-tab-integration' role='tab' aria-controls='settings-tab-integration' aria-selected='false' title="<?php echo $lang->get('settings_category_integration_title'); ?>"><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?></a>
@@ -679,18 +679,20 @@ $zones = timezone_list();
                     </div>
                 </div>
                     </div>
-                    <div class='tab-pane fade' id='settings-tab-websocket' role='tabpanel' aria-labelledby='settings-nav-websocket' data-section-label='<?php echo $lang->get('settings_websocket_title'); ?>'>
+                    <div class='tab-pane fade' id='settings-tab-websocket' role='tabpanel' aria-labelledby='settings-nav-websocket' data-section-label='<?php echo $lang->get('settings_realtime_title'); ?>'>
 <div class='card card-info'>
                     <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-ear-listen mr-2"></i><?php echo $lang->get('settings_websocket_title'); ?>
+                        <h3 class='card-title'><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?>
                             <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_websocket_title_goal'); ?>
+                                <?php echo $lang->get('settings_realtime_title_goal'); ?>
                             </span>
                         </h3>
                     </div>
                     <!-- /.card-header -->
                     <!-- form start -->
                     <div class='card-body'>
+
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-ear-listen mr-2'></i><?php echo $lang->get('settings_websocket_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_websocket_title_goal'); ?></span></h6>
 
                         <div class='row mb-2 option' data-keywords="websocket">
                             <div class='col-10'>
@@ -703,7 +705,7 @@ $zones = timezone_list();
                                 <div class='toggle toggle-modern' id='websocket_enabled' data-toggle-on='<?php echo isset($SETTINGS['websocket_enabled']) === true && (int) $SETTINGS['websocket_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='websocket_enabled_input' value='<?php echo isset($SETTINGS['websocket_enabled']) && (int) $SETTINGS['websocket_enabled'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
-                        
+
                         <div class='row mb-2 option' data-keywords="websocket host">
                             <div class='col-8'>
                                 <?php echo $lang->get('settings_websocket_host'); ?>
@@ -715,7 +717,7 @@ $zones = timezone_list();
                                 <input type='text' class='form-control form-control-sm' id='websocket_host' value='<?php echo htmlspecialchars($SETTINGS['websocket_host'] ?? '127.0.0.1'); ?>'>
                             </div>
                         </div>
-                        
+
                         <div class='row mb-2 option' data-keywords="websocket port">
                             <div class='col-10'>
                                 <?php echo $lang->get('settings_websocket_port'); ?>
@@ -725,6 +727,58 @@ $zones = timezone_list();
                             </div>
                             <div class='col-2'>
                                 <input type='number' class='form-control form-control-sm' id='websocket_port' value='<?php echo htmlspecialchars($SETTINGS['websocket_port'] ?? '8080'); ?>'>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-database mr-2'></i><?php echo $lang->get('settings_redis_session_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_redis_session_title_goal'); ?></span></h6>
+
+                        <div class='row mb-2 option' data-keywords="redis session">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_session_enabler'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_session_enabler_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='redis_session_enabled' data-toggle-on='<?php echo isset($SETTINGS['redis_session_enabled']) === true && (int) $SETTINGS['redis_session_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='redis_session_enabled_input' value='<?php echo isset($SETTINGS['redis_session_enabled']) && (int) $SETTINGS['redis_session_enabled'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis host">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_host'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_host_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_host' value='<?php echo htmlspecialchars($SETTINGS['redis_host'] ?? '127.0.0.1'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis port">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_port'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_port_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' class='form-control form-control-sm' id='redis_port' value='<?php echo htmlspecialchars($SETTINGS['redis_port'] ?? '6379'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis prefix">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_prefix'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_prefix_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_prefix' value='<?php echo htmlspecialchars($SETTINGS['redis_prefix'] ?? 'teampass_sess_'); ?>'>
                             </div>
                         </div>
 

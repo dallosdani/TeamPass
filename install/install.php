@@ -223,10 +223,14 @@ $csrf_token = $superGlobal->get('csrf_token', 'SESSION');
 									<li>PHP extension <code>bcmath</code> is loaded&nbsp;<span id="check11"></span></li>
 									<li>PHP extension <code>xml</code> is loaded&nbsp;<span id="check13"></span></li>
 									<li>PHP extension <code>curl</code> is loaded&nbsp;<span id="check15"></span></li>
-									<li>PHP extension <code>posix</code> is loaded&nbsp;<span id="check20"></span></li>
-									<li>PHP extension <code>pcntl</code> is loaded&nbsp;<span id="check19"></span></li>
+									<li>PHP extension <code>posix</code> is loaded&nbsp;<span id="check20"></span> <span class="text-muted small">(optional — required for WebSocket)</span></li>
+									<li>PHP extension <code>pcntl</code> is loaded&nbsp;<span id="check19"></span> <span class="text-muted small">(optional — required for WebSocket)</span></li>
 									<li>PHP version is greater or equal to <code><?php echo MIN_PHP_VERSION;?></code>&nbsp;<span id="check17"></span></li>
 									<li>Execution time limit is at least <code>30s</code>&nbsp;<span id="check18"></span></li>
+									<li>PHP extension <code>Zend OPcache</code> is enabled&nbsp;<span id="check21"></span> <span class="text-muted small">(optional — strongly recommended)</span></li>
+									<li>PHP-FPM is the active SAPI&nbsp;<span id="check22"></span> <span class="text-muted small">(optional — recommended for high-load)</span></li>
+									<li>PHP extension <code>APCu</code> is enabled&nbsp;<span id="check23"></span> <span class="text-muted small">(optional — recommended for settings cache)</span></li>
+									<li>PHP extension <code>redis</code> is loaded&nbsp;<span id="check24"></span> <span class="text-muted small">(optional — required for Redis session storage)</span></li>
 								</ul>
 							</div>
 						</div>

@@ -269,8 +269,12 @@ if (!isset($_GET['step']) && !isset($post_step)) {
                             <span>PHP extension "bcmath" is loaded</span><br />
                             <span>PHP extension "xml" is loaded</span><br />
                             <span>PHP extension "curl" is loaded</span><br />
-                            <span>PHP extension "posix" is loaded</span><br />
-                            <span>PHP extension "pcntl" is loaded</span><br />
+                            <span>PHP extension "posix" is loaded (optional &mdash; required for WebSocket)</span><br />
+                            <span>PHP extension "pcntl" is loaded (optional &mdash; required for WebSocket)</span><br />
+                            <span>PHP extension "Zend OPcache" is enabled (optional &mdash; strongly recommended)</span><br />
+                            <span>PHP-FPM is the active SAPI (optional &mdash; recommended for high-load)</span><br />
+                            <span>PHP extension "APCu" is enabled (optional &mdash; recommended for settings cache)</span><br />
+                            <span>PHP extension "redis" is loaded (optional &mdash; required for Redis session storage)</span><br />
                             <span>PHP version is greater or equal to '.MIN_PHP_VERSION.'</span><br />
                             <span>SQL version is greater or equal to MySQL '.MIN_MYSQL_VERSION.' or MariaDB '.MIN_MARIADB_VERSION.'</span><br />
                             <span>Tasks manager has no tasks behind</span><br />
@@ -465,6 +469,16 @@ if (!isset($_GET['step']) && !isset($post_step)) {
                 <small class="form-text text-muted">
                     The database needs to be adapted. This step can take a very long time depending on the data volume and server performance.
                 </small>
+                <div class="progress mt-2" style="height: 22px;">
+                    <div class="progress-bar progress-bar-striped bg-primary"
+                         id="step4_progress_bar"
+                         role="progressbar"
+                         style="width: 0%; transition: width 0.4s ease;"
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+                <div id="step4_progress_label" class="text-muted small mt-1 mb-1"></div>
+
                 <div class="row card card-primary mt-2">
                     <div class="card-body col-12 font-weight-light" id="step4_progress" style="overflow-y: scroll; height:400px;">
                         Please click the button START.
@@ -603,7 +617,8 @@ echo '
 
 
 <script type="text/javascript">
-var timeTaken = '';
+var timeTaken = '',
+    total_scripts = 0;
 
 
 $(function(){
@@ -758,6 +773,17 @@ function aesEncrypt(text)
 }
 
 
+function updateProgressBar(current, total)
+{
+    if (total <= 0) return;
+    var pct = Math.round((current / total) * 100);
+    $('#step4_progress_bar')
+        .css('width', pct + '%')
+        .attr('aria-valuenow', pct)
+        .text(pct + '%');
+    $('#step4_progress_label').text('Script ' + current + ' / ' + total);
+}
+
 function manageUpgradeScripts(file_number)
 {
     var start_at = 0;
@@ -766,6 +792,8 @@ function manageUpgradeScripts(file_number)
 
     if (file_number == 0) {
         $("#step4_progress").html("");
+        $('#step4_progress_bar').css('width', '0%').attr('aria-valuenow', 0).text('');
+        $('#step4_progress_label').text('');
         alertify
             .success('Done', 1)
             .dismissOthers();
@@ -778,6 +806,13 @@ function manageUpgradeScripts(file_number)
         },
         function(data) {
             //console.log(data[0])
+            // Store total on first call
+            if (data[0].total && parseInt(data[0].total) > 0) {
+                total_scripts = parseInt(data[0].total);
+            }
+            // Update progress bar
+            updateProgressBar(file_number, total_scripts);
+
             // work not finished
             if (data[0].finish !== "1") {
                 // loop
@@ -803,7 +838,9 @@ function manageUpgradeScripts(file_number)
                     complete : function(result, status) {
                         console.log("Tash perform_nestedtree_categories_population_3.0.0.18 DONE");
                         $("#user_"+rand_number)
-                            .html('Database update operations done <i class="fas fa-thumbs-up" style="color:green"></i>'); 
+                            .html('Database update operations done <i class="fas fa-thumbs-up" style="color:green"></i>');
+                        // Show 100% only after all scripts + the final ajax task
+                        updateProgressBar(total_scripts, total_scripts);
                         migrateUsersToV3('step1', '', 'init', createRandomId(), 0, false, 0);
 
                         alertify

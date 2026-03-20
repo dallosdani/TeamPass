@@ -508,10 +508,14 @@ function performStep2() {
         { id: 'check11', type: 'extension', name: 'bcmath' },
         { id: 'check13', type: 'extension', name: 'xml' },
         { id: 'check15', type: 'extension', name: 'curl' },
-        { id: 'check20', type: 'extension', name: 'posix' },
-        { id: 'check19', type: 'extension', name: 'pcntl' },
+        { id: 'check20', type: 'extension', name: 'posix', optional: true },
+        { id: 'check19', type: 'extension', name: 'pcntl', optional: true },
         { id: 'check17', type: 'php_version', version: '' },
-        { id: 'check18', type: 'execution_time', limit: 30 }
+        { id: 'check18', type: 'execution_time', limit: 30 },
+        { id: 'check21', type: 'opcache', optional: true },
+        { id: 'check22', type: 'php_fpm', optional: true },
+        { id: 'check23', type: 'apcu', optional: true },
+        { id: 'check24', type: 'redis', optional: true }
     ];
 
     let errorOccurred = false; // Variable to track errors
@@ -550,6 +554,8 @@ function performStep2() {
             success: function(response) {
                 if (response.success) {
                     $(`#${check.id}`).html('<i class="fas fa-check text-success"></i>'); // Green checkmark
+                } else if (check.optional) {
+                    $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>'); // Warning — optional
                 } else {
                     errorOccurred = true; // An error occurred
                     $(`#${check.id}`).html('<i class="fas fa-times text-danger"></i>'); // Red cross

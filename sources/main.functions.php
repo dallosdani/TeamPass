@@ -3359,37 +3359,38 @@ function storeUsersShareKey(
         $user_ids
     );
 
-    // Insert or update sharekeys first, track which users were processed
+    // Collect all (objectId, userId, encryptedKey) rows first, then batch-insert
+    $rows = [];
     $processedUserIds = [];
     foreach ($users as $user) {
-        // Insert in DB the new object key for this item by user
         if (count($objectKeyArray) === 0) {
             if (WIP === true) {
                 error_log('TEAMPASS Debug - storeUsersShareKey case1 - ' . $object_name . ' - ' . $post_object_id . ' - ' . $user['id']);
             }
-
-            insertOrUpdateSharekey(
-                prefixTable($object_name),
-                $post_object_id,
-                (int) $user['id'],
-                encryptUserObjectKey($objectKey, $user['public_key'])
-            );
+            $rows[] = [
+                'object_id'          => $post_object_id,
+                'user_id'            => (int) $user['id'],
+                'share_key'          => encryptUserObjectKey($objectKey, $user['public_key']),
+                'encryption_version' => 3,
+            ];
         } else {
             foreach ($objectKeyArray as $object) {
                 if (WIP === true) {
                     error_log('TEAMPASS Debug - storeUsersShareKey case2 - ' . $object_name . ' - ' . $object['objectId'] . ' - ' . $user['id']);
                 }
-
-                insertOrUpdateSharekey(
-                    prefixTable($object_name),
-                    (int) $object['objectId'],
-                    (int) $user['id'],
-                    encryptUserObjectKey($object['objectKey'], $user['public_key'])
-                );
+                $rows[] = [
+                    'object_id'          => (int) $object['objectId'],
+                    'user_id'            => (int) $user['id'],
+                    'share_key'          => encryptUserObjectKey($object['objectKey'], $user['public_key']),
+                    'encryption_version' => 3,
+                ];
             }
         }
         $processedUserIds[] = (int) $user['id'];
     }
+
+    // Single batched upsert instead of N individual queries
+    batchUpsertSharekeys(prefixTable($object_name), $rows);
 
     // Remove stale sharekeys for users who no longer qualify
     // This replaces the previous DELETE-all-then-INSERT pattern which
@@ -3444,6 +3445,39 @@ function insertOrUpdateSharekey(
     } catch (Exception $e) {
         error_log('TEAMPASS Error - insertOrUpdateSharekey: ' . $e->getMessage());
         return false;
+    }
+}
+
+/**
+ * Batch upsert sharekeys using a single INSERT ... ON DUPLICATE KEY UPDATE.
+ * Processes rows in chunks of $chunkSize to stay within max_allowed_packet.
+ *
+ * @param string $tableName  Table name (with prefix)
+ * @param array  $rows       Array of ['object_id', 'user_id', 'share_key', 'encryption_version']
+ * @param int    $chunkSize  Max rows per query (default 100)
+ *
+ * @return void
+ */
+function batchUpsertSharekeys(string $tableName, array $rows, int $chunkSize = 100): void
+{
+    if (empty($rows) === true) {
+        return;
+    }
+
+    foreach (array_chunk($rows, $chunkSize) as $chunk) {
+        $placeholders = [];
+        $bindings = [];
+        foreach ($chunk as $row) {
+            $placeholders[] = '(%i, %i, %s, %i)';
+            $bindings[] = $row['object_id'];
+            $bindings[] = $row['user_id'];
+            $bindings[] = $row['share_key'];
+            $bindings[] = $row['encryption_version'];
+        }
+        $sql = 'INSERT INTO ' . $tableName . ' (object_id, user_id, share_key, encryption_version) VALUES '
+            . implode(', ', $placeholders)
+            . ' ON DUPLICATE KEY UPDATE share_key = VALUES(share_key), encryption_version = VALUES(encryption_version)';
+        DB::query($sql, ...$bindings);
     }
 }
 

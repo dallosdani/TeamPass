@@ -710,7 +710,7 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
     if ($session_user_admin === 1) {
         echo '
                             <li class="nav-item">
-                                <a href="#" data-name="utilities.health" class="nav-link'. $get['page'] === 'utilities.health' ? ' active' : ''. '">
+                                <a href="#" data-name="utilities.health" class="nav-link'. ($get['page'] === 'utilities.health' ? ' active' : ''). '">
                                 <i class="fa-solid fa-heart-pulse nav-icon"></i>
                                 <p>' . $lang->get('system_health') . '</p>
                                 </a>

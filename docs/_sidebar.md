@@ -4,6 +4,7 @@
 - **Get Started**
 - [Installation](install/installation.md)
 - [Upgrade](install/upgrade.md)
+- [Docker](install/docker.md)
 - [Information](install/encryption.md)
 - [Extra](install/extra-settings.md)
 - [Performance](install/performance.md)
@@ -13,6 +14,10 @@
 - [Authentication](features/authentication.md)
 - [Backups](features/backups.md)
 - [Items](features/items.md)
+- [Search](features/search.md)
+- [Favourites](features/favourites.md)
+- [Custom Fields](features/custom-fields.md)
+- [Renewal](features/renewal.md)
 - [Import](features/import.md)
 - [Export](features/export.md)
 - [Keys](features/keys.md)
@@ -20,6 +25,7 @@
 - [Roles](features/roles.md)
 - [Folders](features/folders.md)
 - [Users](features/users.md)
+- [Profile](features/profile.md)
 - **Manage**
 - [Settings](manage/settings.md)
 - [Tasks](manage/tasks.md)

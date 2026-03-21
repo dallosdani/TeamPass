@@ -1,0 +1,139 @@
+<!-- docs/features/profile.md -->
+
+## Overview
+
+The **My Profile** page lets every user consult their account information, adjust personal preferences, change their password, and manage their encryption keys. It is accessible from the top-right user menu.
+
+> 🔔 Some fields may be locked by the administrator (e.g. name, timezone, language). When an option is grayed out or absent, it means the administrator has disabled self-editing for that field.
+
+---
+
+## Information tab
+
+The default tab gives a read-only summary of the account.
+
+### Activity counters
+
+| Counter | What it measures |
+|---------|-----------------|
+| **Created items** | Total number of items you have created |
+| **Modifications** | Total number of items you have edited |
+| **Items opened** | Total number of times you have opened an item |
+| **Passwords seen** | Total number of times you have revealed a password |
+
+### Account details
+
+- **Groups** — The roles you are currently a member of.
+- **Last seen** — Date and time of your last login.
+- **Password expiration** — If your administrator has set a password expiration policy, this shows how many days remain before your login password must be changed.
+- **Last password change** — Date of your last password update.
+- **File upload** — Indicates whether your browser supports the file upload feature used for item attachments.
+- **Tree load strategy** — Shows whether the folder tree is loaded lazily (on demand) or fully at login.
+
+### API key
+
+If the API is enabled, your personal API key is shown here. You can:
+
+- **Copy** the key to the clipboard using the copy icon.
+- **Regenerate** a new key using the rotate icon (this invalidates the previous key immediately).
+
+> 🔔 Treat your API key like a password. Anyone who has it can access Teampass on your behalf via the API.
+
+---
+
+## Timeline tab
+
+The Timeline shows a chronological log of your own recent actions (items viewed, created, edited, etc.). It is a personal audit trail — only your actions are shown, not other users'.
+
+---
+
+## Settings tab
+
+### Identity
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Your first name as displayed in the interface |
+| **Last name** | Your last name |
+| **Email** | Your email address, used for notifications and for receiving MFA setup codes |
+
+Click **Save** to apply identity changes.
+
+### Interface preferences
+
+| Option | Effect |
+|--------|--------|
+| **Timezone** | Adjusts how dates and times are displayed throughout the interface |
+| **Language** | Changes the interface language. Takes effect on the next page load |
+| **Split view mode** | When enabled, the item list and item details are shown side by side instead of a single expanding list |
+| **Show sub-folders in main view** | When enabled, items from sub-folders are listed inline below the parent folder's items. See [Show sub-directories](items.md#show-sub-directories-with-items-list) |
+
+### Avatar
+
+Click **Upload new avatar** to replace your profile picture. Supported formats are JPEG and PNG. The image is resized and stored server-side.
+
+---
+
+## Changing your password
+
+The password change panel is accessible from the **top-right user menu → Change password** (or directly from the lock icon in the navigation bar).
+
+1. Enter your **current password**.
+2. Enter the **new password**. The strength meter updates in real time — make sure the complexity meets your administrator's requirements.
+3. Confirm the new password.
+4. Click **Save**.
+
+> 🔔 Changing your login password also re-encrypts your private key. If Teampass cannot decrypt your key with the new password, item access may be lost. The operation is safe as long as you enter your current password correctly.
+
+> 🔔 **LDAP and OAuth2 accounts** authenticate against an external directory. The password change form is not available for these accounts — password changes must be done in Active Directory or the identity provider.
+
+---
+
+## Keys tab
+
+### Recovery keys
+
+Your **recovery keys** are a backup of your encryption key pair. They allow an administrator to restore your access if your account becomes locked or your keys are corrupted.
+
+> 🔔 Download and store your recovery keys in a safe place (password manager, secure storage). If you lose access to your account and no recovery keys are available, your encrypted items cannot be recovered.
+
+**To download your recovery keys:**
+
+1. Go to the **Keys** tab.
+2. Click **Download recovery keys**.
+3. Enter your current password to confirm.
+4. Save the downloaded file securely.
+
+The date of your last download is shown next to the button. If it shows a warning (no download recorded), download your keys now.
+
+See [Keys management](keys.md) for more details on what recovery keys are and when they are used.
+
+---
+
+## Two-factor authentication (MFA)
+
+MFA is configured globally by the administrator and may be **required** for your account depending on your role.
+
+### Enrolling with Google Authenticator (TOTP)
+
+When TOTP is enabled by the administrator, you will be prompted to scan a QR code on your next login. To complete enrollment:
+
+1. Open an authenticator app on your phone (Google Authenticator, Aegis, Authy, etc.).
+2. Tap **Add account** → **Scan QR code**.
+3. Scan the QR code shown on screen.
+4. Enter the 6-digit code generated by the app to confirm.
+
+From that point on, you will be asked for a code at every login.
+
+> 💡 If you lose access to your authenticator app, contact your administrator. They can reset your TOTP enrollment from the **Users** page (action menu → **Email Google Auth QR**), which sends a new QR code to your registered email address.
+
+### Duo Security
+
+If your organization uses Duo, you will be redirected to the Duo authentication screen after entering your Teampass credentials. Follow the Duo prompt (push notification, phone call, or passcode) to complete login.
+
+### Resetting MFA
+
+Users cannot reset their own MFA. Contact your administrator to:
+
+- Receive a new TOTP QR code by email.
+- Be exempted temporarily from MFA if you are locked out.

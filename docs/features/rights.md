@@ -123,7 +123,7 @@ A user's roles can come from two sources, which are merged together:
 | **Manual** | Administrator assigns a role directly to the user in the Users page | `source = 'manual'` in `teampass_users_roles` |
 | **LDAP / AD groups** | At login, the user's AD group memberships are looked up and mapped to Teampass roles via the LDAP group mapping table | `source = 'ad'` in `teampass_users_roles` |
 
-Both sources are combined before resolving effective permissions. The same "most permissive wins" rule applies regardless of source.
+Both sources are combined before resolving effective permissions. The same "least permissive wins" rule applies regardless of source.
 
 > 💡 LDAP group mapping is configured in **Settings → LDAP** and **Roles → LDAP synchronization**. See [Roles](roles.md) for setup instructions.
 

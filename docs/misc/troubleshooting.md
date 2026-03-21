@@ -1,4 +1,6 @@
-## LDAP login shows “wrong passphrase” on first-time login
+<!-- docs/misc/troubleshooting.md -->
+
+## LDAP login shows "wrong passphrase" on first-time login
 
 ### Symptom
 During first-time LDAP logins, users may see:
@@ -15,15 +17,11 @@ This can occur if the PHP-FPM pool is saturated or too small, causing POST reque
 **In Apache access logs:**
 `HTTP 408 (Request Timeout) entries around the same time`
 
+These timeouts make Teampass appear to reject the passphrase, while in fact the request was never processed.
 
-These timeouts make TeamPass appear to reject the passphrase, while in fact the request was never processed.
+### Solution
 
----
-
-### Solution (no code changes needed)
-
-Tune your PHP-FPM pool settings.  
-Edit `/etc/php/8.x/fpm/pool.d/www.conf`:
+Tune your PHP-FPM pool settings. Edit `/etc/php/8.x/fpm/pool.d/www.conf`:
 
 ```
 pm = dynamic
@@ -34,62 +32,107 @@ pm.max_spare_servers = 10 ; was 3
 pm.max_requests = 500     ; optional but recommended
 ```
 
-Then reload services:
-```
+Then reload:
+```bash
 systemctl reload php8.x-fpm
 systemctl reload apache2
 ```
 
-After this change, first LDAP logins and passphrase setup should work immediately.
+> **TL;DR** — If you see "wrong passphrase" but logs show FPM warnings or HTTP 408s: it is not a bad passphrase, it is PHP-FPM capacity. Increase pool size and try again.
 
 ---
 
-### How to verify
+## Page loads but items or folders do not appear
 
-1. No more FPM warnings or HTTP 408s
-Check your php-fpm log:
-`sudo journalctl -u php8.x-fpm.service | tail -n 20`
+### Possible causes and fixes
 
-2. TeamPass database shows normal first-login sequence
-```
--- Recent system events for a user (replace USER_ID)
-SELECT id, type, label,
-       FROM_UNIXTIME(CAST(date AS UNSIGNED)) AS event_time,
-       qui, field_1
-FROM teampass_log_system
-WHERE (qui = USER_ID OR field_1 = USER_ID)
-ORDER BY id DESC
-LIMIT 200;
-```
+**1. Session expired silently**
+Reload the page. If you are redirected to the login page, your session expired. See [Session management](session-management.md).
 
-3. User is ready for usage
-```
-SELECT id, login, is_ready_for_usage,
-(public_key IS NOT NULL)  AS has_pub,
-(private_key IS NOT NULL) AS has_priv,
-(encrypted_psk IS NOT NULL) AS has_enc_psk
-FROM teampass_users
-WHERE id = USER_ID;
-```
+**2. Folder tree not loading**
+Open the browser console (F12 → Console). If you see JavaScript errors, clear your browser cache and reload.
 
-If is_ready_for_usage = 1 and all keys are present → success ✅
+**3. No access to any folder**
+If the folder tree is empty after login, your account has no role assigned. Ask an administrator to assign a role with folder access (see [Users](../features/users.md)).
+
+**4. APCu cache serving stale settings**
+If a setting change is not reflected, restart PHP-FPM to clear the 60-second APCu cache: `systemctl reload php8.x-fpm`.
 
 ---
 
-### Extra tips
+## Emails are not being sent
 
-If LDAP mapping uses sAMAccountName, make sure users don’t log in with user@domain.
+### Checklist
 
-For the first passphrase, use an ASCII-only code (no spaces or accents) in a private window to avoid autofill or charset issues.
-
-If you still experience issues, test running the vhost under PHP-FPM 8.3 as a fallback (works fine once FPM pool is correctly sized).
+1. **Verify email settings** — Go to **Admin → Emails** and confirm the SMTP host, port, and credentials are correct.
+2. **Test sending** — Use the **Send test email** button on the Emails page.
+3. **Check the task queue** — Email sending is handled by background tasks. Go to **Tasks** and verify the email task is not stuck or in error.
+4. **PHP mail function** — If using `mail()` instead of SMTP, verify that the server's mail transfer agent (Postfix, Sendmail, etc.) is running.
+5. **Firewall** — Verify outbound connections on port 25, 465, or 587 are not blocked.
 
 ---
 
- """ TL;DR
+## Background tasks are not running
 
-If you see “wrong passphrase” but logs show FPM warnings or HTTP 408s:
+Teampass uses a cron job to run background tasks (key generation, email, statistics). If tasks are stuck:
 
-> It’s not a bad passphrase — it’s php-fpm capacity.
+1. **Verify the cron entry**:
+```bash
+crontab -l -u www-data
+```
+It should contain something like:
+```
+* * * * * php /var/www/html/teampass/scripts/background_tasks___handler.php
+```
 
-Increase pool size, reload FPM and Apache, and try again.
+2. **Run manually to see errors**:
+```bash
+php /var/www/html/teampass/scripts/background_tasks___handler.php
+```
+
+3. **Check file permissions** — The `www-data` user must be able to read and write inside the Teampass directory.
+
+4. **Check the Tasks page** — In the Admin menu, **Tasks** shows each task's last execution time, status, and any error messages.
+
+---
+
+## A user's items all show as empty after re-encryption
+
+After a key regeneration or migration, items may temporarily appear empty while the background task processes the sharekeys. This is normal and should resolve within a few minutes.
+
+To monitor progress:
+
+1. Go to **Admin → Tasks**.
+2. Find the key generation task for that user.
+3. Wait for it to complete (status changes from `in progress` to `done`).
+
+If the task completed but items are still empty, use the **Tools** page to run a diagnostic and repair.
+
+---
+
+## Upgrade fails or leaves the interface broken
+
+If an upgrade via `upgrade.php` fails partway through:
+
+1. **Do not run the upgrade script again immediately** — check the error message first.
+2. **Restore your database backup** (taken before the upgrade).
+3. **Check PHP error logs**: `tail -f /var/log/php_errors.log` or the Apache/Nginx error log.
+4. **Common cause**: PHP version mismatch. Teampass requires PHP 8.1+. Verify with `php -v`.
+5. **Permissions**: ensure the web server can write to the Teampass directory during upgrade.
+
+If you cannot resolve the issue, open a ticket on [GitHub Issues](https://github.com/nilsteampassnet/TeamPass/issues) with the error message and your PHP / database versions.
+
+---
+
+## OAuth2 / Azure Entra users cannot log in on second attempt
+
+### Symptom
+A user authenticates successfully via Azure the first time, but on subsequent logins sees "Login credentials do not correspond" or is redirected back to the login page.
+
+### Cause
+The account creation background task (key generation) may not have completed before the second login attempt. The account is created but `is_ready_for_usage` is still `0`.
+
+### Fix
+1. Go to **Admin → Tasks** and verify the key generation task for that user completed successfully.
+2. If the task failed, check the task error message. Common causes: missing email address in the Azure profile, or the background task cron job is not running.
+3. Once the task completes, the user can log in normally.

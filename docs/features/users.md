@@ -139,7 +139,7 @@ The modal has three columns:
 
 The **filter bar** at the top of the modal allows narrowing the list to one or more permission types (W, ND, NE, NDNE, R). This is useful for quickly finding all folders where a user has full write access, or all read-only folders.
 
-> 💡 When a user has unexpectedly high access to a folder, the Roles column immediately reveals which role is responsible. See [Rights — most permissive wins](rights.md#multiple-roles--the-most-permissive-wins-rule) for the underlying logic.
+> 💡 When a user has unexpectedly high access to a folder, the Roles column immediately reveals which role is responsible. See [Rights — least permissive wins](rights.md#multiple-roles--the-least-permissive-wins-rule) for the underlying logic.
 
 ---
 

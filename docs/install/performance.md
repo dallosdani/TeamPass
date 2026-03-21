@@ -22,7 +22,7 @@ A value of `1` means it is active.
 ### Install (Debian/Ubuntu)
 
 ```
-sudo apt-get install php8.2-opcache
+sudo apt-get install php8.4-opcache
 ```
 
 > :bulb: **Note:** Adapt the PHP version number to your environment.
@@ -49,9 +49,9 @@ TeamPass detects the current SAPI at runtime. If you are not running PHP-FPM, th
 ### Install and enable (Debian/Ubuntu with Apache)
 
 ```
-sudo apt-get install php8.2-fpm libapache2-mod-fcgid
+sudo apt-get install php8.4-fpm libapache2-mod-fcgid
 sudo a2enmod proxy_fcgi setenvif
-sudo a2enconf php8.2-fpm
+sudo a2enconf php8.4-fpm
 sudo systemctl restart apache2
 ```
 
@@ -70,7 +70,7 @@ php -r "echo extension_loaded('apcu') ? 'ok' : 'missing';"
 ### Install (Debian/Ubuntu)
 
 ```
-sudo apt-get install php8.2-apcu
+sudo apt-get install php8.4-apcu
 ```
 
 ### Enable in `php.ini` (if not enabled automatically)
@@ -98,7 +98,7 @@ By default, PHP sessions are stored on the filesystem. For high-concurrency depl
 ### Install (Debian/Ubuntu)
 
 ```
-sudo apt-get install redis-server php8.2-redis
+sudo apt-get install redis-server php8.4-redis
 sudo systemctl enable --now redis-server
 ```
 

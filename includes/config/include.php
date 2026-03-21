@@ -101,8 +101,6 @@ define('MYSQL_LOG', false); // Can be used in order to enable global MySQL log. 
 define('MYSQL_LOG_FILE', '/var/log/teampass_mysql_query.log'); // 🫸 Ensure you have the right to write in the log file
 define('DEBUGLDAP', false); // Can be used in order to debug LDAP authentication
 
-define("ADMIN_VISIBLE_OTP_ON_LDAP_IMPORT", true);
-
 // Management Pages
 $mngPages = array(
     'admin' => 'admin.php',

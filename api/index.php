@@ -39,6 +39,9 @@ header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: POST, GET");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: DENY");
+header("Referrer-Policy: no-referrer");
 require __DIR__ . "/inc/bootstrap.php";
 
 // sanitize url segments
@@ -102,10 +105,16 @@ if (isset($uri[0]) && $uri[0] === 'authorize') {
                 }
             } else {
                 // Rebuild: recompute from DB and refresh cache_tree.folders
+                // groupes_visibles was migrated from teampass_users to teampass_users_groups in v3.1.5
                 $userRow = DB::queryFirstRow(
-                    'SELECT id, groupes_visibles, fonction_id
-                    FROM ' . prefixTable('users') . '
-                    WHERE id = %i',
+                    'SELECT u.id,
+                    GROUP_CONCAT(DISTINCT ug.group_id ORDER BY ug.group_id SEPARATOR ";") AS groupes_visibles,
+                    GROUP_CONCAT(DISTINCT CASE WHEN ur.source = "manual" THEN ur.role_id END ORDER BY ur.role_id SEPARATOR ";") AS fonction_id
+                    FROM ' . prefixTable('users') . ' AS u
+                    LEFT JOIN ' . prefixTable('users_groups') . ' AS ug ON (u.id = ug.user_id)
+                    LEFT JOIN ' . prefixTable('users_roles') . ' AS ur ON (u.id = ur.user_id)
+                    WHERE u.id = %i
+                    GROUP BY u.id',
                     $userId
                 );
                 if ($userRow !== null) {

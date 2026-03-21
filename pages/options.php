@@ -108,13 +108,187 @@ $zones = timezone_list();
 </div>
 <!-- /.content-header -->
 
+<style>
+    #settings-navigation-card .card-body {
+        overflow-x: hidden;
+    }
+    #settings-navigation-card #settings-nav-tab {
+        align-items: stretch;
+    }
+    #settings-navigation-card #settings-nav-tab .nav-link {
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #settings-navigation-card {
+        top: 1rem;
+    }
+    #settings-tab-content .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+    }
+    #settings-tab-content .card-header .card-title {
+        margin: 0;
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+    #settings-tab-content .card-header .card-tools {
+        margin: 0;
+        float: none;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        align-self: center;
+        height: 100%;
+    }
+    .tp-section-favorites-tools {
+        display: flex;
+        align-items: center;
+        align-self: center;
+        height: 100%;
+        margin: 0 !important;
+    }
+    .tp-section-favorites-tools .btn-group {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: auto;
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        min-width: 2rem;
+        height: 2rem;
+        padding: 0 .5rem;
+        line-height: 1;
+        margin: 0;
+        border: 1px solid rgba(255, 255, 255, .55);
+        border-radius: .3rem;
+        background-color: rgba(255, 255, 255, .97);
+        color: #5f6b77;
+        box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .10);
+        transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease, transform .15s ease;
+        transform: translateY(0);
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle:hover,
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle:focus,
+    .tp-section-favorites-tools .show > .btn.btn-tool.dropdown-toggle {
+        background-color: #ffffff;
+        border-color: rgba(255, 255, 255, .75);
+        color: #495057;
+        box-shadow: 0 .25rem .6rem rgba(0, 0, 0, .18);
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle .fa-star {
+        color: #d48a12;
+        font-size: .85rem;
+    }
+    .tp-section-favorites-menu {
+        min-width: 300px;
+        max-width: 360px;
+        max-height: 360px;
+        overflow-y: auto;
+        padding: .25rem 0;
+        border: 1px solid rgba(0, 0, 0, .12);
+        box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+        background-color: #ffffff;
+    }
+    .tp-favorite-menu-item {
+        display: flex;
+        align-items: flex-start;
+        gap: .65rem;
+        white-space: normal;
+        color: inherit;
+    }
+    .tp-favorite-menu-item i {
+        width: 1rem;
+        margin-top: .15rem;
+        text-align: center;
+        flex: 0 0 1rem;
+    }
+    .tp-favorite-menu-item .tp-favorite-menu-label {
+        flex: 1 1 auto;
+        line-height: 1.3;
+        min-width: 0;
+    }
+    .option.tp-option-is-favorite {
+        border-left: 3px solid #f0ad4e;
+        padding-left: .5rem;
+    }
+    .tp-favorite-highlight {
+        animation: tpFavoriteHighlight 2.2s ease;
+    }
+    @keyframes tpFavoriteHighlight {
+        0% { background-color: rgba(255, 193, 7, .35); }
+        100% { background-color: transparent; }
+    }
+    #settings-favorites-list .tp-favorite-actions {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+    }
+</style>
+
 
 <!-- Main content -->
 <div class='content'>
     <div class='container-fluid'>
         <div class='row'>
-            <div class='col-md-6'>
-                <div class='card card-info'>
+            <div class='col-lg-3 col-md-4'>
+                <div class='card card-info sticky-top' id='settings-navigation-card'>
+                    <div class='card-header'>
+                        <h3 class='card-title'><i class="fa-solid fa-list mr-2"></i><?php echo $lang->get('settings_navigation_title'); ?></h3>
+                    </div>
+                    <div class='card-body p-2'>
+                        <div class='nav flex-column nav-pills' id='settings-nav-tab' role='tablist' aria-orientation='vertical'>
+                            <a class='nav-link active' id='settings-nav-favorites' data-toggle='pill' href='#settings-tab-favorites' role='tab' aria-controls='settings-tab-favorites' aria-selected='true' title="<?php echo $lang->get('settings_category_favorites_title'); ?>"><i class="fa-solid fa-star mr-2"></i><?php echo $lang->get('settings_category_favorites_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-general' data-toggle='pill' href='#settings-tab-general' role='tab' aria-controls='settings-tab-general' aria-selected='false' title="<?php echo $lang->get('settings_category_general_info_title'); ?>"><i class="fa-solid fa-folder-open mr-2"></i><?php echo $lang->get('settings_category_general_info_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-system' data-toggle='pill' href='#settings-tab-system' role='tab' aria-controls='settings-tab-system' aria-selected='false' title="<?php echo $lang->get('settings_category_system_title'); ?>"><i class="fa-solid fa-gears mr-2"></i><?php echo $lang->get('settings_category_system_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-security' data-toggle='pill' href='#settings-tab-security' role='tab' aria-controls='settings-tab-security' aria-selected='false' title="<?php echo $lang->get('settings_category_security_title'); ?>"><i class="fa-solid fa-shield-halved mr-2"></i><?php echo $lang->get('settings_category_security_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-websocket' data-toggle='pill' href='#settings-tab-websocket' role='tab' aria-controls='settings-tab-websocket' aria-selected='false' title="<?php echo $lang->get('settings_realtime_title'); ?>"><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-networks' data-toggle='pill' href='#settings-tab-networks' role='tab' aria-controls='settings-tab-networks' aria-selected='false' title="<?php echo $lang->get('settings_category_networks_title'); ?>"><i class="fa-solid fa-network-wired mr-2"></i><?php echo $lang->get('settings_category_networks_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-logging' data-toggle='pill' href='#settings-tab-logging' role='tab' aria-controls='settings-tab-logging' aria-selected='false' title="<?php echo $lang->get('settings_category_logging_title'); ?>"><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-integration' data-toggle='pill' href='#settings-tab-integration' role='tab' aria-controls='settings-tab-integration' aria-selected='false' title="<?php echo $lang->get('settings_category_integration_title'); ?>"><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-items' data-toggle='pill' href='#settings-tab-items' role='tab' aria-controls='settings-tab-items' aria-selected='false' title="<?php echo $lang->get('settings_category_items_title'); ?>"><i class="fa-solid fa-folder-tree mr-2"></i><?php echo $lang->get('settings_category_items_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-users' data-toggle='pill' href='#settings-tab-users' role='tab' aria-controls='settings-tab-users' aria-selected='false' title="<?php echo $lang->get('settings_category_users_title'); ?>"><i class="fa-solid fa-users-cog mr-2"></i><?php echo $lang->get('settings_category_users_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-collaboration' data-toggle='pill' href='#settings-tab-collaboration' role='tab' aria-controls='settings-tab-collaboration' aria-selected='false' title="<?php echo $lang->get('settings_category_collaboration_title'); ?>"><i class="fa-solid fa-people-arrows mr-2"></i><?php echo $lang->get('settings_category_collaboration_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-inactive' data-toggle='pill' href='#settings-tab-inactive' role='tab' aria-controls='settings-tab-inactive' aria-selected='false' title="<?php echo $lang->get('settings_category_inactive_users_title'); ?>"><i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('settings_category_inactive_users_title'); ?></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class='col-lg-9 col-md-8'>
+                <div class='tab-content' id='settings-tab-content'>
+<div class='tab-pane fade show active' id='settings-tab-favorites' role='tabpanel' aria-labelledby='settings-nav-favorites' data-section-label='<?php echo $lang->get('settings_category_favorites_title'); ?>'>
+                        <div class='card card-info' id='settings-favorites-card'>
+                            <div class='card-header'>
+                                <h3 class='card-title'><i class="fa-solid fa-star mr-2"></i><?php echo $lang->get('settings_category_favorites_title'); ?>
+                                    <span class="badge text-bg-secondary">
+                                        <?php echo $lang->get('settings_category_favorites_goal'); ?>
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class='card-body'>
+                                <p class='text-muted mb-3'><?php echo $lang->get('settings_category_favorites_tip'); ?></p>
+                                <div id='settings-favorites-alert' class='alert d-none mb-3' role='alert'></div>
+                                <div id='settings-favorites-empty' class='alert alert-info mb-0'>
+                                    <i class="fa-solid fa-thumbtack mr-2"></i><?php echo $lang->get('settings_category_favorites_empty'); ?>
+                                </div>
+                                <div id='settings-favorites-list' class='list-group d-none'></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-general' role='tabpanel' aria-labelledby='settings-nav-general' data-section-label='<?php echo $lang->get('settings_category_general_info_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-folder-open mr-2"></i><?php echo $lang->get('settings_category_general_info_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -198,9 +372,9 @@ $zones = timezone_list();
                         <!-- /.card-body -->
                     </form>
                 </div>
-                <!-- /.card -->
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-system' role='tabpanel' aria-labelledby='settings-nav-system' data-section-label='<?php echo $lang->get('settings_category_system_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-gears mr-2"></i><?php echo $lang->get('settings_category_system_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -225,7 +399,7 @@ $zones = timezone_list();
                                 <?php echo $lang->get('settings_default_session_expiration_time'); ?>
                             </div>
                             <div class='col-2 mb-2'>
-                                <input type='number' class='form-control form-control-sm' id='default_session_expiration_time' value='<?php echo htmlspecialchars($SETTINGS['default_session_expiration_time']) ?? '60'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='default_session_expiration_time' value='<?php echo htmlspecialchars($SETTINGS['default_session_expiration_time'] ?? '60'); ?>'>
                             </div>
                         </div>
 
@@ -237,7 +411,7 @@ $zones = timezone_list();
                                 </small>
                             </div>
                             <div class='col-2 mb-2'>
-                                <input type='number' class='form-control form-control-sm' id='maximum_session_expiration_time' value='<?php echo htmlspecialchars($SETTINGS['maximum_session_expiration_time']) ?? '60'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='maximum_session_expiration_time' value='<?php echo htmlspecialchars($SETTINGS['maximum_session_expiration_time'] ?? '60'); ?>'>
                             </div>
                         </div>
 
@@ -331,7 +505,7 @@ $zones = timezone_list();
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='pwd_maximum_length' value='<?php echo htmlspecialchars($SETTINGS['pwd_maximum_length']) ?? '60'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='pwd_maximum_length' value='<?php echo htmlspecialchars($SETTINGS['pwd_maximum_length'] ?? '60'); ?>'>
                             </div>
                         </div>
 
@@ -340,17 +514,16 @@ $zones = timezone_list();
                                 <?php echo $lang->get('password_length_by_default'); ?>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='pwd_default_length' value='<?php echo htmlspecialchars($SETTINGS['pwd_default_length']) ?? '14'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='pwd_default_length' value='<?php echo htmlspecialchars($SETTINGS['pwd_default_length'] ?? '14'); ?>'>
                             </div>
                         </div>
 
                     </div>
                     <!-- /.card-body -->
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-security' role='tabpanel' aria-labelledby='settings-nav-security' data-section-label='<?php echo $lang->get('settings_category_security_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-shield-halved mr-2"></i><?php echo $lang->get('settings_category_security_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -400,7 +573,7 @@ $zones = timezone_list();
                                 <?php echo $lang->get('pw_life_duration'); ?>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='pw_life_duration' value='<?php echo htmlspecialchars($SETTINGS['pw_life_duration']) ?? '5'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='pw_life_duration' value='<?php echo htmlspecialchars($SETTINGS['pw_life_duration'] ?? '5'); ?>'>
                             </div>
                         </div>
 
@@ -409,7 +582,7 @@ $zones = timezone_list();
                                 <?php echo $lang->get('nb_false_login_attempts'); ?>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='nb_bad_authentication' value='<?php echo htmlspecialchars($SETTINGS['nb_bad_authentication']) ?? '0'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='nb_bad_authentication' value='<?php echo htmlspecialchars($SETTINGS['nb_bad_authentication'] ?? '0'); ?>'>
                             </div>
                         </div>
 
@@ -499,20 +672,19 @@ $zones = timezone_list();
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='transparent_key_recovery_pbkdf2_iterations' value='<?php echo htmlspecialchars($SETTINGS['transparent_key_recovery_pbkdf2_iterations']) ?? '60'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='transparent_key_recovery_pbkdf2_iterations' value='<?php echo htmlspecialchars($SETTINGS['transparent_key_recovery_pbkdf2_iterations'] ?? '60'); ?>'>
                             </div>
                         </div>
 
                     </div>
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-websocket' role='tabpanel' aria-labelledby='settings-nav-websocket' data-section-label='<?php echo $lang->get('settings_realtime_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-users-cog mr-2"></i><?php echo $lang->get('settings_category_users_title'); ?>
+                        <h3 class='card-title'><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?>
                             <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_category_users_goal'); ?>
+                                <?php echo $lang->get('settings_realtime_title_goal'); ?>
                             </span>
                         </h3>
                     </div>
@@ -520,264 +692,236 @@ $zones = timezone_list();
                     <!-- form start -->
                     <div class='card-body'>
 
-                        <div class='row mb-2 option' data-keywords="right manager item">
-                            <div class='col-10'>
-                                <?php echo $lang->get('settings_manager_edit'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='manager_edit' data-toggle-on='<?php echo isset($SETTINGS['manager_edit']) === true && (int) $SETTINGS['manager_edit'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='manager_edit_input' value='<?php echo isset($SETTINGS['manager_edit']) && (int) $SETTINGS['manager_edit'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-ear-listen mr-2'></i><?php echo $lang->get('settings_websocket_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_websocket_title_goal'); ?></span></h6>
 
-                        <div class='row mb-2 option' data-keywords="right manager move item">
+                        <div class='row mb-2 option' data-keywords="websocket">
                             <div class='col-10'>
-                                <?php echo $lang->get('settings_manager_move_item'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='manager_move_item' data-toggle-on='<?php echo isset($SETTINGS['manager_move_item']) === true && (int) $SETTINGS['manager_move_item'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='manager_move_item_input' value='<?php echo isset($SETTINGS['manager_move_item']) && (int) $SETTINGS['manager_move_item'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="folder creation">
-                            <div class='col-10'>
-                                <?php echo $lang->get('subfolder_rights_as_parent'); ?>
+                                <?php echo $lang->get('settings_websocket_enabler'); ?>
                                 <small class='form-text text-muted'>
-                                    <?php echo $lang->get('subfolder_rights_as_parent_tip'); ?>
+                                    <?php echo $lang->get('settings_websocket_enabler_tip'); ?>
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern' id='subfolder_rights_as_parent' data-toggle-on='<?php echo isset($SETTINGS['subfolder_rights_as_parent']) === true && (int) $SETTINGS['subfolder_rights_as_parent'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='subfolder_rights_as_parent_input' value='<?php echo isset($SETTINGS['subfolder_rights_as_parent']) && (int) $SETTINGS['subfolder_rights_as_parent'] === 1 ? 1 : 0; ?>' />
+                                <div class='toggle toggle-modern' id='websocket_enabled' data-toggle-on='<?php echo isset($SETTINGS['websocket_enabled']) === true && (int) $SETTINGS['websocket_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='websocket_enabled_input' value='<?php echo isset($SETTINGS['websocket_enabled']) && (int) $SETTINGS['websocket_enabled'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="role restriction modify right">
-                            <div class='col-10'>
-                                <?php echo $lang->get('settings_anyone_can_modify'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('settings_anyone_can_modify_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='anyone_can_modify' data-toggle-on='<?php echo isset($SETTINGS['anyone_can_modify']) === true && (int) $SETTINGS['anyone_can_modify'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='anyone_can_modify_input' value='<?php echo isset($SETTINGS['anyone_can_modify']) && (int) $SETTINGS['anyone_can_modify'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option <?php echo isset($SETTINGS['anyone_can_modify']) === true && (int) $SETTINGS['anyone_can_modify'] === 1 ? '' : 'hidden'; ?>' id="form-item-row-modify" data-keywords="role restriction modify right">
-                            <div class='col-10'>
-                                <?php echo $lang->get('settings_anyone_can_modify_bydefault'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='anyone_can_modify_bydefault' data-toggle-on='<?php echo isset($SETTINGS['anyone_can_modify_bydefault']) === true && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='anyone_can_modify_bydefault_input' value='<?php echo isset($SETTINGS['anyone_can_modify_bydefault']) && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="folder creation">
-                            <div class='col-10'>
-                                <?php echo $lang->get('can_create_root_folder'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='can_create_root_folder' data-toggle-on='<?php echo isset($SETTINGS['can_create_root_folder']) === true && (int) $SETTINGS['can_create_root_folder'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='can_create_root_folder_input' value='<?php echo isset($SETTINGS['can_create_root_folder']) && (int) $SETTINGS['can_create_root_folder'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="password delete massive">
-                            <div class='col-10'>
-                                <?php echo $lang->get('enable_massive_move_delete'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('enable_massive_move_delete_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='enable_massive_move_delete' data-toggle-on='<?php echo isset($SETTINGS['enable_massive_move_delete']) === true && (int) $SETTINGS['enable_massive_move_delete'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_massive_move_delete_input' value='<?php echo isset($SETTINGS['enable_massive_move_delete']) && (int) $SETTINGS['enable_massive_move_delete'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="profile">
-                            <div class='col-10'>
-                                <?php echo $lang->get('disable_user_edit_profile'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='disable_user_edit_profile' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_profile']) === true && (int) $SETTINGS['disable_user_edit_profile'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_profile_input' value='<?php echo isset($SETTINGS['disable_user_edit_profile']) && (int) $SETTINGS['disable_user_edit_profile'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="language lang">
-                            <div class='col-10'>
-                                <?php echo $lang->get('disable_user_edit_language'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='disable_user_edit_language' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_language']) === true && (int) $SETTINGS['disable_user_edit_language'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_language_input' value='<?php echo isset($SETTINGS['disable_user_edit_language']) && (int) $SETTINGS['disable_user_edit_language'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="timezone">
-                            <div class='col-10'>
-                                <?php echo $lang->get('disable_user_edit_timezone'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='disable_user_edit_timezone' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_timezone']) === true && (int) $SETTINGS['disable_user_edit_timezone'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_timezone_input' value='<?php echo isset($SETTINGS['disable_user_edit_timezone']) && (int) $SETTINGS['disable_user_edit_timezone'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="tree load strategy">
-                            <div class='col-10'>
-                                <?php echo $lang->get('disable_user_edit_tree_load_strategy'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='disable_user_edit_tree_load_strategy' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_tree_load_strategy']) === true && (int) $SETTINGS['disable_user_edit_tree_load_strategy'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_tree_load_strategy_input' value='<?php echo isset($SETTINGS['disable_user_edit_tree_load_strategy']) && (int) $SETTINGS['disable_user_edit_tree_load_strategy'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="tree load strategy">
-                            <div class='col-10'>
-                                <?php echo $lang->get('disable_drag_drop'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='disable_drag_drop' data-toggle-on='<?php echo isset($SETTINGS['disable_drag_drop']) === true && (int) $SETTINGS['disable_drag_drop'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_drag_drop_input' value='<?php echo isset($SETTINGS['disable_drag_drop']) && (int) $SETTINGS['disable_drag_drop'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="folder personal user">
-                            <div class='col-10'>
-                                <?php echo $lang->get('enable_personal_folder_feature'); ?>
+                        <div class='row mb-2 option' data-keywords="websocket host">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_websocket_host'); ?>
                                 <small id='passwordHelpBlock' class='form-text text-muted'>
-                                    <?php echo $lang->get('enable_personal_folder_feature_tip'); ?>
+                                    <?php echo $lang->get('settings_websocket_host_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='websocket_host' value='<?php echo htmlspecialchars($SETTINGS['websocket_host'] ?? '127.0.0.1'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="websocket port">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_websocket_port'); ?>
+                                <small id='passwordHelpBlock' class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_websocket_port_tip'); ?>
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern' id='enable_pf_feature' data-toggle-on='<?php echo isset($SETTINGS['enable_pf_feature']) === true && (int) $SETTINGS['enable_pf_feature'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_pf_feature_input' value='<?php echo isset($SETTINGS['enable_pf_feature']) && (int) $SETTINGS['enable_pf_feature'] === 1 ? 1 : 0; ?>' />
+                                <input type='number' class='form-control form-control-sm' id='websocket_port' value='<?php echo htmlspecialchars($SETTINGS['websocket_port'] ?? '8080'); ?>'>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-database mr-2'></i><?php echo $lang->get('settings_redis_session_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_redis_session_title_goal'); ?></span></h6>
+
+                        <div class='row mb-2 option' data-keywords="redis session">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_session_enabler'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_session_enabler_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='redis_session_enabled' data-toggle-on='<?php echo isset($SETTINGS['redis_session_enabled']) === true && (int) $SETTINGS['redis_session_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='redis_session_enabled_input' value='<?php echo isset($SETTINGS['redis_session_enabled']) && (int) $SETTINGS['redis_session_enabled'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis host">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_host'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_host_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_host' value='<?php echo htmlspecialchars($SETTINGS['redis_host'] ?? '127.0.0.1'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis port">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_port'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_port_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' class='form-control form-control-sm' id='redis_port' value='<?php echo htmlspecialchars($SETTINGS['redis_port'] ?? '6379'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis prefix">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_prefix'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_prefix_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_prefix' value='<?php echo htmlspecialchars($SETTINGS['redis_prefix'] ?? 'teampass_sess_'); ?>'>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-networks' role='tabpanel' aria-labelledby='settings-nav-networks' data-section-label='<?php echo $lang->get('settings_category_networks_title'); ?>'>
+                        <div class='card card-info'>
+                            <div class='card-header'>
+                                <h3 class='card-title'><i class="fa-solid fa-network-wired mr-2"></i><?php echo $lang->get('settings_category_networks_title'); ?>
+                                    <span class="badge text-bg-secondary">
+                                        <?php echo $lang->get('settings_category_networks_goal'); ?>
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class='card-body'>
+                                <div class='alert alert-secondary mb-0'>
+                                    <?php echo $lang->get('settings_category_networks_under_construction'); ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-logging' role='tabpanel' aria-labelledby='settings-nav-logging' data-section-label='<?php echo $lang->get('settings_category_logging_title'); ?>'>
+<div class='card card-info'>
+                    <div class='card-header'>
+                        <h3 class='card-title'><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?>
+                            <span class="badge text-bg-secondary">
+                                <?php echo $lang->get('settings_category_logging_goal'); ?>
+                            </span>
+                        </h3>
+                    </div>
+                    <!-- /.card-header -->
+                    <!-- form start -->
+                    <div class='card-body'>
+
+                        <div class='row mb-2 option' data-keywords="log item password log security">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_log_accessed'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='log_accessed' data-toggle-on='<?php echo isset($SETTINGS['log_accessed']) === true && (int) $SETTINGS['log_accessed'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='log_accessed_input' value='<?php echo isset($SETTINGS['log_accessed']) && (int) $SETTINGS['log_accessed'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="email notification login">
+                            <div class='col-10'>
+                                <?php echo $lang->get('enable_send_email_on_user_login'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='enable_send_email_on_user_login' data-toggle-on='<?php echo isset($SETTINGS['enable_send_email_on_user_login']) === true && (int) $SETTINGS['enable_send_email_on_user_login'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_send_email_on_user_login_input' value='<?php echo isset($SETTINGS['enable_send_email_on_user_login']) && (int) $SETTINGS['enable_send_email_on_user_login'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="email notification">
+                            <div class='col-10'>
+                                <?php echo $lang->get('enable_email_notification_on_item_shown'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='enable_email_notification_on_item_shown' data-toggle-on='<?php echo isset($SETTINGS['enable_email_notification_on_item_shown']) === true && (int) $SETTINGS['enable_email_notification_on_item_shown'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_email_notification_on_item_shown_input' value='<?php echo isset($SETTINGS['enable_email_notification_on_item_shown']) && (int) $SETTINGS['enable_email_notification_on_item_shown'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="email notification password change">
+                            <div class='col-10'>
+                                <?php echo $lang->get('enable_email_notification_on_user_pw_change'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='enable_email_notification_on_user_pw_change' data-toggle-on='<?php echo isset($SETTINGS['enable_email_notification_on_user_pw_change']) === true && (int) $SETTINGS['enable_email_notification_on_user_pw_change'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_email_notification_on_user_pw_change_input' value='<?php echo isset($SETTINGS['enable_email_notification_on_user_pw_change']) && (int) $SETTINGS['enable_email_notification_on_user_pw_change'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="history manual">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_insert_manual_entry_item_history'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_insert_manual_entry_item_history_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='insert_manual_entry_item_history' data-toggle-on='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) === true && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='insert_manual_entry_item_history_input' value='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
                         
                     </div>
                 </div>
-
-                <!-- /.card -->
-                <!-- INACTIVE USERS MANAGEMENT -->
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-integration' role='tabpanel' aria-labelledby='settings-nav-integration' data-section-label='<?php echo $lang->get('settings_category_integration_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('settings_category_inactive_users_title'); ?>
+                        <h3 class='card-title'><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?>
                             <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_category_inactive_users_goal'); ?>
+                                <?php echo $lang->get('settings_category_integration_goal'); ?>
                             </span>
                         </h3>
                     </div>
                     <!-- /.card-header -->
+                    <!-- form start -->
                     <div class='card-body'>
 
-                        <div class='row mb-2 option' data-keywords="inactive users management warn delete disable purge soft hard" id='inactive-users-mgmt-block'>
+                        <div class='row mb-2 option' data-keywords="syslog">
                             <div class='col-10'>
-                                <?php echo $lang->get('inactive_users_mgmt_description'); ?>
+                                <?php echo $lang->get('syslog_enable'); ?>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern' id='ium-enabled' data-toggle-on='false'></div><input type='hidden' id='ium-enabled_input' value='0' />
+                                <div class='toggle toggle-modern' id='syslog_enable' data-toggle-on='<?php echo isset($SETTINGS['syslog_enable']) === true && (int) $SETTINGS['syslog_enable'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='syslog_enable_input' value='<?php echo isset($SETTINGS['syslog_enable']) && (int) $SETTINGS['syslog_enable'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="inactive users management message">
-                            <div class='col-12'>
-                                <div id='ium-alert' class='alert d-none mb-0' role='alert'></div>
+                        <div class='row mb-2 option' data-keywords="syslog">
+                            <div class='col-7'>
+                                <?php echo $lang->get('syslog_host'); ?>
+                            </div>
+                            <div class='col-5'>
+                                <input type='text' class='form-control form-control-sm' id='syslog_host' value='<?php echo isset($SETTINGS['syslog_host']) === true ? htmlspecialchars($SETTINGS['syslog_host']) : ''; ?>'>
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="inactive users management inactivity days warning">
+                        <div class='row mb-5 option' data-keywords="syslog port">
                             <div class='col-10'>
-                                <?php echo $lang->get('inactive_users_mgmt_inactivity_days'); ?>
+                                <?php echo $lang->get('syslog_port'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' class='form-control form-control-sm' id='syslog_port' value='<?php echo isset($SETTINGS['syslog_port']) === true ? htmlspecialchars($SETTINGS['syslog_port']) : ''; ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="password server">
+                            <div class='col-10'>
+                                <?php echo $lang->get('server_password_change_enable'); ?>
                                 <small class='form-text text-muted'>
-                                    <?php echo $lang->get('inactive_users_mgmt_inactivity_days_tip'); ?>
+                                    <?php echo $lang->get('server_password_change_enable_tip'); ?>
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <input type='number' min='1' class='form-control form-control-sm' id='ium-inactivity-days' value='90'>
+                                <div class='toggle toggle-modern disabled' id='enable_server_password_change' data-toggle-on='<?php echo isset($SETTINGS['enable_server_password_change']) === true && (int) $SETTINGS['enable_server_password_change'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_server_password_change_input' value='<?php echo isset($SETTINGS['enable_server_password_change']) && (int) $SETTINGS['enable_server_password_change'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
-
-                        <div class='row mb-2 option' data-keywords="inactive users management grace days delete disable">
-                            <div class='col-10'>
-                                <?php echo $lang->get('inactive_users_mgmt_grace_days'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('inactive_users_mgmt_grace_days_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-2'>
-                                <input type='number' min='0' class='form-control form-control-sm' id='ium-grace-days' value='7'>
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="inactive users management action disable soft hard purge">
-                            <div class='col-4'>
-                                <?php echo $lang->get('inactive_users_mgmt_action'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('inactive_users_mgmt_action_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-8'>
-                                <select id='ium-action' class='form-control form-control-sm w-100' style='min-width: 260px;'>
-                                    <option value='disable'><?php echo $lang->get('inactive_users_mgmt_action_disable'); ?></option>
-                                    <option value='soft_delete'><?php echo $lang->get('inactive_users_mgmt_action_soft_delete'); ?></option>
-                                    <option value='hard_delete'><?php echo $lang->get('inactive_users_mgmt_action_hard_delete'); ?></option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="inactive users management schedule time daily">
-                            <div class='col-4'>
-                                <?php echo $lang->get('inactive_users_mgmt_time'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('inactive_users_mgmt_time_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-8'>
-                                <input type='time' class='form-control form-control-sm' id='ium-time' value='02:00' style='max-width: 180px;'>
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="inactive users management save run now">
-                            <div class='col-4'>
-                                <?php echo $lang->get('actions'); ?>
-                                <small class='form-text text-muted'>
-                                    <?php echo $lang->get('inactive_users_mgmt_actions_tip'); ?>
-                                </small>
-                            </div>
-                            <div class='col-8'>
-                                <button type='button' class='btn btn-primary btn-sm mr-2' id='ium-save'>
-                                    <i class='fas fa-save mr-1'></i><?php echo $lang->get('save'); ?>
-                                </button>
-                                <button type='button' class='btn btn-secondary btn-sm' id='ium-run-now'>
-                                    <i class='fa-solid fa-play mr-1'></i><?php echo $lang->get('inactive_users_mgmt_run_now'); ?>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class='row mb-0 option' data-keywords="inactive users management status next last summary">
-                            <div class='col-12'>
-                                <b><?php echo $lang->get('status'); ?></b>
-                                <small class='form-text text-muted mb-0'>
-                                    <?php echo $lang->get('inactive_users_mgmt_status_next_run'); ?>: <span id='ium-status-next-run'>-</span>
-                                    &nbsp;|&nbsp;
-                                    <?php echo $lang->get('inactive_users_mgmt_status_last_run'); ?>: <span id='ium-status-last-run'>-</span>
-                                    &nbsp;|&nbsp;
-                                    <?php echo $lang->get('inactive_users_mgmt_status_last_status'); ?>: <span id='ium-status-last-status'>-</span>
-                                    <br>
-                                    <?php echo $lang->get('inactive_users_mgmt_status_last_message'); ?>: <span id='ium-status-last-message'>-</span>
-                                    <br>
-                                    <?php echo $lang->get('inactive_users_mgmt_status_last_summary'); ?>: <span id='ium-status-last-summary'>-</span>
-                                </small>
-                            </div>
-                        </div>
-
+                        
                     </div>
-                    <!-- /.card-body -->
                 </div>
-                <!-- /.card -->
-
-            </div>
-            <!-- /.col-md-6 -->
-            <!--/.col (left) -->
-            <!-- right column -->
-            <div class='col-md-6'>
-                <!-- Horizontal Form -->
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-items' role='tabpanel' aria-labelledby='settings-nav-items' data-section-label='<?php echo $lang->get('settings_category_items_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-folder-tree mr-2"></i><?php echo $lang->get('settings_category_items_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -980,7 +1124,156 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                 <!-- /.card -->
             
 
-                <div class='card card-info'>
+
+                    </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-users' role='tabpanel' aria-labelledby='settings-nav-users' data-section-label='<?php echo $lang->get('settings_category_users_title'); ?>'>
+<div class='card card-info'>
+                    <div class='card-header'>
+                        <h3 class='card-title'><i class="fa-solid fa-users-cog mr-2"></i><?php echo $lang->get('settings_category_users_title'); ?>
+                            <span class="badge text-bg-secondary">
+                                <?php echo $lang->get('settings_category_users_goal'); ?>
+                            </span>
+                        </h3>
+                    </div>
+                    <!-- /.card-header -->
+                    <!-- form start -->
+                    <div class='card-body'>
+
+                        <div class='row mb-2 option' data-keywords="right manager item">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_manager_edit'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='manager_edit' data-toggle-on='<?php echo isset($SETTINGS['manager_edit']) === true && (int) $SETTINGS['manager_edit'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='manager_edit_input' value='<?php echo isset($SETTINGS['manager_edit']) && (int) $SETTINGS['manager_edit'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="right manager move item">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_manager_move_item'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='manager_move_item' data-toggle-on='<?php echo isset($SETTINGS['manager_move_item']) === true && (int) $SETTINGS['manager_move_item'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='manager_move_item_input' value='<?php echo isset($SETTINGS['manager_move_item']) && (int) $SETTINGS['manager_move_item'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="folder creation">
+                            <div class='col-10'>
+                                <?php echo $lang->get('subfolder_rights_as_parent'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('subfolder_rights_as_parent_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='subfolder_rights_as_parent' data-toggle-on='<?php echo isset($SETTINGS['subfolder_rights_as_parent']) === true && (int) $SETTINGS['subfolder_rights_as_parent'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='subfolder_rights_as_parent_input' value='<?php echo isset($SETTINGS['subfolder_rights_as_parent']) && (int) $SETTINGS['subfolder_rights_as_parent'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="role restriction modify right">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_anyone_can_modify'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_anyone_can_modify_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='anyone_can_modify' data-toggle-on='<?php echo isset($SETTINGS['anyone_can_modify']) === true && (int) $SETTINGS['anyone_can_modify'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='anyone_can_modify_input' value='<?php echo isset($SETTINGS['anyone_can_modify']) && (int) $SETTINGS['anyone_can_modify'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option <?php echo isset($SETTINGS['anyone_can_modify']) === true && (int) $SETTINGS['anyone_can_modify'] === 1 ? '' : 'hidden'; ?>' id="form-item-row-modify" data-keywords="role restriction modify right">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_anyone_can_modify_bydefault'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='anyone_can_modify_bydefault' data-toggle-on='<?php echo isset($SETTINGS['anyone_can_modify_bydefault']) === true && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='anyone_can_modify_bydefault_input' value='<?php echo isset($SETTINGS['anyone_can_modify_bydefault']) && (int) $SETTINGS['anyone_can_modify_bydefault'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="folder creation">
+                            <div class='col-10'>
+                                <?php echo $lang->get('can_create_root_folder'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='can_create_root_folder' data-toggle-on='<?php echo isset($SETTINGS['can_create_root_folder']) === true && (int) $SETTINGS['can_create_root_folder'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='can_create_root_folder_input' value='<?php echo isset($SETTINGS['can_create_root_folder']) && (int) $SETTINGS['can_create_root_folder'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="password delete massive">
+                            <div class='col-10'>
+                                <?php echo $lang->get('enable_massive_move_delete'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('enable_massive_move_delete_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='enable_massive_move_delete' data-toggle-on='<?php echo isset($SETTINGS['enable_massive_move_delete']) === true && (int) $SETTINGS['enable_massive_move_delete'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_massive_move_delete_input' value='<?php echo isset($SETTINGS['enable_massive_move_delete']) && (int) $SETTINGS['enable_massive_move_delete'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="profile">
+                            <div class='col-10'>
+                                <?php echo $lang->get('disable_user_edit_profile'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='disable_user_edit_profile' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_profile']) === true && (int) $SETTINGS['disable_user_edit_profile'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_profile_input' value='<?php echo isset($SETTINGS['disable_user_edit_profile']) && (int) $SETTINGS['disable_user_edit_profile'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="language lang">
+                            <div class='col-10'>
+                                <?php echo $lang->get('disable_user_edit_language'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='disable_user_edit_language' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_language']) === true && (int) $SETTINGS['disable_user_edit_language'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_language_input' value='<?php echo isset($SETTINGS['disable_user_edit_language']) && (int) $SETTINGS['disable_user_edit_language'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="timezone">
+                            <div class='col-10'>
+                                <?php echo $lang->get('disable_user_edit_timezone'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='disable_user_edit_timezone' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_timezone']) === true && (int) $SETTINGS['disable_user_edit_timezone'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_timezone_input' value='<?php echo isset($SETTINGS['disable_user_edit_timezone']) && (int) $SETTINGS['disable_user_edit_timezone'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="tree load strategy">
+                            <div class='col-10'>
+                                <?php echo $lang->get('disable_user_edit_tree_load_strategy'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='disable_user_edit_tree_load_strategy' data-toggle-on='<?php echo isset($SETTINGS['disable_user_edit_tree_load_strategy']) === true && (int) $SETTINGS['disable_user_edit_tree_load_strategy'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_user_edit_tree_load_strategy_input' value='<?php echo isset($SETTINGS['disable_user_edit_tree_load_strategy']) && (int) $SETTINGS['disable_user_edit_tree_load_strategy'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="tree load strategy">
+                            <div class='col-10'>
+                                <?php echo $lang->get('disable_drag_drop'); ?>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='disable_drag_drop' data-toggle-on='<?php echo isset($SETTINGS['disable_drag_drop']) === true && (int) $SETTINGS['disable_drag_drop'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='disable_drag_drop_input' value='<?php echo isset($SETTINGS['disable_drag_drop']) && (int) $SETTINGS['disable_drag_drop'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="folder personal user">
+                            <div class='col-10'>
+                                <?php echo $lang->get('enable_personal_folder_feature'); ?>
+                                <small id='passwordHelpBlock' class='form-text text-muted'>
+                                    <?php echo $lang->get('enable_personal_folder_feature_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='enable_pf_feature' data-toggle-on='<?php echo isset($SETTINGS['enable_pf_feature']) === true && (int) $SETTINGS['enable_pf_feature'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_pf_feature_input' value='<?php echo isset($SETTINGS['enable_pf_feature']) && (int) $SETTINGS['enable_pf_feature'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-collaboration' role='tabpanel' aria-labelledby='settings-nav-collaboration' data-section-label='<?php echo $lang->get('settings_category_collaboration_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-people-arrows mr-2"></i><?php echo $lang->get('settings_category_collaboration_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -1006,7 +1299,7 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                                 <?php echo $lang->get('settings_otv_expiration_period'); ?>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='otv_expiration_period' value='<?php echo htmlspecialchars($SETTINGS['otv_expiration_period']) ?? '7'; ?>'>
+                                <input type='number' class='form-control form-control-sm' id='otv_expiration_period' value='<?php echo htmlspecialchars($SETTINGS['otv_expiration_period'] ?? '7'); ?>'>
                             </div>
                         </div>
 
@@ -1125,130 +1418,127 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                         
                     </div>
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-inactive' role='tabpanel' aria-labelledby='settings-nav-inactive' data-section-label='<?php echo $lang->get('settings_category_inactive_users_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?>
+                        <h3 class='card-title'><i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('settings_category_inactive_users_title'); ?>
                             <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_category_logging_goal'); ?>
+                                <?php echo $lang->get('settings_category_inactive_users_goal'); ?>
                             </span>
                         </h3>
                     </div>
                     <!-- /.card-header -->
-                    <!-- form start -->
                     <div class='card-body'>
 
-                        <div class='row mb-2 option' data-keywords="log item password log security">
+                        <div class='row mb-2 option' data-keywords="inactive users management warn delete disable purge soft hard" id='inactive-users-mgmt-block'>
                             <div class='col-10'>
-                                <?php echo $lang->get('settings_log_accessed'); ?>
+                                <?php echo $lang->get('inactive_users_mgmt_description'); ?>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern' id='log_accessed' data-toggle-on='<?php echo isset($SETTINGS['log_accessed']) === true && (int) $SETTINGS['log_accessed'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='log_accessed_input' value='<?php echo isset($SETTINGS['log_accessed']) && (int) $SETTINGS['log_accessed'] === 1 ? 1 : 0; ?>' />
+                                <div class='toggle toggle-modern' id='ium-enabled' data-toggle-on='false'></div><input type='hidden' id='ium-enabled_input' value='0' />
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="email notification login">
-                            <div class='col-10'>
-                                <?php echo $lang->get('enable_send_email_on_user_login'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='enable_send_email_on_user_login' data-toggle-on='<?php echo isset($SETTINGS['enable_send_email_on_user_login']) === true && (int) $SETTINGS['enable_send_email_on_user_login'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_send_email_on_user_login_input' value='<?php echo isset($SETTINGS['enable_send_email_on_user_login']) && (int) $SETTINGS['enable_send_email_on_user_login'] === 1 ? 1 : 0; ?>' />
+                        <div class='row mb-2 option' data-keywords="inactive users management message">
+                            <div class='col-12'>
+                                <div id='ium-alert' class='alert d-none mb-0' role='alert'></div>
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="email notification">
+                        <div class='row mb-2 option' data-keywords="inactive users management inactivity days warning">
                             <div class='col-10'>
-                                <?php echo $lang->get('enable_email_notification_on_item_shown'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='enable_email_notification_on_item_shown' data-toggle-on='<?php echo isset($SETTINGS['enable_email_notification_on_item_shown']) === true && (int) $SETTINGS['enable_email_notification_on_item_shown'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_email_notification_on_item_shown_input' value='<?php echo isset($SETTINGS['enable_email_notification_on_item_shown']) && (int) $SETTINGS['enable_email_notification_on_item_shown'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="email notification password change">
-                            <div class='col-10'>
-                                <?php echo $lang->get('enable_email_notification_on_user_pw_change'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='enable_email_notification_on_user_pw_change' data-toggle-on='<?php echo isset($SETTINGS['enable_email_notification_on_user_pw_change']) === true && (int) $SETTINGS['enable_email_notification_on_user_pw_change'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_email_notification_on_user_pw_change_input' value='<?php echo isset($SETTINGS['enable_email_notification_on_user_pw_change']) && (int) $SETTINGS['enable_email_notification_on_user_pw_change'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="history manual">
-                            <div class='col-10'>
-                                <?php echo $lang->get('settings_insert_manual_entry_item_history'); ?>
+                                <?php echo $lang->get('inactive_users_mgmt_inactivity_days'); ?>
                                 <small class='form-text text-muted'>
-                                    <?php echo $lang->get('settings_insert_manual_entry_item_history_tip'); ?>
+                                    <?php echo $lang->get('inactive_users_mgmt_inactivity_days_tip'); ?>
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern' id='insert_manual_entry_item_history' data-toggle-on='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) === true && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='insert_manual_entry_item_history_input' value='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 1 : 0; ?>' />
+                                <input type='number' min='1' class='form-control form-control-sm' id='ium-inactivity-days' value='90'>
                             </div>
                         </div>
-                        
-                    </div>
-                </div>
-            
 
-                <div class='card card-info'>
-                    <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?>
-                            <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_category_integration_goal'); ?>
-                            </span>
-                        </h3>
-                    </div>
-                    <!-- /.card-header -->
-                    <!-- form start -->
-                    <div class='card-body'>
-
-                        <div class='row mb-2 option' data-keywords="syslog">
+                        <div class='row mb-2 option' data-keywords="inactive users management grace days delete disable">
                             <div class='col-10'>
-                                <?php echo $lang->get('syslog_enable'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <div class='toggle toggle-modern' id='syslog_enable' data-toggle-on='<?php echo isset($SETTINGS['syslog_enable']) === true && (int) $SETTINGS['syslog_enable'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='syslog_enable_input' value='<?php echo isset($SETTINGS['syslog_enable']) && (int) $SETTINGS['syslog_enable'] === 1 ? 1 : 0; ?>' />
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="syslog">
-                            <div class='col-7'>
-                                <?php echo $lang->get('syslog_host'); ?>
-                            </div>
-                            <div class='col-5'>
-                                <input type='text' class='form-control form-control-sm' id='syslog_host' value='<?php echo isset($SETTINGS['syslog_host']) === true ? htmlspecialchars($SETTINGS['syslog_host']) : ''; ?>'>
-                            </div>
-                        </div>
-
-                        <div class='row mb-5 option' data-keywords="syslog port">
-                            <div class='col-10'>
-                                <?php echo $lang->get('syslog_port'); ?>
-                            </div>
-                            <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='syslog_port' value='<?php echo isset($SETTINGS['syslog_port']) === true ? htmlspecialchars($SETTINGS['syslog_port']) : ''; ?>'>
-                            </div>
-                        </div>
-
-                        <div class='row mb-2 option' data-keywords="password server">
-                            <div class='col-10'>
-                                <?php echo $lang->get('server_password_change_enable'); ?>
+                                <?php echo $lang->get('inactive_users_mgmt_grace_days'); ?>
                                 <small class='form-text text-muted'>
-                                    <?php echo $lang->get('server_password_change_enable_tip'); ?>
+                                    <?php echo $lang->get('inactive_users_mgmt_grace_days_tip'); ?>
                                 </small>
                             </div>
                             <div class='col-2'>
-                                <div class='toggle toggle-modern disabled' id='enable_server_password_change' data-toggle-on='<?php echo isset($SETTINGS['enable_server_password_change']) === true && (int) $SETTINGS['enable_server_password_change'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_server_password_change_input' value='<?php echo isset($SETTINGS['enable_server_password_change']) && (int) $SETTINGS['enable_server_password_change'] === 1 ? 1 : 0; ?>' />
+                                <input type='number' min='0' class='form-control form-control-sm' id='ium-grace-days' value='7'>
                             </div>
                         </div>
-                        
+
+                        <div class='row mb-2 option' data-keywords="inactive users management action disable soft hard purge">
+                            <div class='col-4'>
+                                <?php echo $lang->get('inactive_users_mgmt_action'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('inactive_users_mgmt_action_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-8'>
+                                <select id='ium-action' class='form-control form-control-sm w-100' style='min-width: 260px;'>
+                                    <option value='disable'><?php echo $lang->get('inactive_users_mgmt_action_disable'); ?></option>
+                                    <option value='soft_delete'><?php echo $lang->get('inactive_users_mgmt_action_soft_delete'); ?></option>
+                                    <option value='hard_delete'><?php echo $lang->get('inactive_users_mgmt_action_hard_delete'); ?></option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="inactive users management schedule time daily">
+                            <div class='col-4'>
+                                <?php echo $lang->get('inactive_users_mgmt_time'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('inactive_users_mgmt_time_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-8'>
+                                <input type='time' class='form-control form-control-sm' id='ium-time' value='02:00' style='max-width: 180px;'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="inactive users management save run now">
+                            <div class='col-4'>
+                                <?php echo $lang->get('actions'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('inactive_users_mgmt_actions_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-8'>
+                                <button type='button' class='btn btn-primary btn-sm mr-2' id='ium-save'>
+                                    <i class='fas fa-save mr-1'></i><?php echo $lang->get('save'); ?>
+                                </button>
+                                <button type='button' class='btn btn-secondary btn-sm' id='ium-run-now'>
+                                    <i class='fa-solid fa-play mr-1'></i><?php echo $lang->get('inactive_users_mgmt_run_now'); ?>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class='row mb-0 option' data-keywords="inactive users management status next last summary">
+                            <div class='col-12'>
+                                <b><?php echo $lang->get('status'); ?></b>
+                                <small class='form-text text-muted mb-0'>
+                                    <?php echo $lang->get('inactive_users_mgmt_status_next_run'); ?>: <span id='ium-status-next-run'>-</span>
+                                    &nbsp;|&nbsp;
+                                    <?php echo $lang->get('inactive_users_mgmt_status_last_run'); ?>: <span id='ium-status-last-run'>-</span>
+                                    &nbsp;|&nbsp;
+                                    <?php echo $lang->get('inactive_users_mgmt_status_last_status'); ?>: <span id='ium-status-last-status'>-</span>
+                                    <br>
+                                    <?php echo $lang->get('inactive_users_mgmt_status_last_message'); ?>: <span id='ium-status-last-message'>-</span>
+                                    <br>
+                                    <?php echo $lang->get('inactive_users_mgmt_status_last_summary'); ?>: <span id='ium-status-last-summary'>-</span>
+                                </small>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- /.card-body -->
+                </div>
                     </div>
                 </div>
-                <!-- /.card -->
             </div>
-            <!--/.col (right) -->
         </div>
     </div><!-- /.container-fluid -->
-</div></div>
+</div>
 <!-- /.content -->

@@ -26,9 +26,9 @@
  * @see       https://www.teampass.net
  */
 
-define('TP_VERSION', '3.1.6');
-define("UPGRADE_MIN_DATE", "1772381248");
-define('TP_VERSION_MINOR', '13');
+define('TP_VERSION', '3.1.7');
+define("UPGRADE_MIN_DATE", "1774079358");
+define('TP_VERSION_MINOR', '0');
 define('TP_TOOL_NAME', 'Teampass');
 define('TP_ONE_DAY_SECONDS', 86400);
 define('TP_ONE_WEEK_SECONDS', 604800);
@@ -41,11 +41,12 @@ define('TP_COPYRIGHT', '2009-'.date('Y'));
 define('TP_ALLOWED_TAGS', '<b><i><sup><sub><em><strong><u><br><br /><a><strike><ul><blockquote><blockquote><img><li><h1><h2><h3><h4><h5><ol><small><font>');
 define('TP_FILE_PREFIX', 'EncryptedFile_');
 define('NUMBER_ITEMS_IN_BATCH', 1000);
-define('WIP', false);
+define('WIP', (bool) getenv('TEAMPASS_DEBUG'));
 define('UPGRADE_SEND_EMAILS', true);
 define('KEY_LENGTH', 16);
 define('EDITION_LOCK_PERIOD', 86400);   // Defines the delay for which an item edition lock is active
-define('LOG_TO_SERVER', false);         // Defines if logs are sent to the server
+define('EDITION_LOCK_HEARTBEAT_TIMEOUT', 600);  // Lock expires after 5 minutes without heartbeat renewal
+define('LOG_TO_SERVER', (bool) getenv('TEAMPASS_DEBUG'));         // Defines if logs are sent to the server
 define('OAUTH2_REDIRECTURI', 'index.php?post_type=oauth2');
 define('FORCE_PHPSECLIBV3_MIGRATION', true); // Set to true to force phpseclib v1 to v3 migration on user login
 
@@ -99,8 +100,6 @@ define('DEBUG', false); // Can be used in order to debug the application
 define('MYSQL_LOG', false); // Can be used in order to enable global MySQL log. 🫸 Ensure the mysql user has SUPER privilege set
 define('MYSQL_LOG_FILE', '/var/log/teampass_mysql_query.log'); // 🫸 Ensure you have the right to write in the log file
 define('DEBUGLDAP', false); // Can be used in order to debug LDAP authentication
-
-define("ADMIN_VISIBLE_OTP_ON_LDAP_IMPORT", true);
 
 // Management Pages
 $mngPages = array(

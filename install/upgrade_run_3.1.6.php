@@ -183,16 +183,19 @@ if (mysqli_error($db_link)) {
          WHERE private_key IS NOT NULL AND private_key != ''"
     );
     $stats = mysqli_fetch_assoc($result);
+    $total = (int) ($stats['total'] ?? 0);
+    $v1    = (int) ($stats['v1']    ?? 0);
+    $v3    = (int) ($stats['v3']    ?? 0);
 
     mysqli_query(
         $db_link,
         "INSERT INTO `" . $pre . "encryption_migration_stats`
          (table_name, total_records, v1_records, v3_records)
-         VALUES ('users', " . $stats['total'] . ", " . $stats['v1'] . ", " . $stats['v3'] . ")
+         VALUES ('users', " . $total . ", " . $v1 . ", " . $v3 . ")
          ON DUPLICATE KEY UPDATE
-            total_records = " . $stats['total'] . ",
-            v1_records = " . $stats['v1'] . ",
-            v3_records = " . $stats['v3']
+            total_records = " . $total . ",
+            v1_records = " . $v1 . ",
+            v3_records = " . $v3
     );
 
     // Sharekeys statistics
@@ -206,16 +209,19 @@ if (mysqli_error($db_link)) {
              FROM `" . $pre . $table . "`"
         );
         $stats = mysqli_fetch_assoc($result);
+        $total = (int) ($stats['total'] ?? 0);
+        $v1    = (int) ($stats['v1']    ?? 0);
+        $v3    = (int) ($stats['v3']    ?? 0);
 
         mysqli_query(
             $db_link,
             "INSERT INTO `" . $pre . "encryption_migration_stats`
              (table_name, total_records, v1_records, v3_records)
-             VALUES ('" . $table . "', " . $stats['total'] . ", " . $stats['v1'] . ", " . $stats['v3'] . ")
+             VALUES ('" . $table . "', " . $total . ", " . $v1 . ", " . $v3 . ")
              ON DUPLICATE KEY UPDATE
-                total_records = " . $stats['total'] . ",
-                v1_records = " . $stats['v1'] . ",
-                v3_records = " . $stats['v3']
+                total_records = " . $total . ",
+                v1_records = " . $v1 . ",
+                v3_records = " . $v3
         );
     }
 }
@@ -346,6 +352,7 @@ foreach ($iumSettings as $setting) {
     }
 }
 
+// @phpstan-ignore identical.alwaysFalse (mysqli_query may return false on error despite PHPDoc)
 if ($res === false) {
     $error[] = "Failed to add phpseclibv3_migration_task_id to users table - MySQL Error: " . mysqli_error($db_link);
 }
@@ -501,6 +508,7 @@ $res = checkIndexExist(
     'UNIQUE_LDAP_GROUP_ID',
     "ADD UNIQUE KEY `UNIQUE_LDAP_GROUP_ID` (`ldap_group_id`(255))"
 );
+// @phpstan-ignore identical.alwaysFalse (checkIndexExist may return false on error despite PHPDoc)
 if ($res === false) {
     $error[] = "Failed to add unique key on ldap_groups_roles.ldap_group_id - MySQL Error: " . mysqli_error($db_link);
 }

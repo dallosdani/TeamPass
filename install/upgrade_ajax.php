@@ -109,7 +109,10 @@ function settingsConsistencyCheck(): array
         unlink($settingsFile);
         // Now create new file
         $file_handled = fopen($settingsFile, 'w');
-        
+
+        // @phpstan-ignore function.impossibleType (DB_SSL may be false or array depending on SSL configuration)
+        $dbSslData = is_array(DB_SSL) ? DB_SSL : ['key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => ''];
+
         $settingsTxt = '<?php
 // DATABASE connexion parameters
 define("DB_HOST", "' . DB_HOST . '");
@@ -122,11 +125,11 @@ define("DB_ENCODING", "' . DB_ENCODING . '");
 define("DB_SSL", false); // if DB over SSL then comment this line
 // if DB over SSL then uncomment the following lines
 define("DB_SSL", array(
-    "key" => "' . DB_SSL['key'] . '",
-    "cert" => "' . DB_SSL['cert'] . '",
-    "ca_cert" => "' . DB_SSL['ca_cert'] . '",
-    "ca_path" => "' . DB_SSL['ca_path'] . '",
-    "cipher" => "' . DB_SSL['cipher'] . '"
+    "key" => "' . $dbSslData['key'] . '",
+    "cert" => "' . $dbSslData['cert'] . '",
+    "ca_cert" => "' . $dbSslData['ca_cert'] . '",
+    "ca_path" => "' . $dbSslData['ca_path'] . '",
+    "cipher" => "' . $dbSslData['cipher'] . '"
 ));
 define("DB_CONNECT_OPTIONS", array(
     MYSQLI_OPT_CONNECT_TIMEOUT => 10
@@ -306,7 +309,7 @@ if (isset($post_type)) {
                 )
             );
             
-            if (empty($user_info['pw']) || $user_info['pw'] === null) {
+            if (empty($user_info['pw'])) {
                 echo '[{'.
                     '"error" : "User is not allowed",'.
                     '"index" : ""'.
@@ -385,23 +388,13 @@ if (isset($post_type)) {
             }
 
             if (!extension_loaded('openssl')) {
-                //$okExtensions = false;
                 $txt .= '<span>PHP extension \"openssl\"' .
                     '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
             } else {
                 $txt .= '<span>PHP extension \"openssl\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-            }
-            if (!extension_loaded('gd')) {
-                //$okExtensions = false;
-                $txt .= '<span>PHP extension \"gd\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"gd\"' .
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
             if (!extension_loaded('mbstring')) {
-                //$okExtensions = false;
                 $txt .= '<span>PHP extension \"mbstring\"' .
                     '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
             } else {
@@ -409,23 +402,13 @@ if (isset($post_type)) {
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
             if (!extension_loaded('bcmath')) {
-                //$okExtensions = false;
                 $txt .= '<span>PHP extension \"bcmath\"' .
                     '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
             } else {
                 $txt .= '<span>PHP extension \"bcmath\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-            }
-            if (!extension_loaded('iconv')) {
-                //$okExtensions = false;
-                $txt .= '<span>PHP extension \"iconv\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"iconv\"' .
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
             if (!extension_loaded('xml')) {
-                //$okExtensions = false;
                 $txt .= '<span>PHP extension \"xml\"' .
                     '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
             } else {
@@ -439,13 +422,70 @@ if (isset($post_type)) {
                 $txt .= '<span>PHP extension \"curl\"' .
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
-            if (!extension_loaded('gmp')) {
-                $txt .= '<span>PHP extension \"gmp\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
+            // pcntl and posix are CLI-only extensions, only required for WebSocket (optional)
+            // Use shell check to verify they are installed for CLI
+            $cliModules = [];
+            exec('php -m 2>/dev/null', $cliModules);
+            foreach (['posix', 'pcntl'] as $cliExt) {
+                if (!in_array($cliExt, $cliModules, true)) {
+                    $txt .= '<span>PHP extension \"' . $cliExt . '\" not found' .
+                        ' &mdash; optional, required for WebSocket' .
+                        '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
+                } else {
+                    $txt .= '<span>PHP extension \"' . $cliExt . '\"' .
+                        '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+                }
+            }
+            // OPcache — optional, strongly recommended
+            $opcacheLoaded  = extension_loaded('Zend OPcache');
+            $opcacheEnabled = $opcacheLoaded && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
+            if ($opcacheEnabled === false) {
+                $txt .= '<span>PHP extension \"Zend OPcache\" is not enabled' .
+                    ' &mdash; strongly recommended for performance' .
+                    '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
             } else {
-                $txt .= '<span>PHP extension \"gmp\"' .
+                $opcacheMemMb = (int) ini_get('opcache.memory_consumption');
+                if ($opcacheMemMb > 0 && $opcacheMemMb < 128) {
+                    $txt .= '<span>PHP extension \"Zend OPcache\" is enabled but memory is low (' .
+                        $opcacheMemMb . ' MB, 128 MB recommended)' .
+                        '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
+                } else {
+                    $txt .= '<span>PHP extension \"Zend OPcache\" is enabled' .
+                        '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+                }
+            }
+
+            // PHP-FPM — optional, recommended for high-concurrency deployments
+            if (PHP_SAPI === 'fpm-fcgi') {
+                $txt .= '<span>PHP-FPM detected (SAPI: fpm-fcgi)' .
+                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            } else {
+                $txt .= '<span>PHP is running under SAPI \"' . PHP_SAPI . '\"' .
+                    ' &mdash; PHP-FPM recommended for high-load deployments' .
+                    '<i class=\"fa-solid fa-circle-info text-info ml-2\"></i></span><br />';
+            }
+
+            // APCu — optional, recommended for settings cache
+            $apcuEnabled = extension_loaded('apcu') && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN);
+            if ($apcuEnabled === false) {
+                $txt .= '<span>PHP extension \"APCu\" is not enabled' .
+                    ' &mdash; recommended to cache settings and reduce DB queries' .
+                    '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
+            } else {
+                $txt .= '<span>PHP extension \"APCu\" is enabled' .
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
+
+            // ext-redis — optional, required only if Redis session storage is desired
+            if (extension_loaded('redis')) {
+                $txt .= '<span>PHP extension \"redis\" is loaded' .
+                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            } else {
+                $txt .= '<span>PHP extension \"redis\" is not loaded' .
+                    ' &mdash; optional, required only for Redis session storage' .
+                    '<i class=\"fa-solid fa-circle-info text-info ml-2\"></i></span><br />';
+            }
+
             if (ini_get('max_execution_time') < 30) {
                 $txt .= '<span>PHP \"Maximum ' .
                     'execution time\" is set to ' . ini_get('max_execution_time') . ' seconds.' .
@@ -468,26 +508,13 @@ if (isset($post_type)) {
             $mysqlVersion = version_compare((string) $db_link -> server_version, MIN_MYSQL_VERSION, '<') ;
             $mariadbVersion = version_compare((string) $db_link -> server_version, MIN_MARIADB_VERSION, '<') ;
             if ($mysqlVersion && $mariadbVersion) {
-                if ($mariadbVersion === '') {
-                    $txt .= '<span>MySQL version ' .
-                        $db_link -> server_version . ' is not OK (minimum is '.MIN_MYSQL_VERSION.') &nbsp;&nbsp;' .
-                        '<img src=\"images/minus-circle.png\"></span><br />';
-                } else {
-                    $txt .= '<span>MySQL version ' .
-                        $db_link -> server_version . ' is not OK (minimum is '.MIN_MARIADB_VERSION.') &nbsp;&nbsp;' .
-                        '<img src=\"images/minus-circle.png\"></span><br />';
-                }
+                $txt .= '<span>MySQL version ' .
+                    $db_link -> server_version . ' is not OK (minimum is '.MIN_MARIADB_VERSION.') &nbsp;&nbsp;' .
+                    '<img src=\"images/minus-circle.png\"></span><br />';
             } else {
-                if ($mariadbVersion === '') {
-                    $txt .= '<span>MySQL version ' .
-                        $db_link -> server_info . ' is OK<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                        '</span><br />';
-                } else {
-                    $txt .= '<span>MySQL version ' .
-                        $db_link -> server_info . ' is OK<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                        '</span><br />';
-                }
-                
+                $txt .= '<span>MySQL version ' .
+                    $db_link -> server_info . ' is OK<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
+                    '</span><br />';
             }
             
 
@@ -531,6 +558,7 @@ if (isset($post_type)) {
                 $okEncryptKey = true;
             }
 
+            // @phpstan-ignore identical.alwaysTrue
             if ($okWritable === true && $okExtensions === true && $okEncryptKey === true) {
                 $error = "";
                 $nextStep = 2;
@@ -581,6 +609,7 @@ if (isset($post_type)) {
                 if (TP_VERSION === '3.2.0') $okTUsersPasswordsSymfony = false;
             }
 
+            // @phpstan-ignore identical.alwaysTrue
             if ($okWritable === true && $okExtensions === true && $okEncryptKey === true && $okTasksManager === true && $okTUsersPasswordsSymfony === true) {
                 $error = "";
                 $nextStep = 2;

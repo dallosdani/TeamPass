@@ -289,7 +289,10 @@ function performStep5() {
         { id: 'check50', action: 'users_groups_forbidden' },
         { id: 'check51', action: 'users_roles' },
         { id: 'check52', action: 'users_favorites' },
-        { id: 'check53', action: 'users_latest_items' }
+        { id: 'check53', action: 'users_latest_items' },
+        { id: 'check54', action: 'websocket_events' },
+        { id: 'check55', action: 'websocket_connections' },
+        { id: 'check56', action: 'websocket_tokens' }
     ];
     
     let errorOccurred = false; // Variable to track errors
@@ -503,12 +506,16 @@ function performStep2() {
         { id: 'check9', type: 'extension', name: 'mbstring' },
         { id: 'check10', type: 'extension', name: 'openssl' },
         { id: 'check11', type: 'extension', name: 'bcmath' },
-        { id: 'check12', type: 'extension', name: 'iconv' },
         { id: 'check13', type: 'extension', name: 'xml' },
-        { id: 'check14', type: 'extension', name: 'gd' },
         { id: 'check15', type: 'extension', name: 'curl' },
+        { id: 'check20', type: 'extension', name: 'posix', optional: true },
+        { id: 'check19', type: 'extension', name: 'pcntl', optional: true },
         { id: 'check17', type: 'php_version', version: '' },
-        { id: 'check18', type: 'execution_time', limit: 30 }
+        { id: 'check18', type: 'execution_time', limit: 30 },
+        { id: 'check21', type: 'opcache', optional: true },
+        { id: 'check22', type: 'php_fpm', optional: true },
+        { id: 'check23', type: 'apcu', optional: true },
+        { id: 'check24', type: 'redis', optional: true }
     ];
 
     let errorOccurred = false; // Variable to track errors
@@ -547,6 +554,8 @@ function performStep2() {
             success: function(response) {
                 if (response.success) {
                     $(`#${check.id}`).html('<i class="fas fa-check text-success"></i>'); // Green checkmark
+                } else if (check.optional) {
+                    $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>'); // Warning — optional
                 } else {
                     errorOccurred = true; // An error occurred
                     $(`#${check.id}`).html('<i class="fas fa-times text-danger"></i>'); // Red cross

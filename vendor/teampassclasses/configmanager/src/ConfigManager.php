@@ -69,7 +69,20 @@ class ConfigManager
     }
 
     /**
+     * Cache key used for APCu settings storage.
+     * Bump this constant to invalidate all cached settings across workers.
+     */
+    private const APCU_CACHE_KEY = 'teampass_settings_v1';
+
+    /**
+     * APCu cache TTL in seconds (60 s — short enough to reflect manual DB edits).
+     */
+    private const APCU_TTL = 60;
+
+    /**
      * Load settings from the database.
+     * When APCu is available, settings are cached for APCU_TTL seconds to
+     * avoid a full DB query on every request.
      *
      * @return array
      */
@@ -79,6 +92,16 @@ class ConfigManager
         $settingsFile = __DIR__ . '/../../../../includes/config/settings.php';
         if (!file_exists($settingsFile) || empty(DB_HOST) === true) {
             return [];
+        }
+
+        // Serve from APCu cache when available
+        if (function_exists('apcu_fetch') === true) {
+            $success = false;
+            /** @var array<string,string>|false $cached */
+            $cached = apcu_fetch(self::APCU_CACHE_KEY, $success);
+            if ($success === true && is_array($cached) === true) {
+                return $cached;
+            }
         }
 
         // Load the DB library
@@ -95,7 +118,23 @@ class ConfigManager
             $ret[$row['intitule']] = $row['valeur'];
         }
 
+        // Store in APCu for subsequent requests within this worker
+        if (function_exists('apcu_store') === true) {
+            apcu_store(self::APCU_CACHE_KEY, $ret, self::APCU_TTL);
+        }
+
         return $ret;
+    }
+
+    /**
+     * Invalidate the APCu settings cache.
+     * Must be called after any write to teampass_misc.
+     */
+    public static function invalidateCache(): void
+    {
+        if (function_exists('apcu_delete') === true) {
+            apcu_delete(self::APCU_CACHE_KEY);
+        }
     }
 
     /**

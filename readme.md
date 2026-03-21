@@ -1,8 +1,8 @@
 [![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner-direct.svg)](https://github.com/vshymanskyy/StandWithUkraine/blob/main/docs/README.md)
 
-# Teampass 3
+# TeamPass 3
 
-Teampass is a Collaborative Passwords Manager solution installed On-Premise.
+TeamPass is a Collaborative Passwords Manager solution installed On-Premise.
 
 [![StandWithUkraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://github.com/vshymanskyy/StandWithUkraine/blob/main/docs/README.md)
 
@@ -24,8 +24,8 @@ Teampass is a Collaborative Passwords Manager solution installed On-Premise.
 - [Requirements](#requirements)
   - [About PHP versions](#about-php-versions)
 - [Installation](#installation)
-  - [Docker (Recommended)](#docker-recommended)
-  - [Traditional Installation](#traditional-installation)
+  - [Traditional Installation (Recommended)](#traditional-installation-recommended)
+  - [Docker](#docker)
 - [Documentation](#documentation)
 - [Languages](#languages)
 - [Licence Agreement](#licence-agreement)
@@ -36,77 +36,48 @@ Teampass is a Collaborative Passwords Manager solution installed On-Premise.
 
 ## Requirements
 
-* MySQL 5.7 or higher,
+* MySQL 5.7 or higher
 * MariaDB 10.7 or higher
-* PHP 8.1 or newer,
-* PHP extensions:
-  * mcrypt
-  * openssl
-  * ldap (if used)
-  * mbstring
-  * bcmath
-  * iconv
-  * xml
-  * gd
-  * mysql
-  * curl
-  * gmp
+* PHP 8.1 or newer (PHP 8.2+ recommended)
+* PHP extensions (required):
+  * `openssl`
+  * `mysqli`
+  * `mbstring`
+  * `bcmath`
+  * `iconv`
+  * `xml`
+  * `gd`
+  * `curl`
+  * `gmp`
+  * `ldap` (only if LDAP/AD authentication is used)
+* PHP extensions (optional but recommended):
+  * `apcu` — in-memory configuration cache, reduces database load on every request
+  * `redis` — Redis-backed session storage for high-availability deployments
+  * `pcntl` + `posix` — required to run the WebSocket daemon (real-time sync)
+  * `opcache` — improves overall PHP performance
 
 ### About PHP versions
 
-Teampass should be installed using the most recent PHP version.
-The branch `master` is the living one that is improved and comes with new features.
-It requires __at least__ `PHP 8.1` installed on the server.
-
-Nevertheless, Teampass can be used with PHP 7.4 version.
-The Github Teampass project has a dedicated branch called `PHP_7.4` for this version.
-Notice that only bug fixing will be performed on this branch.
+TeamPass follows active PHP support. The `master` branch requires **at least PHP 8.1** and is tested against PHP 8.2 and 8.3. Using the latest stable PHP release is strongly recommended for both security and performance.
 
 ## Installation
 
-### Docker (Recommended)
+### Traditional Installation (Recommended)
 
-The easiest way to run Teampass is using Docker. We provide official images on Docker Hub with production-ready configurations.
+Installing TeamPass directly on a PHP/MySQL server gives the best performance and the most control over your environment. This is the recommended approach for production deployments.
 
-**Quick Start:**
+- 📖 [Official Installation Guide](https://documentation.teampass.net) — step-by-step instructions covering prerequisites, web server configuration, and first-run setup
+- 📝 [Community article](https://www.valters.eu/teampass-a-self-hosted-password-manager-to-increase-organizations-cybersecurity/) — practical walkthrough for a typical Linux/Apache/MySQL stack
+- 🎥 [Video tutorial](https://youtu.be/eXieWAIsGzc?feature=shared) — visual installation walkthrough
 
-```bash
-# Download compose files
-curl -O https://raw.githubusercontent.com/nilsteampassnet/TeamPass/master/docker/docker-compose/docker-compose.yml
-curl -O https://raw.githubusercontent.com/nilsteampassnet/TeamPass/master/docker/docker-compose/.env.example
+### Docker
 
-# Configure
-cp .env.example .env
-nano .env  # Set secure passwords
+Official images are available for containerized deployments. Docker is convenient for testing and isolated environments but may not deliver the same raw performance as a native installation.
 
-# Start Teampass
-docker-compose up -d
-```
-
-**Available registries:**
 - Docker Hub: `teampass/teampass`
 - GitHub Container Registry: `ghcr.io/nilsteampassnet/teampass`
-
-**📚 Complete Docker Documentation:**
-- **[Docker Installation Guide](DOCKER.md)** - Complete guide with configuration options
-- **[Migration Guide](DOCKER-MIGRATION.md)** - Upgrade from older Docker versions
-- **[Docker Hub](https://hub.docker.com/r/teampass/teampass)** - Official images and tags
-
-**Key Features:**
-- ✅ Optimized Alpine-based image (PHP 8.3-FPM + Nginx)
-- ✅ Automatic SSL support with Let's Encrypt
-- ✅ Health checks and monitoring
-- ✅ Optional automatic installation
-- ✅ Persistent volumes for data safety
-
-### Traditional Installation
-
-For traditional server installations without Docker:
-
-**Resources:**
-- 📖 [Official Documentation](https://documentation.teampass.net)
-- 📝 Website article: [TeamPass Installation Guide](https://www.valters.eu/teampass-a-self-hosted-password-manager-to-increase-organizations-cybersecurity/)
-- 🎥 YouTube video: [Installation Tutorial](https://youtu.be/eXieWAIsGzc?feature=shared)
+- 📖 [Docker Installation Guide](DOCKER.md) — configuration options, environment variables, and volumes
+- 📖 [Migration Guide](DOCKER-MIGRATION.md) — upgrading from older Docker setups
 
 ## Documentation
 
@@ -120,7 +91,7 @@ For traditional server installations without Docker:
 
 ## Languages
 
-Teampass is currently available in 19 languages:
+TeamPass is currently available in 20 languages:
 * CATALAN
 * CHINESE
 * CZECH
@@ -142,7 +113,7 @@ Teampass is currently available in 19 languages:
 * UKRAINIAN
 * VIETNAMESE
 
-Languages strings are managed at [POEditor.com](https://poeditor.com/projects/view?id=433631).
+Languages strings are managed at [POEditor.com](https://poeditor.com/join/project?hash=0vptzClQrM).
 Please participate to improving its translation by joining Teampass POEditor project.
 
 ## Licence Agreement

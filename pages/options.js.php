@@ -80,34 +80,448 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 
 <script type='text/javascript'>
     // -------------------------
-    // Existing "find options" UI
+    // Find options (search)
     // -------------------------
+    function clearOptionsSearch() {
+        $('.option').removeClass('hidden');
+    }
+
+    function activateTabForOption($opt) {
+        if (!$opt || !$opt.length) {
+            return;
+        }
+
+        const $pane = $opt.closest('.tab-pane');
+        if (!$pane.length) {
+            return;
+        }
+
+        const paneId = $pane.attr('id');
+        const $link = $('#settings-nav-tab a.nav-link[href="#' + paneId + '"]');
+
+        try {
+            if ($link.length && typeof $link.tab === 'function') {
+                $link.tab('show');
+            }
+        } catch (e) {
+            // Keep page usable even if tabs plugin is unavailable.
+        }
+    }
+
+    function searchKeyword(criteria) {
+        criteria = (criteria || '').toString().trim().toLowerCase();
+
+        if (criteria === '') {
+            clearOptionsSearch();
+            return;
+        }
+
+        const $allOptions = $('.option');
+        const $matches = $allOptions.filter(function() {
+            const kw = ($(this).data('keywords') || '').toString().toLowerCase();
+            return kw.indexOf(criteria) !== -1;
+        });
+
+        if ($matches.length === 0) {
+            clearOptionsSearch();
+            return;
+        }
+
+        $allOptions.addClass('hidden');
+        $matches.removeClass('hidden');
+        activateTabForOption($matches.first());
+    }
+
     $(document).on('click', '#button-find-options', function() {
         searchKeyword($('#find-options').val());
     });
 
-    $("#find-options").on('keyup search', function() {
-        if ($(this).val() === "") {
-            $('.option').removeClass('hidden');
+    $('#find-options').on('keyup search', function() {
+        if ($(this).val() === '') {
+            clearOptionsSearch();
             return false;
         }
 
         searchKeyword($(this).val());
     });
 
-    function searchKeyword(criteria) {
-        var rows = $('[data-keywords*="' + criteria + '"]');
+    const tpOptionsFavorites = (function() {
+        const sessionKey = "<?php echo $session->get('key'); ?>";
+        const t = {
+            server_answer_error: "<?php echo addslashes($lang->get('server_answer_error')); ?>",
+            add_title: "<?php echo addslashes($lang->get('settings_favorite_add')); ?>",
+            remove_title: "<?php echo addslashes($lang->get('settings_favorite_remove')); ?>",
+            added: "<?php echo addslashes($lang->get('settings_favorite_added')); ?>",
+            removed: "<?php echo addslashes($lang->get('settings_favorite_removed')); ?>",
+            goto_label: "<?php echo addslashes($lang->get('settings_favorite_action_goto')); ?>",
+            remove_label: "<?php echo addslashes($lang->get('settings_favorite_action_remove')); ?>",
+            category_label: "<?php echo addslashes($lang->get('settings_favorite_category')); ?>",
+            menu_title: "<?php echo addslashes($lang->get('settings_category_favorites_title')); ?>"
+        };
 
-        if (rows.length > 0) {
-            // Hide rows
-            $('.option').addClass('hidden');
+        let favorites = [];
 
-            // Show
-            $.each(rows, function(i, value) {
-                $(value).removeClass('hidden');
+        function safeDecode(resp) {
+            try {
+                if ((resp || '').toString().trim() === '') {
+                    return { error: true, message: t.server_answer_error };
+                }
+                return prepareExchangedData(resp, 'decode', sessionKey);
+            } catch (e) {
+                return { error: true, message: t.server_answer_error };
+            }
+        }
+
+        function ajax(type, payload, cb) {
+            $.post(
+                'sources/options_favorites.queries.php',
+                {
+                    type: type,
+                    data: prepareExchangedData(JSON.stringify(payload || {}), 'encode', sessionKey),
+                    key: sessionKey
+                },
+                function(resp) {
+                    const decoded = safeDecode(resp);
+                    if (typeof cb === 'function') {
+                        cb(decoded);
+                    }
+                }
+            );
+        }
+
+        function slugify(value) {
+            return (value || '').toString().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+
+        function escapeHtml(value) {
+            return $('<div>').text((value || '').toString()).html();
+        }
+
+        function getOptionControl($option) {
+            let $control = $option.find('.toggle[id]').first();
+            if ($control.length) {
+                return $control;
+            }
+
+            $control = $option.find('input[id]').filter(function() {
+                const type = ($(this).attr('type') || '').toLowerCase();
+                return type !== 'hidden';
+            }).first();
+            if ($control.length) {
+                return $control;
+            }
+
+            $control = $option.find('select[id], textarea[id]').first();
+            return $control;
+        }
+
+        function getOptionKey($option) {
+            const $control = getOptionControl($option);
+            if (!$control.length) {
+                return '';
+            }
+
+            return (($control.attr('id') || '').toString()).replace(/_input$/, '');
+        }
+
+        function getLabelCell($option) {
+            let $cell = $option.children('.col-10, .col-8, .col-7, .col-6, .col-4, .col-sm-10, .col-12').first();
+            if ($cell.length) {
+                return $cell;
+            }
+
+            $cell = $option.children('label').first();
+            if ($cell.length) {
+                return $cell;
+            }
+
+            return $option;
+        }
+
+        function getOptionLabel($option) {
+            const key = $option.data('option-key') || '';
+            const $clone = getLabelCell($option).clone();
+            $clone.find('.form-text, small, .text-muted').remove();
+            const text = $.trim($clone.text().replace(/\s+/g, ' '));
+            return text !== '' ? text : key;
+        }
+
+        function getSectionLabel($option) {
+            return ($option.closest('.tab-pane').data('section-label') || '').toString();
+        }
+
+        function isFavorite(key) {
+            return favorites.indexOf(key) !== -1;
+        }
+
+        function showAlert(type, message) {
+            const $alert = $('#settings-favorites-alert');
+            if (!$alert.length) {
+                return;
+            }
+
+            $alert.removeClass('d-none alert-success alert-danger alert-warning alert-info')
+                .addClass('alert-' + type)
+                .text(message || '');
+        }
+
+        function hideAlert() {
+            const $alert = $('#settings-favorites-alert');
+            if (!$alert.length) {
+                return;
+            }
+
+            $alert.addClass('d-none').text('');
+        }
+
+        function updateOptionState($option) {
+            const key = ($option.data('option-key') || '').toString();
+            if (key === '') {
+                return;
+            }
+
+            $option.toggleClass('tp-option-is-favorite', isFavorite(key));
+        }
+
+        function updateAllOptionStates() {
+            $('.option[data-option-key]').each(function() {
+                updateOptionState($(this));
             });
         }
-    }
+
+        function decorateOptions() {
+            $('.option').each(function() {
+                const $option = $(this);
+                const key = getOptionKey($option);
+                if (key === '') {
+                    return;
+                }
+
+                $option.attr('data-option-key', key);
+                if (!$option.attr('id')) {
+                    $option.attr('id', 'option-row-' + slugify(key));
+                }
+            });
+        }
+
+        function buildSectionMenuItem($option) {
+            const key = ($option.data('option-key') || '').toString();
+            if (key === '') {
+                return '';
+            }
+
+            const active = isFavorite(key);
+            const iconClass = active ? 'fa-solid text-warning' : 'fa-regular text-muted';
+            const title = active ? t.remove_title : t.add_title;
+            const label = escapeHtml(getOptionLabel($option));
+
+            return '' +
+                '<button type="button" class="dropdown-item tp-favorite-menu-item" data-option-key="' + escapeHtml(key) + '" title="' + escapeHtml(title) + '">' +
+                    '<i class="fa-star ' + iconClass + '"></i>' +
+                    '<span class="tp-favorite-menu-label">' + label + '</span>' +
+                '</button>';
+        }
+
+        function renderSectionMenus() {
+            $('#settings-tab-content .tab-pane').not('#settings-tab-favorites').each(function() {
+                const $pane = $(this);
+                const $card = $pane.children('.card.card-info').first();
+                const $header = $card.children('.card-header').first();
+                if (!$card.length || !$header.length) {
+                    return;
+                }
+
+                let $tools = $header.children('.card-tools.tp-section-favorites-tools');
+                if (!$tools.length) {
+                    $tools = $(
+                        '<div class="card-tools tp-section-favorites-tools">' +
+                            '<div class="btn-group">' +
+                                '<button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="' + escapeHtml(t.menu_title) + '" aria-label="' + escapeHtml(t.menu_title) + '">' +
+                                    '<i class="fa-solid fa-star"></i>' +
+                                '</button>' +
+                                '<div class="dropdown-menu dropdown-menu-right tp-section-favorites-menu"></div>' +
+                            '</div>' +
+                        '</div>'
+                    );
+                    $header.append($tools);
+                }
+
+                const itemsHtml = $pane.find('.option[data-option-key]').map(function() {
+                    return buildSectionMenuItem($(this));
+                }).get().join('');
+
+                $tools.find('.tp-section-favorites-menu').html(itemsHtml);
+            });
+        }
+
+        function buildFavoriteItem(key) {
+            const $option = $('.option[data-option-key="' + key + '"]').first();
+            if (!$option.length) {
+                return '';
+            }
+
+            const label = escapeHtml(getOptionLabel($option));
+            const section = escapeHtml(getSectionLabel($option));
+
+            return '' +
+                '<div class="list-group-item">' +
+                    '<div class="d-flex justify-content-between align-items-center flex-wrap">' +
+                        '<div class="mr-3">' +
+                            '<div class="font-weight-bold">' + label + '</div>' +
+                            '<small class="text-muted">' + t.category_label + ': ' + section + '</small>' +
+                        '</div>' +
+                        '<div class="tp-favorite-actions">' +
+                            '<button type="button" class="btn btn-xs btn-outline-primary tp-favorite-go" data-option-key="' + escapeHtml(key) + '">' + t.goto_label + '</button>' +
+                            '<button type="button" class="btn btn-xs btn-outline-secondary tp-favorite-remove" data-option-key="' + escapeHtml(key) + '">' + t.remove_label + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        function renderFavorites() {
+            const $list = $('#settings-favorites-list');
+            const $empty = $('#settings-favorites-empty');
+            if (!$list.length || !$empty.length) {
+                return;
+            }
+
+            const rendered = favorites.map(function(key) {
+                return buildFavoriteItem(key);
+            }).filter(function(html) {
+                return html !== '';
+            });
+
+            if (rendered.length === 0) {
+                $list.empty().addClass('d-none');
+                $empty.removeClass('d-none');
+                return;
+            }
+
+            $empty.addClass('d-none');
+            $list.html(rendered.join('')).removeClass('d-none');
+        }
+
+        function refreshUi() {
+            renderFavorites();
+            updateAllOptionStates();
+            renderSectionMenus();
+        }
+
+        function goToOption(key) {
+            const $option = $('.option[data-option-key="' + key + '"]').first();
+            if (!$option.length) {
+                return;
+            }
+
+            hideAlert();
+            clearOptionsSearch();
+            activateTabForOption($option);
+
+            setTimeout(function() {
+                const target = $option.get(0);
+                if (target && typeof target.scrollIntoView === 'function') {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                $option.addClass('tp-favorite-highlight');
+                setTimeout(function() {
+                    $option.removeClass('tp-favorite-highlight');
+                }, 2200);
+            }, 150);
+        }
+
+        function loadFavorites() {
+            ajax('options_favorites_get', {}, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+
+                favorites = Array.isArray(response.result && response.result.option_keys) ? response.result.option_keys : [];
+                refreshUi();
+            });
+        }
+
+        function addFavorite(key) {
+            ajax('options_favorites_add', { option_key: key }, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+
+                if (!isFavorite(key)) {
+                    favorites.push(key);
+                }
+                refreshUi();
+                showAlert('success', t.added);
+            });
+        }
+
+        function removeFavorite(key) {
+            ajax('options_favorites_remove', { option_key: key }, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+
+                favorites = favorites.filter(function(entry) {
+                    return entry !== key;
+                });
+                refreshUi();
+                showAlert('success', t.removed);
+            });
+        }
+
+        function bindEvents() {
+            $(document).on('click', '.tp-favorite-menu-item', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const key = ($(this).data('option-key') || '').toString();
+                if (key === '') {
+                    return;
+                }
+
+                if (isFavorite(key)) {
+                    removeFavorite(key);
+                } else {
+                    addFavorite(key);
+                }
+            });
+
+            $(document).on('click', '.tp-favorite-go', function() {
+                goToOption(($(this).data('option-key') || '').toString());
+            });
+
+            $(document).on('click', '.tp-favorite-remove', function() {
+                removeFavorite(($(this).data('option-key') || '').toString());
+            });
+        }
+
+        function init() {
+            decorateOptions();
+            renderSectionMenus();
+            bindEvents();
+            loadFavorites();
+        }
+
+        return {
+            init: init,
+            goToOption: goToOption
+        };
+    })();
+
+    $(document).ready(function() {
+        const $favorites = $('#settings-nav-favorites');
+        try {
+            if ($favorites.length && typeof $favorites.tab === 'function') {
+                $favorites.tab('show');
+            }
+        } catch (e) {
+            // Silent
+        }
+
+        tpOptionsFavorites.init();
+    });
 
     // ----------------------------------------
     // Inactive Users Management (IUM) - Options

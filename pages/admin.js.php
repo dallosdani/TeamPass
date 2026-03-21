@@ -754,14 +754,25 @@ function loadExtensionLicenceInfo() {
                 return
             }
 
-            // If licence server is unreachable, fall back to the promo text
-            if (!data.server_online) {
+            // Helper: show promotional block (server offline, unreachable, or no licence for this key)
+            const showPromo = () => {
                 $block.removeClass('small').addClass('small text-light').html(
                     '<?php echo addslashes($lang->get('extension_promo_text')); ?>'
                     + '<br><a href="https://documentation.teampass.net/#/misc/extension" target="_blank" class="ml-1">'
                     + '<?php echo addslashes($lang->get('learn_more')); ?> <i class="fas fa-external-link-alt fa-xs"></i>'
                     + '</a>'
                 )
+            }
+
+            // No internet or licence server is down → promo
+            if (!data.server_online) {
+                showPromo()
+                return
+            }
+
+            // Server is reachable but no licence is registered for this key → promo
+            if (!data.licence_status && data.max_users === 0) {
+                showPromo()
                 return
             }
 

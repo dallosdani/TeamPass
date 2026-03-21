@@ -66,10 +66,16 @@ $scripts_list = array(
 );
 $param = '';
 
+$total_scripts = count($scripts_list);
+
 // test if finished
-if (intval($post_file_number) >= count($scripts_list)) {
+if (intval($post_file_number) >= $total_scripts) {
     $finished = 1;
+    $scriptname = '';
+    $parameter = '';
 } else {
     $finished = 0;
+    $scriptname = $scripts_list[$post_file_number][0];
+    $parameter = $scripts_list[$post_file_number][1];
 }
-echo '[{"finish":"'.$finished.'", "scriptname":"'.$scripts_list[$post_file_number][0].'", "parameter":"'.$scripts_list[$post_file_number][1].'"}]';
+echo '[{"finish":"'.$finished.'", "scriptname":"'.$scriptname.'", "parameter":"'.$parameter.'", "total":'.$total_scripts.'}]';

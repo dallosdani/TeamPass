@@ -108,13 +108,187 @@ $zones = timezone_list();
 </div>
 <!-- /.content-header -->
 
+<style>
+    #settings-navigation-card .card-body {
+        overflow-x: hidden;
+    }
+    #settings-navigation-card #settings-nav-tab {
+        align-items: stretch;
+    }
+    #settings-navigation-card #settings-nav-tab .nav-link {
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #settings-navigation-card {
+        top: 1rem;
+    }
+    #settings-tab-content .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+    }
+    #settings-tab-content .card-header .card-title {
+        margin: 0;
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+    #settings-tab-content .card-header .card-tools {
+        margin: 0;
+        float: none;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        align-self: center;
+        height: 100%;
+    }
+    .tp-section-favorites-tools {
+        display: flex;
+        align-items: center;
+        align-self: center;
+        height: 100%;
+        margin: 0 !important;
+    }
+    .tp-section-favorites-tools .btn-group {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: auto;
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        min-width: 2rem;
+        height: 2rem;
+        padding: 0 .5rem;
+        line-height: 1;
+        margin: 0;
+        border: 1px solid rgba(255, 255, 255, .55);
+        border-radius: .3rem;
+        background-color: rgba(255, 255, 255, .97);
+        color: #5f6b77;
+        box-shadow: 0 .125rem .25rem rgba(0, 0, 0, .10);
+        transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease, transform .15s ease;
+        transform: translateY(0);
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle:hover,
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle:focus,
+    .tp-section-favorites-tools .show > .btn.btn-tool.dropdown-toggle {
+        background-color: #ffffff;
+        border-color: rgba(255, 255, 255, .75);
+        color: #495057;
+        box-shadow: 0 .25rem .6rem rgba(0, 0, 0, .18);
+    }
+    .tp-section-favorites-tools .btn.btn-tool.dropdown-toggle .fa-star {
+        color: #d48a12;
+        font-size: .85rem;
+    }
+    .tp-section-favorites-menu {
+        min-width: 300px;
+        max-width: 360px;
+        max-height: 360px;
+        overflow-y: auto;
+        padding: .25rem 0;
+        border: 1px solid rgba(0, 0, 0, .12);
+        box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15);
+        background-color: #ffffff;
+    }
+    .tp-favorite-menu-item {
+        display: flex;
+        align-items: flex-start;
+        gap: .65rem;
+        white-space: normal;
+        color: inherit;
+    }
+    .tp-favorite-menu-item i {
+        width: 1rem;
+        margin-top: .15rem;
+        text-align: center;
+        flex: 0 0 1rem;
+    }
+    .tp-favorite-menu-item .tp-favorite-menu-label {
+        flex: 1 1 auto;
+        line-height: 1.3;
+        min-width: 0;
+    }
+    .option.tp-option-is-favorite {
+        border-left: 3px solid #f0ad4e;
+        padding-left: .5rem;
+    }
+    .tp-favorite-highlight {
+        animation: tpFavoriteHighlight 2.2s ease;
+    }
+    @keyframes tpFavoriteHighlight {
+        0% { background-color: rgba(255, 193, 7, .35); }
+        100% { background-color: transparent; }
+    }
+    #settings-favorites-list .tp-favorite-actions {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+    }
+</style>
+
 
 <!-- Main content -->
 <div class='content'>
     <div class='container-fluid'>
         <div class='row'>
-            <div class='col-md-6'>
-                <div class='card card-info'>
+            <div class='col-lg-3 col-md-4'>
+                <div class='card card-info sticky-top' id='settings-navigation-card'>
+                    <div class='card-header'>
+                        <h3 class='card-title'><i class="fa-solid fa-list mr-2"></i><?php echo $lang->get('settings_navigation_title'); ?></h3>
+                    </div>
+                    <div class='card-body p-2'>
+                        <div class='nav flex-column nav-pills' id='settings-nav-tab' role='tablist' aria-orientation='vertical'>
+                            <a class='nav-link active' id='settings-nav-favorites' data-toggle='pill' href='#settings-tab-favorites' role='tab' aria-controls='settings-tab-favorites' aria-selected='true' title="<?php echo $lang->get('settings_category_favorites_title'); ?>"><i class="fa-solid fa-star mr-2"></i><?php echo $lang->get('settings_category_favorites_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-general' data-toggle='pill' href='#settings-tab-general' role='tab' aria-controls='settings-tab-general' aria-selected='false' title="<?php echo $lang->get('settings_category_general_info_title'); ?>"><i class="fa-solid fa-folder-open mr-2"></i><?php echo $lang->get('settings_category_general_info_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-system' data-toggle='pill' href='#settings-tab-system' role='tab' aria-controls='settings-tab-system' aria-selected='false' title="<?php echo $lang->get('settings_category_system_title'); ?>"><i class="fa-solid fa-gears mr-2"></i><?php echo $lang->get('settings_category_system_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-security' data-toggle='pill' href='#settings-tab-security' role='tab' aria-controls='settings-tab-security' aria-selected='false' title="<?php echo $lang->get('settings_category_security_title'); ?>"><i class="fa-solid fa-shield-halved mr-2"></i><?php echo $lang->get('settings_category_security_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-websocket' data-toggle='pill' href='#settings-tab-websocket' role='tab' aria-controls='settings-tab-websocket' aria-selected='false' title="<?php echo $lang->get('settings_realtime_title'); ?>"><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-networks' data-toggle='pill' href='#settings-tab-networks' role='tab' aria-controls='settings-tab-networks' aria-selected='false' title="<?php echo $lang->get('settings_category_networks_title'); ?>"><i class="fa-solid fa-network-wired mr-2"></i><?php echo $lang->get('settings_category_networks_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-logging' data-toggle='pill' href='#settings-tab-logging' role='tab' aria-controls='settings-tab-logging' aria-selected='false' title="<?php echo $lang->get('settings_category_logging_title'); ?>"><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-integration' data-toggle='pill' href='#settings-tab-integration' role='tab' aria-controls='settings-tab-integration' aria-selected='false' title="<?php echo $lang->get('settings_category_integration_title'); ?>"><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-items' data-toggle='pill' href='#settings-tab-items' role='tab' aria-controls='settings-tab-items' aria-selected='false' title="<?php echo $lang->get('settings_category_items_title'); ?>"><i class="fa-solid fa-folder-tree mr-2"></i><?php echo $lang->get('settings_category_items_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-users' data-toggle='pill' href='#settings-tab-users' role='tab' aria-controls='settings-tab-users' aria-selected='false' title="<?php echo $lang->get('settings_category_users_title'); ?>"><i class="fa-solid fa-users-cog mr-2"></i><?php echo $lang->get('settings_category_users_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-collaboration' data-toggle='pill' href='#settings-tab-collaboration' role='tab' aria-controls='settings-tab-collaboration' aria-selected='false' title="<?php echo $lang->get('settings_category_collaboration_title'); ?>"><i class="fa-solid fa-people-arrows mr-2"></i><?php echo $lang->get('settings_category_collaboration_title'); ?></a>
+                            <a class='nav-link' id='settings-nav-inactive' data-toggle='pill' href='#settings-tab-inactive' role='tab' aria-controls='settings-tab-inactive' aria-selected='false' title="<?php echo $lang->get('settings_category_inactive_users_title'); ?>"><i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('settings_category_inactive_users_title'); ?></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class='col-lg-9 col-md-8'>
+                <div class='tab-content' id='settings-tab-content'>
+<div class='tab-pane fade show active' id='settings-tab-favorites' role='tabpanel' aria-labelledby='settings-nav-favorites' data-section-label='<?php echo $lang->get('settings_category_favorites_title'); ?>'>
+                        <div class='card card-info' id='settings-favorites-card'>
+                            <div class='card-header'>
+                                <h3 class='card-title'><i class="fa-solid fa-star mr-2"></i><?php echo $lang->get('settings_category_favorites_title'); ?>
+                                    <span class="badge text-bg-secondary">
+                                        <?php echo $lang->get('settings_category_favorites_goal'); ?>
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class='card-body'>
+                                <p class='text-muted mb-3'><?php echo $lang->get('settings_category_favorites_tip'); ?></p>
+                                <div id='settings-favorites-alert' class='alert d-none mb-3' role='alert'></div>
+                                <div id='settings-favorites-empty' class='alert alert-info mb-0'>
+                                    <i class="fa-solid fa-thumbtack mr-2"></i><?php echo $lang->get('settings_category_favorites_empty'); ?>
+                                </div>
+                                <div id='settings-favorites-list' class='list-group d-none'></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-general' role='tabpanel' aria-labelledby='settings-nav-general' data-section-label='<?php echo $lang->get('settings_category_general_info_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-folder-open mr-2"></i><?php echo $lang->get('settings_category_general_info_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -198,9 +372,9 @@ $zones = timezone_list();
                         <!-- /.card-body -->
                     </form>
                 </div>
-                <!-- /.card -->
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-system' role='tabpanel' aria-labelledby='settings-nav-system' data-section-label='<?php echo $lang->get('settings_category_system_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-gears mr-2"></i><?php echo $lang->get('settings_category_system_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -347,10 +521,9 @@ $zones = timezone_list();
                     </div>
                     <!-- /.card-body -->
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-security' role='tabpanel' aria-labelledby='settings-nav-security' data-section-label='<?php echo $lang->get('settings_category_security_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-shield-halved mr-2"></i><?php echo $lang->get('settings_category_security_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -505,20 +678,21 @@ $zones = timezone_list();
 
                     </div>
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-websocket' role='tabpanel' aria-labelledby='settings-nav-websocket' data-section-label='<?php echo $lang->get('settings_realtime_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
-                        <h3 class='card-title'><i class="fa-solid fa-ear-listen mr-2"></i><?php echo $lang->get('settings_websocket_title'); ?>
+                        <h3 class='card-title'><i class="fa-solid fa-bolt mr-2"></i><?php echo $lang->get('settings_realtime_title'); ?>
                             <span class="badge text-bg-secondary">
-                                <?php echo $lang->get('settings_websocket_title_goal'); ?>
+                                <?php echo $lang->get('settings_realtime_title_goal'); ?>
                             </span>
                         </h3>
                     </div>
                     <!-- /.card-header -->
                     <!-- form start -->
                     <div class='card-body'>
+
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-ear-listen mr-2'></i><?php echo $lang->get('settings_websocket_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_websocket_title_goal'); ?></span></h6>
 
                         <div class='row mb-2 option' data-keywords="websocket">
                             <div class='col-10'>
@@ -531,7 +705,7 @@ $zones = timezone_list();
                                 <div class='toggle toggle-modern' id='websocket_enabled' data-toggle-on='<?php echo isset($SETTINGS['websocket_enabled']) === true && (int) $SETTINGS['websocket_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='websocket_enabled_input' value='<?php echo isset($SETTINGS['websocket_enabled']) && (int) $SETTINGS['websocket_enabled'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
-                        
+
                         <div class='row mb-2 option' data-keywords="websocket host">
                             <div class='col-8'>
                                 <?php echo $lang->get('settings_websocket_host'); ?>
@@ -543,7 +717,7 @@ $zones = timezone_list();
                                 <input type='text' class='form-control form-control-sm' id='websocket_host' value='<?php echo htmlspecialchars($SETTINGS['websocket_host'] ?? '127.0.0.1'); ?>'>
                             </div>
                         </div>
-                        
+
                         <div class='row mb-2 option' data-keywords="websocket port">
                             <div class='col-10'>
                                 <?php echo $lang->get('settings_websocket_port'); ?>
@@ -556,12 +730,79 @@ $zones = timezone_list();
                             </div>
                         </div>
 
+                        <hr />
+
+                        <h6 class='mt-3 mb-2'><i class='fa-solid fa-database mr-2'></i><?php echo $lang->get('settings_redis_session_title'); ?> <span class='badge text-bg-secondary'><?php echo $lang->get('settings_redis_session_title_goal'); ?></span></h6>
+
+                        <div class='row mb-2 option' data-keywords="redis session">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_session_enabler'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_session_enabler_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='redis_session_enabled' data-toggle-on='<?php echo isset($SETTINGS['redis_session_enabled']) === true && (int) $SETTINGS['redis_session_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='redis_session_enabled_input' value='<?php echo isset($SETTINGS['redis_session_enabled']) && (int) $SETTINGS['redis_session_enabled'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis host">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_host'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_host_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_host' value='<?php echo htmlspecialchars($SETTINGS['redis_host'] ?? '127.0.0.1'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis port">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_redis_port'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_port_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' class='form-control form-control-sm' id='redis_port' value='<?php echo htmlspecialchars($SETTINGS['redis_port'] ?? '6379'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="redis prefix">
+                            <div class='col-8'>
+                                <?php echo $lang->get('settings_redis_prefix'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_redis_prefix_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-4'>
+                                <input type='text' class='form-control form-control-sm' id='redis_prefix' value='<?php echo htmlspecialchars($SETTINGS['redis_prefix'] ?? 'teampass_sess_'); ?>'>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
-                <!-- /.card -->
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-networks' role='tabpanel' aria-labelledby='settings-nav-networks' data-section-label='<?php echo $lang->get('settings_category_networks_title'); ?>'>
+                        <div class='card card-info'>
+                            <div class='card-header'>
+                                <h3 class='card-title'><i class="fa-solid fa-network-wired mr-2"></i><?php echo $lang->get('settings_category_networks_title'); ?>
+                                    <span class="badge text-bg-secondary">
+                                        <?php echo $lang->get('settings_category_networks_goal'); ?>
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class='card-body'>
+                                <div class='alert alert-secondary mb-0'>
+                                    <?php echo $lang->get('settings_category_networks_under_construction'); ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-logging' role='tabpanel' aria-labelledby='settings-nav-logging' data-section-label='<?php echo $lang->get('settings_category_logging_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -623,9 +864,9 @@ $zones = timezone_list();
                         
                     </div>
                 </div>
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-integration' role='tabpanel' aria-labelledby='settings-nav-integration' data-section-label='<?php echo $lang->get('settings_category_integration_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-plug mr-2"></i><?php echo $lang->get('settings_category_integration_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -678,15 +919,9 @@ $zones = timezone_list();
                         
                     </div>
                 </div>
-                <!-- /.card -->
-
-            </div>
-            <!-- /.col-md-6 -->
-            <!--/.col (left) -->
-            <!-- right column -->
-            <div class='col-md-6'>
-                <!-- Horizontal Form -->
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-items' role='tabpanel' aria-labelledby='settings-nav-items' data-section-label='<?php echo $lang->get('settings_category_items_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-folder-tree mr-2"></i><?php echo $lang->get('settings_category_items_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -889,7 +1124,11 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                 <!-- /.card -->
             
 
-                <div class='card card-info'>
+
+                    </div>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-users' role='tabpanel' aria-labelledby='settings-nav-users' data-section-label='<?php echo $lang->get('settings_category_users_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-users-cog mr-2"></i><?php echo $lang->get('settings_category_users_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -1032,9 +1271,9 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                         
                     </div>
                 </div>
-            
-
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-collaboration' role='tabpanel' aria-labelledby='settings-nav-collaboration' data-section-label='<?php echo $lang->get('settings_category_collaboration_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-people-arrows mr-2"></i><?php echo $lang->get('settings_category_collaboration_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -1179,11 +1418,9 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                         
                     </div>
                 </div>
-                <!-- /.card -->
-
-                <!-- /.card -->
-                <!-- INACTIVE USERS MANAGEMENT -->
-                <div class='card card-info'>
+                    </div>
+                    <div class='tab-pane fade' id='settings-tab-inactive' role='tabpanel' aria-labelledby='settings-nav-inactive' data-section-label='<?php echo $lang->get('settings_category_inactive_users_title'); ?>'>
+<div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('settings_category_inactive_users_title'); ?>
                             <span class="badge text-bg-secondary">
@@ -1298,11 +1535,10 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                     </div>
                     <!-- /.card-body -->
                 </div>
-                <!-- /.card -->
-
+                    </div>
+                </div>
             </div>
-            <!--/.col (right) -->
         </div>
     </div><!-- /.container-fluid -->
-</div></div>
+</div>
 <!-- /.content -->

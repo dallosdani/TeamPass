@@ -215,24 +215,23 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                         <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="refresh">
                             <i class="fa-solid fa-sync-alt mr-2"></i><?php echo $lang->get('refresh'); ?>
                         </button><?php
-                                    echo isset($SETTINGS['ldap_mode']) === true && (int) $SETTINGS['ldap_mode'] === 1 && (int) $session->get('user-admin') === 1 ?
-                                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
+                        if (isset($SETTINGS['ldap_mode']) === true && (int) $SETTINGS['ldap_mode'] === 1 && (int) $session->get('user-admin') === 1) {
+                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
                             <i class="fa-solid fa-address-card mr-2"></i>' . $lang->get('ldap_synchronization') . '
-                        </button>' : '';
-                                    ?>
-                        </button><?php
-                                    echo isset($SETTINGS['oauth2_enabled']) === true && (int) $SETTINGS['oauth2_enabled'] === 1 && (int) $session->get('user-admin') === 1 ?
-                                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
+                        </button>
+                        
+                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
                             <i class="fa-solid fa-plug mr-2"></i>' . $lang->get('oauth2_synchronization') . '
-                        </button>' : '';
-                                    ?>
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm tp-action mr-2 <?php echo $inactive_blink_class; ?>" data-action="inactive-users">
-                            <i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('inactive_users'); ?>
+                            <i class="fa-solid fa-user-clock mr-2"></i>' . $lang->get('inactive_users') . '
                         </button>
 
-                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 <?php echo $blink_class; ?>" data-action="deleted-users">
-                            <i class="fa-solid fa-user-xmark mr-2"></i><?php echo $lang->get('deleted_users'); ?><?php echo $count_badge_html; ?>
-                        </button>
+                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 ' . $blink_class . '" data-action="deleted-users">
+                            <i class="fa-solid fa-user-xmark mr-2"></i>' . $lang->get('deleted_users') . $count_badge_html . '
+                        </button>';
+                        }
+                        ?>
                     </h3>
                 </div>
 

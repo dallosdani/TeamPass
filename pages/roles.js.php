@@ -274,7 +274,14 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                         for (let x = 1; x < max_folder_depth; x++) {
                             $('#folders-depth').append('<option value="' + x + '">' + x + '</option>')
                         }
-                        $('#folders-depth').val('all').change()
+                        // Restore saved depth or default to 2 (if option exists)
+                        const savedDepth = store.get('teampassUser') && store.get('teampassUser').rolesDepthFilter !== undefined
+                            ? store.get('teampassUser').rolesDepthFilter
+                            : '2'
+                        const targetDepth = $('#folders-depth option[value="' + savedDepth + '"]').length > 0
+                            ? savedDepth
+                            : ($('#folders-depth option[value="2"]').length > 0 ? '2' : 'all')
+                        $('#folders-depth').val(targetDepth).change()
 
                         $('#roles-load-progress').hide()
                         toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 2000, closeButton: true })
@@ -876,11 +883,22 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
      * Handle option when role is displayed
      */
     $(document).on('change', '#folders-depth', function() {
-        if ($('#folders-depth').val() === 'all') {
+        const depth = $(this).val()
+
+        // Persist selection (only when a valid value is set)
+        if (depth !== null && depth !== '') {
+            store.update('teampassUser', function(teampassUser) {
+                teampassUser.rolesDepthFilter = depth
+            })
+        }
+
+        if (depth === 'all' || depth === null || depth === '') {
             $('tr').removeClass('hidden');
         } else {
-            $('tr').filter(function() {
-                if ($(this).data('level') <= $('#folders-depth').val()) {
+            const depthInt = parseInt(depth, 10)
+            // Only filter rows that explicitly have a data-level attribute
+            $('tr[data-level]').each(function() {
+                if (parseInt($(this).data('level'), 10) <= depthInt) {
                     $(this).removeClass('hidden');
                 } else {
                     $(this).addClass('hidden');

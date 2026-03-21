@@ -1333,7 +1333,8 @@ mysqli_query(
     $db_link,
     "ALTER TABLE `" . $pre . "log_system`
         MODIFY COLUMN `id` INT(12) NOT NULL AUTO_INCREMENT,
-        MODIFY COLUMN `qui` VARCHAR(255) NOT NULL;"
+        MODIFY COLUMN `qui` VARCHAR(255) NOT NULL,
+        MODIFY COLUMN `type` VARCHAR(255) NOT NULL;"
 );
 
 // Alter table misc column name if necessary
@@ -1554,25 +1555,44 @@ if ($res === false) {
     exit();
 }
 
-// Alter USERS table
+// Alter USERS table — build ALTER dynamically to skip columns removed in later versions
+$alterClauses = [
+    'MODIFY COLUMN `id` INT(12) NOT NULL AUTO_INCREMENT',
+    'MODIFY COLUMN `pw` VARCHAR(400) NOT NULL',
+    'MODIFY COLUMN `email` VARCHAR(300) NOT NULL DEFAULT \'none\'',
+    'MODIFY COLUMN `personal_folder` INT(1) NOT NULL DEFAULT 0',
+    'MODIFY COLUMN `isAdministratedByRole` tinyint(5) NOT NULL DEFAULT 0',
+    'MODIFY COLUMN `avatar` VARCHAR(1000) DEFAULT NULL',
+    'MODIFY COLUMN `avatar_thumb` VARCHAR(1000) DEFAULT NULL',
+    'MODIFY COLUMN `agses_usercardid` VARCHAR(50) NOT NULL DEFAULT \'0\'',
+    'MODIFY COLUMN `encrypted_psk` text DEFAULT NULL',
+];
+
+// These columns were removed in 3.1.6 — only modify them if they still exist
+$colCheckResult = mysqli_query($db_link, "SHOW COLUMNS FROM `" . $pre . "users` LIKE 'groupes_visibles'");
+if ($colCheckResult !== false && mysqli_num_rows($colCheckResult) > 0) {
+    $alterClauses[] = 'MODIFY COLUMN `groupes_visibles` VARCHAR(1000) NOT NULL';
+}
+$colCheckResult = mysqli_query($db_link, "SHOW COLUMNS FROM `" . $pre . "users` LIKE 'groupes_interdits'");
+if ($colCheckResult !== false && mysqli_num_rows($colCheckResult) > 0) {
+    $alterClauses[] = 'MODIFY COLUMN `groupes_interdits` VARCHAR(1000) DEFAULT NULL';
+}
+$colCheckResult = mysqli_query($db_link, "SHOW COLUMNS FROM `" . $pre . "users` LIKE 'fonction_id'");
+if ($colCheckResult !== false && mysqli_num_rows($colCheckResult) > 0) {
+    $alterClauses[] = 'MODIFY COLUMN `fonction_id` VARCHAR(1000) DEFAULT NULL';
+}
+$colCheckResult = mysqli_query($db_link, "SHOW COLUMNS FROM `" . $pre . "users` LIKE 'favourites'");
+if ($colCheckResult !== false && mysqli_num_rows($colCheckResult) > 0) {
+    $alterClauses[] = 'MODIFY COLUMN `favourites` VARCHAR(1000) DEFAULT NULL';
+}
+$colCheckResult = mysqli_query($db_link, "SHOW COLUMNS FROM `" . $pre . "users` LIKE 'latest_items'");
+if ($colCheckResult !== false && mysqli_num_rows($colCheckResult) > 0) {
+    $alterClauses[] = 'MODIFY COLUMN `latest_items` VARCHAR(1000) DEFAULT NULL';
+}
+
 mysqli_query(
     $db_link,
-    "ALTER TABLE `" . $pre . "users`
-        MODIFY COLUMN `id` INT(12) NOT NULL AUTO_INCREMENT,
-        MODIFY COLUMN `pw` VARCHAR(400) NOT NULL,
-        MODIFY COLUMN `groupes_visibles` VARCHAR(1000) NOT NULL,
-        MODIFY COLUMN `fonction_id` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `groupes_interdits` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `email` VARCHAR(300) NOT NULL DEFAULT 'none',
-        MODIFY COLUMN `favourites` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `latest_items` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `personal_folder` INT(1) NOT NULL DEFAULT 0,
-        MODIFY COLUMN `isAdministratedByRole` tinyint(5) NOT NULL DEFAULT 0,
-        MODIFY COLUMN `avatar` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `avatar_thumb` VARCHAR(1000) DEFAULT NULL,
-        MODIFY COLUMN `agses-usercardid` VARCHAR(50) NOT NULL DEFAULT '0',
-        MODIFY COLUMN `encrypted_psk` text DEFAULT NULL,
-        MODIFY COLUMN `user_ip` VARCHAR(400) NOT NULL DEFAULT 'none';"
+    "ALTER TABLE `" . $pre . "users` " . implode(', ', $alterClauses)
 );
 // --- End DB consolidation from fresh install --- //
 

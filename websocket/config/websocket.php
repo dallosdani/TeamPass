@@ -24,7 +24,8 @@ return [
     // ===================
 
     // Interval between database polls for new events (milliseconds)
-    'poll_interval_ms' => 200,
+    // 500ms reduces DB contention under high load while keeping latency acceptable
+    'poll_interval_ms' => 500,
 
     // Maximum number of events to process per poll cycle
     'poll_batch_size' => 100,

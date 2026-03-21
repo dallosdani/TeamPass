@@ -121,13 +121,18 @@ Located in `/includes/libraries/teampassclasses/`, these are local packages mana
 
 **SessionManager** (`TeampassClasses\SessionManager\SessionManager`)
 - Singleton pattern: `SessionManager::getSession()`
-- Wraps Symfony Session with custom encrypted storage handler
+- Wraps Symfony Session with `EncryptedSessionProxy` — session data is always encrypted at rest
 - Encryption key loaded from `SECUREPATH/SECUREFILE`
-- Session data encrypted at rest on server
+- **Session storage backend** (selected automatically):
+  - **Redis** (opt-in): when `ext-redis` is loaded AND `redis_session_enabled=1` in settings, sessions are stored in Redis via `RedisSessionHandler` wrapped by `EncryptedSessionProxy`; 2-second connect timeout; falls back to filesystem on any failure
+  - **Filesystem** (default): `\SessionHandler` wrapped by `EncryptedSessionProxy`
+- Redis connection settings: `redis_host` (default `127.0.0.1`), `redis_port` (default `6379`), `redis_prefix` (default `teampass_sess_`)
+- `gc_maxlifetime` is set dynamically to `maximum_session_expiration_time × 60 + 1800 s` (minimum 7200 s) to prevent premature PHP garbage collection
 
 **ConfigManager** (`TeampassClasses\ConfigManager\ConfigManager`)
-- Loads all settings from `teampass_misc` database table
-- Caches in memory as `$SETTINGS` array
+- Loads all settings from `teampass_misc` database table (`type = 'admin'`)
+- **APCu caching**: when `ext-apcu` is available, settings are cached in shared memory for 60 s under the key `teampass_settings_v1`; cache is bypassed on miss and populated after every DB read
+- **Cache invalidation**: `ConfigManager::invalidateCache()` must be called after any write to `teampass_misc` (already called in `sources/admin.queries.php` `save_option_change`)
 - Usage: `$configManager->getSetting('setting_key')`
 
 **PasswordManager** (`TeampassClasses\PasswordManager\PasswordManager`)
@@ -494,7 +499,7 @@ teampass_websocket_connections:
   id, user_id, resource_id VARCHAR(50), connected_at, disconnected_at, ip_address, user_agent
 ```
 
-Tables created by `/install1/upgrade_run_3.1.7.php`. Migration script: `/install1/scripts/websocket_migration.php`.
+Tables created by `/install/upgrade_run_3.1.7.php`.
 
 #### End-to-End Event Flow Example
 
@@ -813,6 +818,7 @@ When making changes to core functionality:
    ```
 
 3. If adding during upgrade, add to appropriate `/install/upgrade_run_*.php`
+4. **Always call `ConfigManager::invalidateCache()`** after any write to `teampass_misc` so the APCu cache does not serve stale values to other requests
 
 ### Adding a New Page
 
@@ -863,6 +869,14 @@ Current version constants in `/includes/config/include.php`:
 - Full version: 3.1.5.2
 
 Version upgrades managed through `/install/upgrade_run_*.php` scripts.
+
+### Dual-location classes
+
+`ConfigManager` and `SessionManager` exist in two locations that must be kept in sync:
+- `includes/libraries/teampassclasses/configmanager/src/ConfigManager.php` (source)
+- `vendor/teampassclasses/configmanager/src/ConfigManager.php` (Composer copy)
+
+Same for `SessionManager` and `EncryptedSessionProxy`. Always edit both locations together.
 
 ## IMPORTANT Rules
 - Always prioritize minimal modifications.

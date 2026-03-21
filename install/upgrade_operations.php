@@ -282,7 +282,7 @@ function transparentRecovery(string $pre)
         mysqli_query(
             $db_link,
             "INSERT INTO `" . $pre . "log_system`
-            (`date`, `label`, `qui`, `action`)
+            (`date`, `type`, `qui`, `label`)
             VALUES
                 ('" . time() . "', 'transparent_key_recovery_migration', '1', 'Transparent key recovery migration completed')"
         );

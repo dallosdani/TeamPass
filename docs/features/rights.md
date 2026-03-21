@@ -2,18 +2,63 @@
 
 ## Overview
 
-> 🔔 **Administrator ≠ access to items.** The Administrator privilege in Teampass is a purely administrative role: it grants access to configuration pages (users, roles, folders, settings, logs) but **not** to folder contents or items. Item access is always and exclusively controlled through roles, for every account without exception.
+> 🔔 **Administrator ≠ access to items.** The Administrator privilege in Teampass is a purely administrative role: it grants access to configuration pages (users, roles, folders, settings, logs) but **not** to folder contents or items. Item access is always and exclusively controlled through roles or direct folder grants, for every account without exception.
 
 In Teampass, access to items is controlled at the **folder** level through a layered system:
 
 ```
 User account
-  └── Roles  (one or more)
-        └── Folder permissions  (one permission type per folder per role)
-              └── Effective access  (resolved when the user has multiple roles)
+  ├── Roles  (one or more)
+  │     └── Folder permissions  (one permission type per folder per role)
+  │               └── Effective access  (resolved when the user has multiple roles)
+  ├── Allowed folders  (direct grants — always full write, override role-based read-only)
+  └── Forbidden folders  (explicit denials — override everything, including direct grants)
 ```
 
-A user never has a permission directly on a folder. Permissions are always defined on a **Role**, and roles are assigned to users.
+The three layers are evaluated in priority order:
+
+> **Forbidden folders** (highest priority) › **Direct folder grants** › **Role-based permissions** (lowest priority)
+
+---
+
+## Direct folder grants and forbidden folders
+
+In addition to role-based permissions, an administrator can assign **per-user folder overrides** directly on a user account. These operate independently of roles and take priority over them.
+
+### Allowed folders (direct grants)
+
+An administrator can designate specific folders as **explicitly allowed** for a given user (configured in the Users page, "Folder rights" section).
+
+- The access granted is always **full write (`W`)**, regardless of what any role would give.
+- If a role would otherwise restrict that folder to read-only, the direct grant wins and the user gets write access.
+- These folders are visible in the "Visible folders" diagnostic modal with a **"Specific"** badge (no role badge) to distinguish them from role-based entries.
+
+> 💡 Use direct grants when a user needs elevated access to one specific folder without changing their roles or creating a dedicated role for the exception.
+
+### Forbidden folders (explicit denials)
+
+An administrator can also designate specific folders as **explicitly forbidden** for a given user.
+
+- A forbidden folder is **completely invisible** to that user — no access whatsoever.
+- Forbidden folders override **everything**: role-based permissions and direct grants alike.
+- Even if a role grants write access to a folder, adding it to the forbidden list removes all access.
+
+> 🔔 Forbidden folders are the strongest override in the system. They are useful for blocking access to sensitive folders without having to restructure roles.
+
+### Priority summary
+
+| Source | Effective access | Can be overridden by |
+|--------|-----------------|---------------------|
+| Role-based permission | `W`, `ND`, `NE`, `NDNE`, or `R` | Direct grant (upgrades R→W), forbidden folder (removes all) |
+| Direct grant (allowed folder) | Always `W` | Forbidden folder only |
+| Forbidden folder | No access | Nothing — highest priority |
+
+### Storage
+
+| Layer | Database table | Column |
+|-------|---------------|--------|
+| Allowed folders | `teampass_users_groups` | `group_id` (= folder ID) |
+| Forbidden folders | `teampass_users_groups_forbidden` | `group_id` (= folder ID) |
 
 ---
 
@@ -78,7 +123,7 @@ A user's roles can come from two sources, which are merged together:
 | **Manual** | Administrator assigns a role directly to the user in the Users page | `source = 'manual'` in `teampass_users_roles` |
 | **LDAP / AD groups** | At login, the user's AD group memberships are looked up and mapped to Teampass roles via the LDAP group mapping table | `source = 'ad'` in `teampass_users_roles` |
 
-Both sources are combined before resolving effective permissions. The same "most permissive wins" rule applies regardless of source.
+Both sources are combined before resolving effective permissions. The same "least permissive wins" rule applies regardless of source.
 
 > 💡 LDAP group mapping is configured in **Settings → LDAP** and **Roles → LDAP synchronization**. See [Roles](roles.md) for setup instructions.
 
@@ -86,7 +131,9 @@ Both sources are combined before resolving effective permissions. The same "most
 
 ## Folder visibility
 
-A user only sees folders they have at least one permission type on (through any of their roles). Folders with no matching role entry are invisible.
+A user only sees folders they have at least one permission on — whether from a role, a direct grant, or both. Folders with no matching entry are invisible.
+
+Forbidden folders are never shown, even if a role or direct grant would otherwise give access. They are completely absent from the user's folder tree.
 
 The folder tree also reflects read-only status: folders where the effective permission is `R` are shown but the "Add item" button is hidden and item edit/delete actions are disabled.
 
@@ -99,10 +146,11 @@ An administrator can inspect the exact permissions a specific user has on every 
 1. Open **Users** in the administration menu.
 2. Click the action menu next to a user and select **Visible folders**.
 3. A modal opens with the full list of folders the user can access, including:
-   - The **effective permission type** (resolved from all roles).
+   - The **effective permission type** (resolved from all roles and direct grants).
    - The **contributing roles** — each role that has an entry for that folder, shown as a badge with its individual type.
+   - A **"Specific"** badge (no role name) for folders granted via a direct user assignment rather than a role.
 
-This view makes it straightforward to identify which role is granting an unexpected level of access. For example, if a user has `W` access to a sensitive folder, the badge column will show exactly which role is responsible.
+This view makes it straightforward to identify which role or direct grant is responsible for a given level of access. For example, if a user has `W` access to a folder that all their roles restrict to `R`, a "Specific" badge will confirm it comes from a direct grant.
 
 > 💡 Use the **filter bar** at the top of the modal to isolate folders by permission type. For instance, filtering on `W` shows only folders where the user has full write access.
 
@@ -113,10 +161,18 @@ This view makes it straightforward to identify which role is granting an unexpec
 ```
 User
  ├── Role A  ──► Folder 1: W,  Folder 2: R
- └── Role B  ──► Folder 1: R,  Folder 3: ND
-                      │                │
-                  Folder 1: R      Folder 3: ND
-                  (R beats W)      (only one role)
+ ├── Role B  ──► Folder 1: R,  Folder 3: ND
+ ├── Allowed folder (direct grant) ──► Folder 2: W  (overrides role R → W)
+ └── Forbidden folder ──► Folder 3: no access  (overrides role ND → blocked)
+
+Result:
+  Folder 1: R   (R beats W — least permissive role wins)
+  Folder 2: W   (direct grant overrides role-based R)
+  Folder 3: —   (forbidden folder overrides role-based ND)
 ```
 
-The effective permission on each folder is calculated independently. Adding a restrictive role to a user **will reduce** their access on any folder where that role defines a less permissive type.
+The effective permission on each folder is calculated independently, applying all three layers in priority order:
+
+1. **Forbidden folder** — blocks the folder entirely, no matter what roles or direct grants say.
+2. **Direct grant** — gives full write (`W`), overriding any role-based read-only on that folder.
+3. **Role-based permission** — least-permissive role wins when multiple roles apply.

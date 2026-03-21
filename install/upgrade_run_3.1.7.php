@@ -153,6 +153,29 @@ mysqli_query(
 );
 // --->
 
+
+// <---
+// ==========================================
+// Options page: Favorites storage for administrators
+// ==========================================
+mysqli_query(
+    $db_link,
+    'CREATE TABLE IF NOT EXISTS `' . $pre . "users_options_favorites` (
+            `id` INT(12) NOT NULL AUTO_INCREMENT,
+            `user_id` INT(12) NOT NULL,
+            `option_key` VARCHAR(100) NOT NULL,
+            `position` INT(12) NOT NULL DEFAULT 1,
+            `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_user_option` (`user_id`, `option_key`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_user_position` (`user_id`, `position`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='Options page favorites stored per administrator';"
+);
+// --->
+
 // <---
 // ==========================================
 // roles_values: Clean up duplicates and add UNIQUE constraint
@@ -234,6 +257,26 @@ addColumnIfNotExist(
 
 //---<END 3.1.7
 
+// ==========================================
+// Redis session storage settings (optional, disabled by default)
+// INSERT IGNORE ensures idempotency on repeated upgrade runs
+// ==========================================
+$redisDefaults = [
+    'redis_session_enabled' => '0',
+    'redis_host'            => '127.0.0.1',
+    'redis_port'            => '6379',
+    'redis_prefix'          => 'teampass_sess_',
+];
+foreach ($redisDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
 
 // Close connection
 mysqli_close($db_link);

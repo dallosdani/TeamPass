@@ -83,6 +83,9 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     // Clear
     $('#folders-search').val('');
 
+    // Generation counter: incremented on each buildTable() call so stale batch loops self-cancel
+    var _buildGeneration = 0
+
     buildTable();
 
     // Prepare iCheck format for checkboxes
@@ -95,27 +98,24 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     });
 
     // Prepare buttons
-    var deletionList = [];
+    var deletionList = []
+    // Cached after buildTable() for use in insertFolderRow()
+    var _userIsAdmin = 0
+    var _userCanCreateRootFolder = 0
     $('.tp-action').click(function() {
         if ($(this).data('action') === 'new') {
-            //--- NEW FOLDER FORM
-            // Prepare form
-            $('.form-check-input').iCheck('uncheck');
-            $('.clear-me').val('');
-            $('#new-parent').val('na').change();
-            $('#new-minimal-complexity').val(0).change();
+            //--- NEW FOLDER MODAL
+            // Reset simple fields (select2 and focus handled in shown.bs.modal)
+            $('#modal-folder-new .clear-me').val('')
+            $('#modal-folder-new .form-check-input').iCheck('uncheck')
 
-            // Show
-            $('.form').addClass('hidden');
-            $('#folder-new').removeClass('hidden');
-            $('#folders-list').addClass('hidden');
-            $('#new-title').focus();
+            $('#modal-folder-new').modal('show')
 
         } else if ($(this).data('action') === 'new-submit') {
             //--- SAVE NEW FOLDER
 
             // Sanitize text fields
-            purifyRes = fieldDomPurifierLoop('#folder-new .purify');
+            purifyRes = fieldDomPurifierLoop('#modal-folder-new .purify');
             if (purifyRes.purifyStop === true) {
                 // if purify failed, stop
                 return false;
@@ -159,7 +159,12 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                             }
                         );
                     } else {
-                        buildTable();
+                        // Insert new row directly — no full table rebuild needed
+                        if (data.rowData) {
+                            insertFolderRow(data.rowData)
+                        } else {
+                            buildTable()
+                        }
 
                         // Add new folder to the list 'new-parent'
                         // Launch action
@@ -189,19 +194,13 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                             }
                         );
 
-                        $('.form').addClass('hidden');
-                        $('#folders-list').removeClass('hidden');
+                        $('#modal-folder-new').modal('hide')
                     }
                 }
             );
 
-        } else if ($(this).data('action') === 'cancel') {
-            //--- NEW FORM CANCEL
-            $('.form').addClass('hidden');
-            $('#folders-list').removeClass('hidden');
-
         } else if ($(this).data('action') === 'delete') {
-            //--- DELETE FORM SHOW
+            //--- DELETE FOLDER MODAL
             if ($('#table-folders input[type=checkbox]:checked').length === 0) {
                 toastr.remove();
                 toastr.warning(
@@ -214,10 +213,8 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 return false;
             }
 
-            // Prepare
+            // Reset confirm checkbox and build folder list
             $('#delete-confirm').iCheck('uncheck');
-
-            // Build list
             var selectedFolders = '<ul>';
             $("input:checkbox[class=checkbox-folder]:checked").each(function() {
                 var folderText = $('#folder-' + $(this).data('id')).text();
@@ -225,11 +222,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             });
             $('#delete-list').html(selectedFolders + '</ul>');
 
-
-            // Show
-            $('.form').addClass('hidden');
-            $('#folder-delete').removeClass('hidden');
-            $('#folders-list').addClass('hidden');
+            $('#modal-folder-delete').modal('show')
 
         } else if ($(this).data('action') === 'delete-submit') {
             console.log('delete-submit')
@@ -272,31 +265,22 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                             }
                         );
                     } else {
-                        // refresh
-                        buildTable();
+                        // Remove deleted rows (and all their descendants) directly from the DOM
+                        selectedFolders.forEach(function(folderId) {
+                            $('#table-folders tbody tr[data-id="' + folderId + '"]').remove()
+                            $('#table-folders tbody .p' + folderId).remove()
+                        })
 
-                        // Show list
-                        $('.form').addClass('hidden');
-                        $('#folders-list').removeClass('hidden');
+                        $('#modal-folder-delete').modal('hide')
 
-                        // OK
-                        toastr.remove();
-                        toastr.success(
-                            '<?php echo $lang->get('done'); ?>',
-                            '', {
-                                timeOut: 1000
-                            }
-                        );
+                        toastr.remove()
+                        toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
                     }
                 }
             );
 
         } else if ($(this).data('action') === 'refresh') {
             //--- REFRESH FOLDERS LIST
-            $('.form').addClass('hidden');
-            $('#folders-list').removeClass('hidden');
-
-            // Build matrix
             buildTable();
         }
     });
@@ -311,197 +295,326 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         $('#delete-submit').addClass('disabled');
     });
 
+    // Reset confirm checkbox when delete modal closes
+    $('#modal-folder-delete').on('hidden.bs.modal', function() {
+        $('#delete-confirm').iCheck('uncheck')
+    })
+
 
     /**
-     * Undocumented function
+     * Build the folders table with batch rendering and a progress bar.
+     * Folders are rendered 25 at a time so the browser stays responsive
+     * and the user sees incremental progress on large installations.
      *
      * @return void
      */
     function buildTable() {
-        // Clear
-        $('#table-folders > tbody').html('');
+        const BATCH_SIZE = 25
+        const myGeneration = ++_buildGeneration
 
-        // Show spinner
-        toastr.remove();
-        toastr.info('<?php echo $lang->get('loading_data'); ?> ... <i class="fas fa-circle-notch fa-spin fa-2x"></i>');
+        // Clear table and reset progress bar
+        $('#table-folders > tbody').html('')
+        $('#folders-load-progress').show()
+        $('#folders-load-progress .progress-bar').css('width', '0%').attr('aria-valuenow', 0)
+        $('#folders-load-progress .folders-load-text').text('')
 
-        // Build matrix
+        // Clear any leftover action-level toast; progress bar handles loading feedback
+        toastr.remove()
+
         $.post(
             'sources/folders.queries.php', {
                 type: 'build_matrix',
                 key: '<?php echo $session->get('key'); ?>'
             },
             function(data) {
-                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
-                console.log(data);
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+                console.log(data)
+
                 if (data.error !== false) {
-                    // Show error
-                    toastr.remove();
-                    toastr.error(
-                        data.message,
-                        '<?php echo $lang->get('error'); ?>', {
-                            timeOut: 5000,
-                            progressBar: true
-                        }
-                    );
-                } else {
-                    // Build html
-                    var newHtml = '',
-                        ident = '',
-                        path = '',
-                        columns = '',
-                        rowCounter = 0,
-                        path = '',
-                        parentsClass = '',
-                        max_folder_depth = 0,
-                        foldersSelect = '<option value="0"><?php echo $lang->get('root'); ?></option>';
-
-                    $(data.matrix).each(function(i, value) {
-                        // List of parents
-                        parentsClass = '';
-                        $(value.parents).each(function(i, id) {
-                            parentsClass += 'p' + id + ' ';
-                        });
-
-                        // Row
-                        columns += '<tr data-id="' + value.id + '" data-level="' + value.level + '" class="' + parentsClass + '"><td>';
-
-                        // Column 1
-                        if ((value.parentId === 0 &&
-                                (data.userIsAdmin === 1 || data.userCanCreateRootFolder === 1)) ||
-                            value.parentId !== 0
-                        ) {
-                            columns += '<input type="checkbox" class="checkbox-folder" id="cb-' + value.id + '" data-id="' + value.id + '">';
-
-                            if (value.numOfChildren > 0) {
-                                columns += '<i class="fas fa-folder-minus infotip ml-2 pointer icon-collapse" data-id="' + value.id + '" title="<?php echo $lang->get('collapse'); ?>"></i>';
-                            }
-                        }
-                        columns += '</td>';
-
-                        // Column 2
-                        columns += '<td class="modify pointer" min-width="200px">' +
-                            '<span id="folder-' + value.id + '" data-id="' + value.id + '" class="infotip folder-name" data-html="true" title="<?php echo $lang->get('id'); ?>: ' + value.id + '<br><?php echo $lang->get('level'); ?>: ' + value.level + '<br><?php echo $lang->get('nb_items'); ?>: ' + value.nbItems + '">' + value.title + '</span></td>';
-
-
-                        // Column 3
-                        path = '';
-                        $(value.path).each(function(i, folder) {
-                            if (path === '') {
-                                path = folder;
-                            } else {
-                                path += '<i class="fas fa-angle-right fa-sm ml-1 mr-1"></i>' + folder;
-                            }
-                        });
-                        columns += '<td class="modify pointer" min-width="200px" data-value="' + value.parentId + '">' +
-                            '<small class="text-muted">' + path + '</small></td>';
-
-
-                        // Column 4
-                        columns += '<td class="modify pointer text-center">';
-                        if (value.folderComplexity.value !== undefined) {
-                            columns += '<i class="' + value.folderComplexity.class + ' infotip" data-value="' + value.folderComplexity.value + '" title="' + value.folderComplexity.text + '"></i>';
-                        } else {
-                            columns += '<i class="fas fa-exclamation-triangle text-danger infotip" data-value="" title="<?php echo $lang->get('no_value_defined_please_fix'); ?>"></i>';
-                        }
-                        columns += '</td>';
-
-
-                        // Column 5
-                        columns += '<td class="modify pointer text-center">' + value.renewalPeriod + '</td>';
-
-
-                        // Column 6
-                        columns += '<td class="modify pointer text-center" data-value="' + value.add_is_blocked + '">';
-                        if (value.add_is_blocked === 1) {
-                            columns += '<i class="fas fa-toggle-on text-info"></i>';
-                        } else {
-                            columns += '<i class="fas fa-toggle-off"></i>';
-                        }
-                        columns += '</td>';
-
-                        // Column 7
-                        columns += '<td class="modify pointer text-center" data-value="' + value.edit_is_blocked + '">';
-                        if (value.edit_is_blocked === 1) {
-                            columns += '<i class="fas fa-toggle-on text-info"></i>';
-                        } else {
-                            columns += '<i class="fas fa-toggle-off"></i>';
-                        }
-                        columns += '</td>';
-
-                        // Column 
-                        columns += '<td class="modify pointer text-center" data-value="' + value.icon + '"><i class="' + value.icon + '"></td>';
-
-                        // Column 9
-                        columns += '<td class="modify pointer text-center" data-value="' + value.iconSelected + '">';
-                        if (value.iconSelected !== "") {
-                            columns += '<i class="' + value.iconSelected + '">';
-                        }
-                        columns += '</td></tr>';
-
-
-                        // Folder Select
-                        foldersSelect += '<option value="' + value.id + '">' + value.title + '</option>';
-
-                        // Max depth
-                        if (parseInt(value.level) > max_folder_depth) {
-                            max_folder_depth = parseInt(value.level);
-                        }
-
-                        rowCounter++;
-                    });
-
-                    // Show result
-                    $('#table-folders > tbody').html(columns);
-
-                    //iCheck for checkbox and radio inputs
-                    $('#table-folders input[type="checkbox"]').iCheck({
-                        checkboxClass: 'icheckbox_flat-blue'
-                    });
-
-                    $('.infotip').tooltip();
-
-                    // store list of folders
-
-                    store.update(
-                        'teampassApplication',
-                        function(teampassApplication) {
-                            teampassApplication.foldersSelect = foldersSelect;
-                        }
-                    );
-
-                    // store list of Complexity
-                    complexity = '';
-                    $(data.fullComplexity).each(function(i, option) {
-                        complexity += '<option value="' + option.value + '">' + option.text + '</option>';
-                    });
-
-                    store.update(
-                        'teampassApplication',
-                        function(teampassApplication) {
-                            teampassApplication.complexityOptions = complexity;
-                        }
-                    );
-
-                    // Adapt select
-                    $('#folders-depth').empty();
-                    $('#folders-depth').append('<option value="all"><?php echo $lang->get('all'); ?></option>');
-                    for (x = 1; x < max_folder_depth; x++) {
-                        $('#folders-depth').append('<option value="' + x + '">' + x + '</option>');
-                    }
-                    $('#folders-depth').val('all').change();
-
-                    // Inform user
-                    toastr.remove();
-                    toastr.success(
-                        '<?php echo $lang->get('done'); ?>',
-                        '', {
-                            timeOut: 1000
-                        }
-                    );
+                    toastr.remove()
+                    toastr.error(data.message, '<?php echo $lang->get('error'); ?>', {
+                        timeOut: 5000,
+                        progressBar: true
+                    })
+                    $('#folders-load-progress').hide()
+                    return
                 }
+
+                const total = data.matrix.length
+                let offset = 0
+                let foldersSelect = '<option value="0"><?php echo $lang->get('root'); ?></option>'
+                let max_folder_depth = 0
+
+                /**
+                 * Render the next batch of BATCH_SIZE rows, then yield to the
+                 * browser via setTimeout so the progress bar and DOM updates
+                 * are painted before the next batch starts.
+                 */
+                function renderBatch() {
+                    // A newer buildTable() call has started — discard this stale loop
+                    if (_buildGeneration !== myGeneration) return
+
+                    const end = Math.min(offset + BATCH_SIZE, total)
+                    let batchHtml = ''
+
+                    for (let i = offset; i < end; i++) {
+                        const value = data.matrix[i]
+                        batchHtml += buildFolderRowHtml(value, data.userIsAdmin, data.userCanCreateRootFolder)
+                        foldersSelect += '<option value="' + value.id + '">' + value.title + '</option>'
+                        if (parseInt(value.level) > max_folder_depth) {
+                            max_folder_depth = parseInt(value.level)
+                        }
+                    }
+
+                    // Append this batch to the DOM
+                    $('#table-folders > tbody').append(batchHtml)
+                    offset = end
+
+                    // Update progress bar
+                    const pct = total > 0 ? Math.round((offset / total) * 100) : 100
+                    $('#folders-load-progress .progress-bar').css('width', pct + '%').attr('aria-valuenow', pct)
+                    $('#folders-load-progress .folders-load-text').text(offset + ' / ' + total)
+
+                    if (offset < total) {
+                        // Yield to browser so it can paint the progress update
+                        setTimeout(renderBatch, 0)
+                    } else {
+                        // All rows rendered — finalize
+                        $('#table-folders input[type="checkbox"]').iCheck({
+                            checkboxClass: 'icheckbox_flat-blue'
+                        })
+                        $('.infotip').tooltip()
+
+                        store.update('teampassApplication', function(teampassApplication) {
+                            teampassApplication.foldersSelect = foldersSelect
+                        })
+
+                        let complexity = ''
+                        $(data.fullComplexity).each(function(i, option) {
+                            complexity += '<option value="' + option.value + '">' + option.text + '</option>'
+                        })
+                        store.update('teampassApplication', function(teampassApplication) {
+                            teampassApplication.complexityOptions = complexity
+                        })
+
+                        $('#folders-depth').empty().append('<option value="all"><?php echo $lang->get('all'); ?></option>')
+                        for (let x = 1; x < max_folder_depth; x++) {
+                            $('#folders-depth').append('<option value="' + x + '">' + x + '</option>')
+                        }
+                        $('#folders-depth').val('all').change()
+
+                        // Populate complexity filter (keep current selection if possible)
+                        const prevComplexity = $('#folders-complexity').val()
+                        $('#folders-complexity').empty().append('<option value="all"><?php echo $lang->get('all'); ?></option>')
+                        $(data.fullComplexity).each(function(i, opt) {
+                            $('#folders-complexity').append('<option value="' + opt.value + '">' + opt.text + '</option>')
+                        })
+                        $('#folders-complexity').val(prevComplexity || 'all')
+
+                        // Cache admin flags for insertFolderRow() and updateFolderRow()
+                        _userIsAdmin = data.userIsAdmin
+                        _userCanCreateRootFolder = data.userCanCreateRootFolder
+
+                        $('#folders-load-progress').hide()
+                        toastr.success('<?php echo $lang->get('done'); ?>', '', {
+                            timeOut: 2000,
+                            closeButton: true,
+                            tapToDismiss: true
+                        })
+                    }
+                }
+
+                renderBatch()
             }
-        );
+        )
+    }
+
+
+    /**
+     * Build HTML string for a single folder table row.
+     * Shared by buildTable() (via renderBatch), insertFolderRow(), and updateFolderRow().
+     */
+    function buildFolderRowHtml(value, userIsAdmin, userCanCreateRootFolder) {
+        let parentsClass = ''
+        $(value.parents).each(function(j, id) {
+            parentsClass += 'p' + id + ' '
+        })
+
+        const complexityVal = value.folderComplexity !== '' && value.folderComplexity.value !== undefined
+            ? value.folderComplexity.value : ''
+        let row = '<tr data-id="' + value.id + '" data-level="' + value.level + '" data-complexity="' + complexityVal + '" class="' + parentsClass + '"><td>'
+
+        // Column 1 — checkbox + collapse icon
+        if ((value.parentId === 0 && (userIsAdmin === 1 || userCanCreateRootFolder === 1)) || value.parentId !== 0) {
+            row += '<input type="checkbox" class="checkbox-folder" id="cb-' + value.id + '" data-id="' + value.id + '">'
+            if (value.numOfChildren > 0) {
+                row += '<i class="fas fa-folder-minus infotip ml-2 pointer icon-collapse" data-id="' + value.id + '" title="<?php echo $lang->get('collapse'); ?>"></i>'
+            }
+        }
+        row += '</td>'
+
+        // Column 2 — folder name with left indent proportional to tree depth + item count badge
+        const indent = (value.level - 1) * 16
+        let nameCell = '<span id="folder-' + value.id + '" data-id="' + value.id + '" class="infotip folder-name" data-html="true" title="<?php echo $lang->get('id'); ?>: ' + value.id + '<br><?php echo $lang->get('level'); ?>: ' + value.level + '<br><?php echo $lang->get('nb_items'); ?>: ' + value.nbItems + '">' + value.title + '</span>'
+        if (value.nbItems > 0) {
+            nameCell += ' <span class="badge badge-secondary ml-1">' + value.nbItems + '</span>'
+        }
+        row += '<td class="modify pointer" style="padding-left:' + indent + 'px">' + nameCell + '</td>'
+
+        // Column 3 — parent path breadcrumb
+        let path = ''
+        $(value.path).each(function(j, folder) {
+            path = path === '' ? folder : path + '<i class="fas fa-angle-right fa-sm ml-1 mr-1"></i>' + folder
+        })
+        row += '<td class="modify pointer" min-width="200px" data-value="' + value.parentId + '"><small class="text-muted">' + path + '</small></td>'
+
+        // Column 4 — complexity
+        row += '<td class="modify pointer text-center">'
+        if (value.folderComplexity !== '' && value.folderComplexity.value !== undefined) {
+            row += '<i class="' + value.folderComplexity.class + ' infotip" data-value="' + value.folderComplexity.value + '" title="' + value.folderComplexity.text + '"></i>'
+        } else {
+            row += '<i class="fas fa-exclamation-triangle text-danger infotip" data-value="" title="<?php echo $lang->get('no_value_defined_please_fix'); ?>"></i>'
+        }
+        row += '</td>'
+
+        // Column 5 — renewal period
+        row += '<td class="modify pointer text-center">' + value.renewalPeriod + '</td>'
+
+        // Column 6 — add restriction
+        row += '<td class="modify pointer text-center" data-value="' + value.add_is_blocked + '">'
+        row += value.add_is_blocked === 1 ? '<i class="fas fa-toggle-on text-info"></i>' : '<i class="fas fa-toggle-off"></i>'
+        row += '</td>'
+
+        // Column 7 — edit restriction
+        row += '<td class="modify pointer text-center" data-value="' + value.edit_is_blocked + '">'
+        row += value.edit_is_blocked === 1 ? '<i class="fas fa-toggle-on text-info"></i>' : '<i class="fas fa-toggle-off"></i>'
+        row += '</td>'
+
+        // Column 8 — folder icon
+        row += '<td class="modify pointer text-center" data-value="' + value.icon + '"><i class="' + value.icon + '"></td>'
+
+        // Column 9 — selected folder icon
+        row += '<td class="modify pointer text-center" data-value="' + value.iconSelected + '">'
+        if (value.iconSelected !== '') {
+            row += '<i class="' + value.iconSelected + '">'
+        }
+        row += '</td></tr>'
+
+        return row
+    }
+
+
+    /**
+     * Insert a newly created folder row at the correct position in the table,
+     * without triggering a full table rebuild.
+     */
+    function insertFolderRow(rowData) {
+        const rowHtml = buildFolderRowHtml(rowData, _userIsAdmin, _userCanCreateRootFolder)
+
+        // Insert after the last row of the parent's subtree
+        // (.p{parentId} matches all descendants of the parent folder)
+        const $parentRow = $('#table-folders tbody tr[data-id="' + rowData.parentId + '"]')
+        const $subtree = $parentRow.length > 0
+            ? $parentRow.add($('#table-folders tbody .p' + rowData.parentId))
+            : $()
+
+        if ($subtree.length > 0) {
+            $subtree.last().after(rowHtml)
+        } else {
+            $('#table-folders tbody').append(rowHtml)
+        }
+
+        // Add a collapse icon to the parent row if it had no children before
+        if ($parentRow.length > 0 && $parentRow.find('.icon-collapse').length === 0) {
+            $parentRow.find('input.checkbox-folder').after(
+                '<i class="fas fa-folder-minus infotip ml-2 pointer icon-collapse" data-id="' + rowData.parentId + '" title="<?php echo $lang->get('collapse'); ?>"></i>'
+            )
+        }
+
+        // Init iCheck and tooltips for the new row
+        $('#cb-' + rowData.id).iCheck({ checkboxClass: 'icheckbox_flat-blue' })
+        $('#table-folders tbody tr[data-id="' + rowData.id + '"] .infotip').tooltip()
+
+        // Append the new folder to the stored select options
+        store.update('teampassApplication', function(app) {
+            app.foldersSelect += '<option value="' + rowData.id + '">' + rowData.title + '</option>'
+        })
+
+        toastr.remove()
+        toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
+    }
+
+
+    /**
+     * Update an existing folder row in-place after an edit.
+     * Only called when the parent folder has not changed (otherwise buildTable() is used).
+     */
+    function updateFolderRow(rowData) {
+        const $row = $('#table-folders tbody tr[data-id="' + rowData.id + '"]')
+        if ($row.length === 0) {
+            buildTable()
+            return
+        }
+
+        // col 2 — folder name + updated depth indentation + item count badge
+        const indent = (rowData.level - 1) * 16
+        const $nameTd = $row.find('td:eq(1)').css('padding-left', indent + 'px')
+        $('#folder-' + rowData.id)
+            .text(rowData.title)
+            .attr('title', '<?php echo $lang->get('id'); ?>: ' + rowData.id +
+                '<br><?php echo $lang->get('level'); ?>: ' + rowData.level +
+                '<br><?php echo $lang->get('nb_items'); ?>: ' + rowData.nbItems)
+        $nameTd.find('.badge').remove()
+        if (rowData.nbItems > 0) {
+            $nameTd.append(' <span class="badge badge-secondary ml-1">' + rowData.nbItems + '</span>')
+        }
+        // Update complexity data attribute for the filters
+        const updatedComplexity = rowData.folderComplexity !== '' && rowData.folderComplexity.value !== undefined
+            ? rowData.folderComplexity.value : ''
+        $row.attr('data-complexity', updatedComplexity)
+
+        // col 3 — parent path
+        let path = ''
+        $(rowData.path).each(function(j, folder) {
+            path = path === '' ? folder : path + '<i class="fas fa-angle-right fa-sm ml-1 mr-1"></i>' + folder
+        })
+        $row.find('td:eq(2)').data('value', rowData.parentId).find('small').html(path)
+
+        // col 4 — complexity
+        const $complexTd = $row.find('td:eq(3)').empty()
+        if (rowData.folderComplexity !== '' && rowData.folderComplexity.value !== undefined) {
+            $complexTd.append('<i class="' + rowData.folderComplexity.class + ' infotip" data-value="' +
+                rowData.folderComplexity.value + '" title="' + rowData.folderComplexity.text + '"></i>')
+        } else {
+            $complexTd.append('<i class="fas fa-exclamation-triangle text-danger infotip" data-value="" title="<?php echo $lang->get('no_value_defined_please_fix'); ?>"></i>')
+        }
+
+        // col 5 — renewal period
+        $row.find('td:eq(4)').text(rowData.renewalPeriod)
+
+        // col 6 — add restriction
+        $row.find('td:eq(5)').data('value', rowData.add_is_blocked).html(
+            rowData.add_is_blocked === 1 ? '<i class="fas fa-toggle-on text-info"></i>' : '<i class="fas fa-toggle-off"></i>'
+        )
+
+        // col 7 — edit restriction
+        $row.find('td:eq(6)').data('value', rowData.edit_is_blocked).html(
+            rowData.edit_is_blocked === 1 ? '<i class="fas fa-toggle-on text-info"></i>' : '<i class="fas fa-toggle-off"></i>'
+        )
+
+        // col 8 — folder icon
+        $row.find('td:eq(7)').data('value', rowData.icon).html('<i class="' + rowData.icon + '">')
+
+        // col 9 — selected folder icon
+        const $iconSelTd = $row.find('td:eq(8)').data('value', rowData.iconSelected).empty()
+        if (rowData.iconSelected !== '') {
+            $iconSelTd.html('<i class="' + rowData.iconSelected + '">')
+        }
+
+        $row.find('.infotip').tooltip()
+        closeSidebar()
+        toastr.remove()
+        toastr.success('<?php echo $lang->get('done'); ?>', '', { timeOut: 1000 })
     }
 
 
@@ -524,35 +637,30 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 
 
     /**
-     * Handle option when role is displayed
+     * Apply all active filters (depth, complexity, search) simultaneously.
+     * Centralising the logic avoids filters overriding each other.
      */
-    $(document).on('change', '#folders-depth', function() {
-        if ($('#folders-depth').val() === 'all') {
-            $('tr').removeClass('hidden');
-        } else {
-            $('tr').filter(function() {
-                if ($(this).data('level') <= $('#folders-depth').val()) {
-                    $(this).removeClass('hidden');
-                } else {
-                    $(this).addClass('hidden');
-                }
-            });
-        }
-    });
+    function applyFilters() {
+        const depthVal = $('#folders-depth').val()
+        const complexityVal = $('#folders-complexity').val()
+        const searchVal = $('#folders-search').val().toLowerCase()
 
-    /**
-     * Handle search criteria
-     */
-    $('#folders-search').on('keyup', function() {
-        var criteria = $(this).val();
-        $('.folder-name').filter(function() {
-            if ($(this).text().toLowerCase().indexOf(criteria) !== -1) {
-                $(this).closest('tr').removeClass('hidden');
+        $('#table-folders tbody tr[data-id]').each(function() {
+            const depthOk = depthVal === 'all' || parseInt($(this).data('level')) <= parseInt(depthVal)
+            const complexityOk = complexityVal === 'all' || String($(this).data('complexity')) === String(complexityVal)
+            const searchOk = searchVal === '' || $(this).find('.folder-name').text().toLowerCase().indexOf(searchVal) !== -1
+
+            if (depthOk && complexityOk && searchOk) {
+                $(this).removeClass('hidden')
             } else {
-                $(this).closest('tr').addClass('hidden');
+                $(this).addClass('hidden')
             }
-        });
-    });
+        })
+    }
+
+    $(document).on('change', '#folders-depth', applyFilters)
+    $(document).on('change', '#folders-complexity', applyFilters)
+    $('#folders-search').on('keyup', applyFilters)
 
     /**
      * Check / Uncheck children folders
@@ -643,191 +751,176 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 
 
     /**
-     * Handle the form for folder edit
+     * Sidebar: current folder id being edited
      */
-    var currentFolderEdited = '';
-    $('#table-folders').on('click', '.modify', function() {
-        // Manage edition of rights card
-        if ((currentFolderEdited !== '' && currentFolderEdited !== $(this).data('id')) ||
-            $('.temp-row').length > 0
-        ) {
-            $('.temp-row').remove();
-        } else if (currentFolderEdited === $(this).data('id')) {
-            return false;
-        }
+    var _sidebarFolderId = null
 
-        // Init
-        var currentRow = $(this).closest('tr'),
-            folderTitle = $(currentRow).find("td:eq(1)").text(),
-            folderParent = $(currentRow).find("td:eq(2)").data('value'),
-            folderComplexity = $(currentRow).find("td:eq(3) > i").data('value'),
-            folderRenewal = $(currentRow).find("td:eq(4)").text(),
-            folderAddRestriction = $(currentRow).find("td:eq(5)").data('value'),
-            folderEditRestriction = $(currentRow).find("td:eq(6)").data('value'),
-            folderIcon = $(currentRow).find("td:eq(7)").data('value'),
-            folderIconSelection = $(currentRow).find("td:eq(8)").data('value');
-        currentFolderEdited = currentRow.data('id');
+    /**
+     * Open the edit sidebar for the given table row.
+     */
+    function openSidebar($row) {
+        const folderId              = $row.data('id')
+        const folderTitle           = $row.find('td:eq(1) .folder-name').text()
+        const folderParent          = $row.find('td:eq(2)').data('value')
+        const folderComplexity      = $row.find('td:eq(3) > i').data('value')
+        const folderRenewal         = $row.find('td:eq(4)').text()
+        const folderAddRestriction  = $row.find('td:eq(5)').data('value')
+        const folderEditRestriction = $row.find('td:eq(6)').data('value')
+        const folderIcon            = $row.find('td:eq(7)').data('value') || ''
+        const folderIconSel         = $row.find('td:eq(8)').data('value') || ''
 
+        _sidebarFolderId = folderId
+        $('#sidebar-submit').data('id', folderId)
 
-        // Now show
-        $(currentRow).after(
-            '<tr class="temp-row"><td colspan="' + $(currentRow).children('td').length + '">' +
-            '<div class="card card-warning card-outline form">' +
-            '<div class="card-body">' +
-            '<div class="form-group ml-2">' +
-            '<label for="folder-edit-title"><?php echo $lang->get('label'); ?></label>' +
-            '<input type="text" class="form-control clear-me purify" id="folder-edit-title" data-field="title">' +
-            '</div>' +
-            '<div class="form-group ml-2">' +
-            '<label for="folder-edit-parent"><?php echo $lang->get('parent'); ?></label><br>' +
-            '<select id="folder-edit-parent" class="form-control form-item-control select2 clear-me">' + store.get('teampassApplication').foldersSelect + '</select>' +
-            '</div>' +
-            '<div class="form-group ml-2">' +
-            '<label for="folder-edit-complexity"><?php echo $lang->get('password_minimal_complexity_target'); ?></label><br>' +
-            '<select id="folder-edit-complexity" class="form-control form-item-control select2 clear-me">' + store.get('teampassApplication').complexityOptions + '</select>' +
-            '</div>' +
-            '<div class="form-group ml-2">' +
-            '<label for="folder-edit-renewal"><?php echo $lang->get('renewal_delay'); ?></label>' +
-            '<input type="text" class="form-control clear-me" id="folder-edit-renewal" value="' + folderRenewal + '">' +
-            '</div>' +
-            '<div class="form-group ml-2">' +
-            '<label><?php echo $lang->get('icon'); ?></label>' +
-            '<input type="text" class="form-control form-folder-control purify" id="folder-edit-icon" data-field="icon" value="'+folderIcon+'">' +
-            '<small class="form-text text-muted">' +
-            '<?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>' +
-            '</small>' +
-            '</div>' +
-            '<div class="form-group ml-2">' +
-            '<label><?php echo $lang->get('icon_on_selection'); ?></label>' +
-            '<input type="text" class="form-control form-folder-control purify" id="folder-edit-icon-selected" data-field="iconSelected" value="'+folderIconSelection+'">' +
-            '<small class="form-text text-muted">' +
-            '<?php echo $lang->get('fontawesome_icon_tip'); ?><a href="<?php echo FONTAWESOME_URL;?>" target="_blank"><i class="fas fa-external-link-alt ml-1"></i></a>' +
-            '</small>' +
-            '</div>' +
-            '<div class="form-group ml-2" id="folder-rights-tuned">' +
-            '<label><?php echo $lang->get('special'); ?></label>' +
-            '<div class="form-check">' +
-            '<input type="checkbox" class="form-check-input form-control" id="folder-edit-add-restriction">' +
-            '<label class="form-check-label pointer ml-2" for="folder-edit-add-restriction"><?php echo $lang->get('create_without_password_minimal_complexity_target'); ?></label>' +
-            '</div>' +
-            '<div class="form-check">' +
-            '<input type="checkbox" class="form-check-input form-control" id="folder-edit-edit-restriction">' +
-            '<label class="form-check-label pointer ml-2" for="folder-edit-edit-restriction"><?php echo $lang->get('edit_without_password_minimal_complexity_target'); ?></label>' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-            '<div class="card-footer">' +
-            '<button type="button" class="btn btn-warning tp-action-edit" data-action="submit" data-id="' + currentFolderEdited + '"><?php echo $lang->get('submit'); ?></button>' +
-            '<button type="button" class="btn btn-default float-right tp-action-edit" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>' +
-            '</div>' +
-            '</div>' +
-            '</td></tr>'
-        );
+        // Header
+        $('#sidebar-folder-name').text(folderTitle)
 
-        // XSS Protection
-        $('#folder-edit-title').val(folderTitle);
+        // Fields
+        $('#folder-edit-title').val(folderTitle)
+        $('#folder-edit-renewal').val(folderRenewal)
+        $('#folder-edit-icon').val(folderIcon)
+        $('#folder-edit-icon-selected').val(folderIconSel)
 
-        // Prepare iCheck format for checkboxes
-        $('input[type="checkbox"].form-check-input, input[type="radio"].form-radio-input').iCheck({
-            radioClass: 'iradio_flat-orange',
-            checkboxClass: 'icheckbox_flat-orange',
-        });
+        // Populate selects from stored options then set values
+        $('#folder-edit-parent').html(store.get('teampassApplication').foldersSelect)
+        $('#folder-edit-complexity').html(store.get('teampassApplication').complexityOptions)
 
-        $('.select2').select2({
+        $('#folder-edit-parent').select2({
             language: '<?php echo $session->get('user-language_code'); ?>'
-        });
+        }).val(String(folderParent)).trigger('change')
 
-        // Manage status of the checkboxes
-        if (folderAddRestriction === 0) {
-            $('#folder-edit-add-restriction').iCheck('uncheck');
+        $('#folder-edit-complexity').select2({
+            language: '<?php echo $session->get('user-language_code'); ?>'
+        }).val(String(folderComplexity)).trigger('change')
+
+        // Checkboxes
+        if (folderAddRestriction === 1) {
+            $('#folder-edit-add-restriction').iCheck('check')
         } else {
-            $('#folder-edit-add-restriction').iCheck('check');
+            $('#folder-edit-add-restriction').iCheck('uncheck')
         }
-        if (folderEditRestriction === 0) {
-            $('#folder-edit-edit-restriction').iCheck('uncheck');
+        if (folderEditRestriction === 1) {
+            $('#folder-edit-edit-restriction').iCheck('check')
         } else {
-            $('#folder-edit-edit-restriction').iCheck('check');
+            $('#folder-edit-edit-restriction').iCheck('uncheck')
         }
 
-        // Prepare select2
-        $('#folder-edit-parent').val(folderParent).change();
-        $('#folder-edit-complexity').val(folderComplexity).change();
+        // Highlight the row being edited
+        $('#table-folders tbody tr.editing-active').removeClass('editing-active')
+        $row.addClass('editing-active')
 
-        $('#folder-edit-renewal').val(folderRenewal).change();
-        currentFolderEdited = '';
-    });
+        // Slide in
+        $('#folder-edit-overlay').fadeIn(150)
+        $('#folder-edit-sidebar').addClass('open')
+    }
 
+    /**
+     * Close the edit sidebar.
+     */
+    function closeSidebar() {
+        $('#folder-edit-sidebar').removeClass('open')
+        $('#folder-edit-overlay').fadeOut(150)
+        $('#table-folders tbody tr.editing-active').removeClass('editing-active')
+        _sidebarFolderId = null
+    }
 
-    $(document).on('click', '.tp-action-edit', function() {
-        if ($(this).data('action') === 'cancel') {
-            $('.temp-row').remove();
-        } else if ($(this).data('action') === 'submit') {
-            // STORE CHANGES
-            var currentFolderId = $(this).data('id');
+    /**
+     * Open sidebar on row click — toggle if same row clicked again
+     */
+    $('#table-folders').on('click', '.modify', function() {
+        const $row = $(this).closest('tr')
+        if (_sidebarFolderId !== null && _sidebarFolderId === $row.data('id')) {
+            closeSidebar()
+            return false
+        }
+        openSidebar($row)
+    })
 
-            // loop on all checked folders
-            var selectedFolders = [];
-            $("input:checkbox[class=checkbox-folder]:checked").each(function() {
-                selectedFolders.push($(this).data('id'));
-            });
+    // Init select2 with dropdownParent when the new-folder modal opens
+    $('#modal-folder-new').on('shown.bs.modal', function() {
+        $('#new-parent').html(store.get('teampassApplication').foldersSelect)
+            .select2({
+                language: '<?php echo $session->get('user-language_code'); ?>',
+                dropdownParent: $('#modal-folder-new')
+            }).val('0').trigger('change')
+        $('#new-complexity').html(store.get('teampassApplication').complexityOptions)
+            .select2({
+                language: '<?php echo $session->get('user-language_code'); ?>',
+                dropdownParent: $('#modal-folder-new')
+            }).val('0').trigger('change')
+        $('#new-title').focus()
+    })
 
-            // Sanitize text fields
-            purifyRes = fieldDomPurifierLoop('#table-folders .purify');
-            if (purifyRes.purifyStop === true) {
-                // if purify failed, stop
-                return false;
-            }
+    // Close buttons
+    $('#sidebar-close, #sidebar-cancel').on('click', function() {
+        closeSidebar()
+    })
 
-            // Prepare data
-            var data = {
-                'id': currentFolderId,
-                'title': purifyRes.arrFields['title'],    //$('#folder-edit-title').val(),
-                'parentId': $('#folder-edit-parent').val(),
-                'complexity': $('#folder-edit-complexity').val(),
-                'renewalPeriod': $('#folder-edit-renewal').val() === '' ? 0 : parseInt($('#folder-edit-renewal').val()),
-                'addRestriction': $('#folder-edit-add-restriction').prop("checked") === true ? 1 : 0,
-                'editRestriction': $('#folder-edit-edit-restriction').prop("checked") === true ? 1 : 0,
-                'icon': purifyRes.arrFields['icon'],    //$('#folder-edit-icon').val(),
-                'iconSelected': purifyRes.arrFields['iconSelected'],    //$('#folder-edit-icon-selected').val(),
-            }
-            console.log(data)
-            // Launch action
-            $.post(
-                'sources/folders.queries.php', {
-                    type: 'update_folder',
-                    data: prepareExchangedData(JSON.stringify(data), "encode", "<?php echo $session->get('key'); ?>"),
-                    key: '<?php echo $session->get('key'); ?>'
-                },
-                function(data) {
-                    //decrypt data
-                    data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>');
+    // Overlay click closes sidebar
+    $('#folder-edit-overlay').on('click', function() {
+        closeSidebar()
+    })
 
-                    if (data.error === true) {
-                        // ERROR
-                        toastr.remove();
-                        toastr.error(
-                            data.message,
-                            '<?php echo $lang->get('error'); ?>', {
-                                timeOut: 5000,
-                                progressBar: true
-                            }
-                        );
+    // Close sidebar on Escape key
+    $(document).keyup(function(e) {
+        if (e.keyCode === 27 && _sidebarFolderId !== null) {
+            closeSidebar()
+        }
+    })
+
+    // Submit from sidebar
+    $('#sidebar-submit').on('click', function() {
+        const currentFolderId = _sidebarFolderId
+        if (!currentFolderId) return
+
+        purifyRes = fieldDomPurifierLoop('#folder-edit-sidebar .purify')
+        if (purifyRes.purifyStop === true) {
+            return false
+        }
+
+        const data = {
+            'id': currentFolderId,
+            'title': purifyRes.arrFields['title'],
+            'parentId': $('#folder-edit-parent').val(),
+            'complexity': $('#folder-edit-complexity').val(),
+            'renewalPeriod': $('#folder-edit-renewal').val() === '' ? 0 : parseInt($('#folder-edit-renewal').val()),
+            'addRestriction': $('#folder-edit-add-restriction').prop('checked') === true ? 1 : 0,
+            'editRestriction': $('#folder-edit-edit-restriction').prop('checked') === true ? 1 : 0,
+            'icon': purifyRes.arrFields['icon'],
+            'iconSelected': purifyRes.arrFields['iconSelected'],
+        }
+
+        $.post(
+            'sources/folders.queries.php', {
+                type: 'update_folder',
+                data: prepareExchangedData(JSON.stringify(data), 'encode', '<?php echo $session->get('key'); ?>'),
+                key: '<?php echo $session->get('key'); ?>'
+            },
+            function(data) {
+                data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>')
+
+                if (data.error === true) {
+                    toastr.remove()
+                    toastr.error(
+                        data.message,
+                        '<?php echo $lang->get('error'); ?>', {
+                            timeOut: 5000,
+                            progressBar: true
+                        }
+                    )
+                } else {
+                    // Parent changed → subtree moved → full rebuild needed
+                    // Parent unchanged → update cells in-place
+                    if (data.info_parent_changed === true || !data.rowData) {
+                        closeSidebar()
+                        buildTable()
                     } else {
-                        buildTable();
+                        updateFolderRow(data.rowData)
                     }
                 }
-            );
-        }
-    });
-
-    // Close on escape key
-    $(document).keyup(function(e) {
-        if (e.keyCode === 27) {
-            if ($('.temp-row').length > 0) {
-                $('.temp-row').remove();
             }
-        }
-    });
+        )
+    })
 
 
     // Manage collapse/expend

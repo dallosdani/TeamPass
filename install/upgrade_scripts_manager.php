@@ -62,13 +62,20 @@ $scripts_list = array(
     array('upgrade_run_3.1.5.php', 'user_id'),
     array('upgrade_operations.php', 'Transparent_recovery_migration'),
     array('upgrade_run_3.1.6.php', 'user_id'),
+    array('upgrade_run_3.1.7.php', 'user_id'),
 );
 $param = '';
 
+$total_scripts = count($scripts_list);
+
 // test if finished
-if (intval($post_file_number) >= count($scripts_list)) {
+if (intval($post_file_number) >= $total_scripts) {
     $finished = 1;
+    $scriptname = '';
+    $parameter = '';
 } else {
     $finished = 0;
+    $scriptname = $scripts_list[$post_file_number][0];
+    $parameter = $scripts_list[$post_file_number][1];
 }
-echo '[{"finish":"'.$finished.'", "scriptname":"'.$scripts_list[$post_file_number][0].'", "parameter":"'.$scripts_list[$post_file_number][1].'"}]';
+echo '[{"finish":"'.$finished.'", "scriptname":"'.$scriptname.'", "parameter":"'.$parameter.'", "total":'.$total_scripts.'}]';

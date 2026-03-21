@@ -102,14 +102,14 @@ $rows = DB::query(
 );
 foreach ($rows as $record) {
     if ((int) $session->get('user-admin') === 1 || in_array($record['id'], $session->get('user-roles_array')) === true) {
-        $optionsManagedBy .= '<option value="' . $record['id'] . '">' . $lang->get('managers_of') . ' ' . addslashes($record['title']) . '</option>';
+        $optionsManagedBy .= '<option value="' . strval($record['id']) . '">' . $lang->get('managers_of') . ' ' . addslashes(strval($record['title'])) . '</option>';
     }
     if (
         (int) $session->get('user-admin') === 1
         || (((int) $session->get('user-manager') === 1 || (int) $session->get('user-can_manage_all_users') === 1)
-            && (in_array($record['id'], $userRoles) === true) || (int) $record['creator_id'] === (int) $session->get('user-id'))
+            && (in_array($record['id'], $userRoles) === true) || intval($record['creator_id']) === intval($session->get('user-id')))
     ) {
-        $optionsRoles .= '<option value="' . $record['id'] . '">' . addslashes($record['title']) . '</option>';
+        $optionsRoles .= '<option value="' . strval($record['id']) . '">' . addslashes(strval($record['title'])) . '</option>';
     }
 }
 
@@ -138,14 +138,13 @@ $showNewUser = $request->query->get('action') === 'new';
  * Counts the number of users who are disabled (deleted) in the database.
  * Assumes the database connection is established and the table is {teampass_users}.
  *
- * @param void
  * @return int The count of disabled users.
  */
 function count_deleted_users() : int
 {
     // Table is teampass_users with the prefix {teampass_users} in MeekroDB context.
     // 'disabled = 1' indicates a deleted/disabled user account.
-    return (int)DB::queryFirstField("SELECT COUNT(id) FROM " . prefixTable('users') . " WHERE deleted_at IS NOT NULL");
+    return intval(DB::queryFirstField("SELECT COUNT(id) FROM " . prefixTable('users') . " WHERE deleted_at IS NOT NULL"));
 }
 
 /**
@@ -157,14 +156,14 @@ function count_deleted_users() : int
  */
 function count_never_connected_active_users() : int
 {
-    return (int)DB::queryFirstField(
+    return intval(DB::queryFirstField(
         "SELECT COUNT(id)
          FROM " . prefixTable('users') . "
          WHERE deleted_at IS NULL
          AND disabled = 0
          AND LOWER(login) NOT IN ('api','otv','tp')
          AND (last_connexion IS NULL OR last_connexion = '' OR last_connexion = '0')"
-    );
+    ));
 }
 
 
@@ -216,24 +215,23 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                         <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="refresh">
                             <i class="fa-solid fa-sync-alt mr-2"></i><?php echo $lang->get('refresh'); ?>
                         </button><?php
-                                    echo isset($SETTINGS['ldap_mode']) === true && (int) $SETTINGS['ldap_mode'] === 1 && (int) $session->get('user-admin') === 1 ?
-                                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
+                        if (isset($SETTINGS['ldap_mode']) === true && (int) $SETTINGS['ldap_mode'] === 1 && (int) $session->get('user-admin') === 1) {
+                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
                             <i class="fa-solid fa-address-card mr-2"></i>' . $lang->get('ldap_synchronization') . '
-                        </button>' : '';
-                                    ?>
-                        </button><?php
-                                    echo isset($SETTINGS['oauth2_enabled']) === true && (int) $SETTINGS['oauth2_enabled'] === 1 && (int) $session->get('user-admin') === 1 ?
-                                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
+                        </button>
+                        
+                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
                             <i class="fa-solid fa-plug mr-2"></i>' . $lang->get('oauth2_synchronization') . '
-                        </button>' : '';
-                                    ?>
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm tp-action mr-2 <?php echo $inactive_blink_class; ?>" data-action="inactive-users">
-                            <i class="fa-solid fa-user-clock mr-2"></i><?php echo $lang->get('inactive_users'); ?>
+                            <i class="fa-solid fa-user-clock mr-2"></i>' . $lang->get('inactive_users') . '
                         </button>
 
-                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 <?php echo $blink_class; ?>" data-action="deleted-users">
-                            <i class="fa-solid fa-user-xmark mr-2"></i><?php echo $lang->get('deleted_users'); ?><?php echo $count_badge_html; ?>
-                        </button>
+                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 ' . $blink_class . '" data-action="deleted-users">
+                            <i class="fa-solid fa-user-xmark mr-2"></i>' . $lang->get('deleted_users') . $count_badge_html . '
+                        </button>';
+                        }
+                        ?>
                     </h3>
                 </div>
 
@@ -554,21 +552,57 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
         </div>
     </div>
 
-    <!-- USER VISIBLE FOLDERS -->
-    <div class="row hidden extra-form user-content" id="row-visible-folders" data-content="visible-folders">
-        <div class="col-12">
-            <div class="card card-primary">
-                <div class="card-header">
-                    <h3 class="card-title"><?php echo $lang->get('access_rights_for_user'); ?> <b><span id="row-folders-title"></span></b></h3>
+    <!-- USER VISIBLE FOLDERS — modal -->
+    <div class="modal fade" id="modal-folders-rights" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <?php echo $lang->get('access_rights_for_user'); ?> &mdash; <b><span id="row-folders-title"></span></b>
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
 
-                <!-- /.card-header -->
-                <!-- table start -->
-                <div class="card-body" id="row-folders-results"></div>
+                <div class="modal-body p-0">
+                    <!-- Loading progress bar -->
+                    <div id="row-folders-progress" class="progress" style="height:4px;display:none;border-radius:0;margin:0">
+                        <div id="row-folders-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                             role="progressbar" style="width:0%"></div>
+                    </div>
 
-                <div class="card-footer">
-                    <button type="button" class="btn btn-default float-right tp-action" data-action="cancel"><?php echo $lang->get('cancel'); ?></button>
+                    <!-- Permission type filter bar (shown after data loads) -->
+                    <div id="row-folders-filter-bar" class="border-bottom px-3 py-2" style="display:none">
+                        <small class="text-muted mr-2"><?php echo $lang->get('filter'); ?> :</small>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="W">
+                                W &mdash; <?php echo $lang->get('write'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="ND">
+                                ND &mdash; <?php echo $lang->get('no_delete'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NE">
+                                NE &mdash; <?php echo $lang->get('no_edit'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NDNE">
+                                NDNE
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="R">
+                                R &mdash; <?php echo $lang->get('read'); ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results table -->
+                    <div id="row-folders-results" class="p-3"></div>
                 </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo $lang->get('cancel'); ?></button>
+                </div>
+
             </div>
         </div>
     </div>

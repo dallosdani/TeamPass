@@ -239,7 +239,7 @@ $('.toggle').on('toggle', function(e, active) {
 
 // <- PREPARE SELECT2
 $('.select2').select2({
-    language: '<?php echo $userLang = $session->get('user-language_code'); echo isset($userLang) === null ? $userLang : 'EN'; ?>'
+    language: '<?php echo $session->get('user-language_code') ?? 'EN'; ?>'
 });
 
 /**
@@ -713,18 +713,109 @@ function loadSystemHealth() {
                 updateHealthBadge('health-encryption', data.encryption.status, data.encryption.text)
                 updateHealthBadge('health-sessions', 'info', data.sessions.count + ' active')
                 updateHealthBadge('health-cron', data.cron.status, data.cron.text)
-                updateHealthBadge('health-unknown-files', 
-                    data.unknown_files.count > 0 ? 'warning' : 'success', 
+                updateHealthBadge('health-unknown-files',
+                    data.unknown_files.count > 0 ? 'warning' : 'success',
                     data.unknown_files.count
                 )
+                // WebSocket status
+                if (data.websocket) {
+                    updateWebSocketUI(data.websocket)
+                }
             }
         }
     );
 }
 
 /**
+ * Load browser extension licence status asynchronously.
+ * Updates #extension-licence-status if present (i.e. a licence key is configured).
+ *
+ * @return {void}
+ */
+function loadExtensionLicenceInfo() {
+    const $block = $('#extension-licence-status')
+    if ($block.length === 0) return
+
+    $.post(
+        'sources/admin.queries.php', {
+            type: 'get_extension_licence_info',
+            key: '<?php echo $session->get('key'); ?>'
+        },
+        function(data) {
+            try {
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+            } catch (e) {
+                $block.html('<i class="fas fa-exclamation-triangle text-warning mr-1"></i><small class="text-muted"><?php echo $lang->get('error'); ?></small>')
+                return
+            }
+
+            if (data.error) {
+                $block.html('')
+                return
+            }
+
+            // Helper: show promotional block (server offline, unreachable, or no licence for this key)
+            const showPromo = () => {
+                $block.removeClass('small').addClass('small text-light').html(
+                    '<?php echo addslashes($lang->get('extension_promo_text')); ?>'
+                    + '<br><a href="https://documentation.teampass.net/#/misc/extension" target="_blank" class="ml-1">'
+                    + '<?php echo addslashes($lang->get('learn_more')); ?> <i class="fas fa-external-link-alt fa-xs"></i>'
+                    + '</a>'
+                )
+            }
+
+            // No internet or licence server is down → promo
+            if (!data.server_online) {
+                showPromo()
+                return
+            }
+
+            // Server is reachable but no licence is registered for this key → promo
+            if (!data.licence_status && data.max_users === 0) {
+                showPromo()
+                return
+            }
+
+            // Server status line (online only)
+            const versionHtml = data.server_version
+                ? ' (' + $('<span>').text(data.server_version).html() + ')'
+                : ''
+
+            let html = '<span>'
+                + '<i class="fas fa-circle text-success mr-1"></i>'
+                + '<?php echo $lang->get('licence_server'); ?>: <strong><?php echo $lang->get('online'); ?></strong>'
+                + versionHtml
+                + '</span>'
+
+            // Consumption, expiration and progress bar (only when server is online and info available)
+            if (data.server_online && data.max_users > 0) {
+                const badgeClass = data.licence_status === 'VALID' ? 'success' : 'warning'
+
+                // Status badge + users ratio
+                html += '<br><span class="badge badge-' + badgeClass + ' mr-1">'
+                    + $('<span>').text(data.licence_status).html()
+                    + '</span>'
+                    + '<i class="fas fa-users mr-1"></i>'
+                    + data.consumed + ' / ' + data.max_users + ' <?php echo $lang->get('users'); ?>'
+
+                // Expiration date
+                if (data.expiration_date) {
+                    html += '<br><span>'
+                        + '<i class="fas fa-calendar-alt mr-1"></i>'
+                        + '<?php echo $lang->get('valid_until'); ?>: <strong>'
+                        + $('<span>').text(data.expiration_date).html()
+                        + '</strong></span>'
+                }
+            }
+
+            $block.html(html)
+        }
+    )
+}
+
+/**
  * Update health badge
- * 
+ *
  * @param {string} id - Element ID (without #)
  * @param {string} status - Badge status class
  * @param {string|number} text - Badge text
@@ -751,17 +842,146 @@ function updateHealthBadge(id, status, text) {
 }
 
 /**
+ * Update WebSocket status UI
+ *
+ * @param {object} ws - WebSocket status data
+ * @return {void}
+ */
+function updateWebSocketUI(ws) {
+    const badge = $('#health-websocket')
+    const btnAction = $('#btn-websocket-action')
+    const details = $('#websocket-details')
+    const detailsContent = $('#websocket-details-content')
+
+    if (!ws.enabled) {
+        updateHealthBadge('health-websocket', 'secondary', '<?php echo addslashes($lang->get('ws_status_disabled')); ?>')
+        btnAction.hide()
+        details.hide()
+        return
+    }
+
+    if (ws.running) {
+        updateHealthBadge('health-websocket', 'success', ws.text)
+        btnAction
+            .attr('title', '<?php echo addslashes($lang->get('ws_action_stop')); ?>')
+            .data('action', 'stop')
+            .html('<i class="fas fa-stop text-danger"></i>')
+            .show()
+    } else {
+        updateHealthBadge('health-websocket', 'danger', ws.text)
+        btnAction
+            .attr('title', '<?php echo addslashes($lang->get('ws_action_start')); ?>')
+            .data('action', 'start')
+            .html('<i class="fas fa-play text-success"></i>')
+            .show()
+    }
+}
+
+/**
+ * Load detailed WebSocket status
+ *
+ * @return {void}
+ */
+function loadWebSocketStatus() {
+    $('#btn-websocket-refresh').find('i').addClass('fa-spin')
+    $.post(
+        'sources/admin.queries.php', {
+            type: 'websocket_status',
+            key: '<?php echo $session->get('key'); ?>'
+        },
+        function(data) {
+            try {
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+            } catch (e) {
+                toastr.error('<?php echo $lang->get('server_answer_error'); ?>')
+                return
+            }
+
+            $('#btn-websocket-refresh').find('i').removeClass('fa-spin')
+
+            if (data.error === false) {
+                updateWebSocketUI(data)
+
+                if (data.running) {
+                    let info = '<i class="fas fa-circle text-success mr-1"></i> '
+                    info += '<strong>' + data.host + ':' + data.port + '</strong>'
+                    if (data.pid) info += ' &middot; PID ' + data.pid
+                    if (data.uptime) info += ' &middot; Uptime ' + data.uptime
+                    if (data.connections !== null) info += ' &middot; ' + data.connections + ' <?php echo addslashes($lang->get('ws_connections_short')); ?>'
+                    $('#websocket-details-content').html(info)
+                    $('#websocket-details').show()
+                } else {
+                    $('#websocket-details-content').html('<i class="fas fa-circle text-danger mr-1"></i> <?php echo addslashes($lang->get('ws_server_not_running')); ?>')
+                    $('#websocket-details').show()
+                }
+            }
+        }
+    )
+}
+
+// WebSocket action button (start/stop)
+$(document).on('click', '#btn-websocket-action', function() {
+    const action = $(this).data('action')
+    const actionType = action === 'start' ? 'websocket_start' : 'websocket_stop'
+    const btn = $(this)
+
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>')
+
+    $.post(
+        'sources/admin.queries.php', {
+            type: actionType,
+            key: '<?php echo $session->get('key'); ?>'
+        },
+        function(data) {
+            try {
+                data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>')
+            } catch (e) {
+                toastr.error('<?php echo $lang->get('server_answer_error'); ?>')
+                btn.prop('disabled', false)
+                return
+            }
+
+            btn.prop('disabled', false)
+
+            if (data.error) {
+                toastr.error(data.message, '', {timeOut: data.systemd_managed ? 0 : 5000, extendedTimeOut: 0})
+            } else {
+                toastr.success(data.message)
+            }
+
+            // Refresh status after action
+            setTimeout(function() {
+                loadWebSocketStatus()
+            }, 1000)
+        }
+    )
+})
+
+// WebSocket refresh button
+$(document).on('click', '#btn-websocket-refresh', function() {
+    loadWebSocketStatus()
+})
+
+/**
  * Initialize dashboard tab with auto-refresh
- * 
+ *
  * @return {void}
  */
 function initDashboardTab() {
     
+    // Internet connectivity badge (instant, no network call)
+    const online = navigator.onLine
+    $('#internet-status-icon').toggleClass('text-success', online).toggleClass('text-danger', !online)
+    $('#internet-status-badge').toggleClass('badge-success', online).toggleClass('badge-danger', !online)
+    $('#internet-status-check').toggleClass('fa-check', online).toggleClass('fa-times', !online)
+    $('#internet-status-text').text(online ? 'Connected' : 'Disconnected')
+
     // Load initial data
     loadDashboardStats()
     loadLiveActivity()
     loadSystemStatus()
     loadSystemHealth()
+    loadExtensionLicenceInfo()
     
     // Start auto-refresh timers
     AdminRefreshManager.start('dashboard_stats', loadDashboardStats, 30000, 'stats-refresh-countdown')

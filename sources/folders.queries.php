@@ -128,88 +128,95 @@ if (null !== $post_type) {
             // Prepare variables
             $arrData = array();
 
+            // Load the full tree once (1 query) — result is indexed by node id
             $treeDesc = $tree->getDescendants();
 
+            // Filter accessible non-personal folders
+            $accessibleFolders = [];
             foreach ($treeDesc as $t) {
                 if (
                     in_array($t->id, $session->get('user-accessible_folders')) === true
                     && in_array($t->id, $session->get('user-personal_visible_folders')) === false
                     && $t->personal_folder == 0
                 ) {
-                    // get $t->parent_id
-                    $data = DB::queryFirstRow('SELECT title FROM ' . prefixTable('nested_tree') . ' WHERE id = %i', $t->parent_id);
-                    if ($t->nlevel == 1) {
-                        $data['title'] = $lang->get('root');
+                    $accessibleFolders[] = $t;
+                }
+            }
+
+            if (!empty($accessibleFolders)) {
+                // Collect IDs for bulk queries
+                $folderIds = array_map(static fn($t) => (int) $t->id, $accessibleFolders);
+
+                // Bulk load complexity values (1 query instead of N)
+                $complexityMap = [];
+                $complexRows = DB::query(
+                    'SELECT intitule, valeur FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule IN %ls',
+                    'complex',
+                    $folderIds
+                );
+                foreach ($complexRows as $row) {
+                    $complexityMap[(int) $row['intitule']] = (int) $row['valeur'];
+                }
+
+                // Bulk load active item counts per folder (1 query instead of N)
+                $itemCountMap = [];
+                $itemCountRows = DB::query(
+                    'SELECT id_tree, COUNT(*) AS cnt FROM ' . prefixTable('items') .
+                    ' WHERE inactif = %i AND id_tree IN %ls GROUP BY id_tree',
+                    0,
+                    $folderIds
+                );
+                foreach ($itemCountRows as $row) {
+                    $itemCountMap[(int) $row['id_tree']] = (int) $row['cnt'];
+                }
+
+                // $treeDesc is indexed by node id — reuse as in-memory node map for path traversal
+                foreach ($accessibleFolders as $t) {
+                    // Build ancestor path by traversing parent_id chain (no DB query)
+                    $arrayPath = [];
+                    $arrayParents = [];
+                    $currentId = (int) $t->parent_id;
+                    while ($currentId > 0 && isset($treeDesc[$currentId])) {
+                        array_unshift($arrayPath, $treeDesc[$currentId]->title);
+                        array_unshift($arrayParents, $currentId);
+                        $currentId = (int) $treeDesc[$currentId]->parent_id;
                     }
 
-                    // get rights on this folder
-                    $arrayRights = array();
-                    $rows = DB::query('SELECT fonction_id  FROM ' . prefixTable('rights') . ' WHERE authorized=%i AND tree_id = %i', 1, $t->id);
-                    foreach ($rows as $record) {
-                        array_push($arrayRights, $record['fonction_id']);
-                    }
+                    // Compute children count from MPTT values (no DB query)
+                    $numOfChildren = (int) (($t->nright - $t->nleft - 1) / 2);
 
-                    $arbo = $tree->getPath($t->id, false);
-                    $arrayPath = array();
-                    $arrayParents = array();
-                    foreach ($arbo as $elem) {
-                        array_push($arrayPath, $elem->title);
-                        array_push($arrayParents, $elem->id);
-                    }
+                    $complexityValue = $complexityMap[(int) $t->id] ?? null;
 
-                    // Get some elements from DB concerning this node
-                    $node_data = DB::queryFirstRow(
-                        'SELECT m.valeur AS valeur, n.renewal_period AS renewal_period,
-                        n.bloquer_creation AS bloquer_creation, n.bloquer_modification AS bloquer_modification,
-                        n.fa_icon AS fa_icon, n.fa_icon_selected AS fa_icon_selected
-                        FROM ' . prefixTable('misc') . ' AS m,
-                        ' . prefixTable('nested_tree') . ' AS n
-                        WHERE m.type=%s AND m.intitule = n.id AND m.intitule = %i',
-                        'complex',
-                        $t->id
-                    );
-
-                    // Preapre array of columns
-                    $arrayColumns = array();
-
+                    // Prepare array of columns
+                    $arrayColumns = [];
                     $arrayColumns['id'] = (int) $t->id;
-                    $arrayColumns['numOfChildren'] = (int) $tree->numDescendants($t->id);
+                    $arrayColumns['numOfChildren'] = $numOfChildren;
                     $arrayColumns['level'] = (int) $t->nlevel;
                     $arrayColumns['parentId'] = (int) $t->parent_id;
                     $arrayColumns['title'] = $t->title;
-                    $arrayColumns['nbItems'] = (int) DB::count();
+                    $arrayColumns['nbItems'] = $itemCountMap[(int) $t->id] ?? 0;
                     $arrayColumns['path'] = $arrayPath;
                     $arrayColumns['parents'] = $arrayParents;
 
-                    if (is_null($node_data) === false && isset(TP_PW_COMPLEXITY[$node_data['valeur']][1]) === true) {
-                        $arrayColumns['folderComplexity'] = array(
-                            'text' => TP_PW_COMPLEXITY[$node_data['valeur']][1],
-                            'value' => TP_PW_COMPLEXITY[$node_data['valeur']][0],
-                            'class' => TP_PW_COMPLEXITY[$node_data['valeur']][2],
-                        );
+                    if ($complexityValue !== null && isset(TP_PW_COMPLEXITY[$complexityValue][1]) === true) {
+                        $arrayColumns['folderComplexity'] = [
+                            'text' => TP_PW_COMPLEXITY[$complexityValue][1],
+                            'value' => TP_PW_COMPLEXITY[$complexityValue][0],
+                            'class' => TP_PW_COMPLEXITY[$complexityValue][2],
+                        ];
                     } else {
                         $arrayColumns['folderComplexity'] = '';
                     }
 
-                    if (is_null($node_data)=== false) {
-                        $arrayColumns['renewalPeriod'] = (int) $node_data['renewal_period'];
-                    } else {
-                        $arrayColumns['renewalPeriod']=0;
-                    }
+                    // renewal_period, bloquer_creation, bloquer_modification, fa_icon, fa_icon_selected
+                    // are all loaded by getDescendants() — no extra query needed
+                    $arrayColumns['renewalPeriod'] = (int) $t->renewal_period;
+                    $arrayColumns['add_is_blocked'] = (int) $t->bloquer_creation;
+                    $arrayColumns['edit_is_blocked'] = (int) $t->bloquer_modification;
+                    $arrayColumns['icon'] = (string) ($t->fa_icon ?? '');
+                    $arrayColumns['iconSelected'] = (string) ($t->fa_icon_selected ?? '');
 
-                    //col7
-                    $data7 = DB::queryFirstRow(
-                        'SELECT bloquer_creation,bloquer_modification
-                        FROM ' . prefixTable('nested_tree') . '
-                        WHERE id = %i',
-                        intval($t->id)
-                    );
-                    $arrayColumns['add_is_blocked'] = (int) $data7['bloquer_creation'];
-                    $arrayColumns['edit_is_blocked'] = (int) $data7['bloquer_modification'];
-                    $arrayColumns['icon'] = (string) !is_null($node_data) ? $node_data['fa_icon'] : '';
-                    $arrayColumns['iconSelected'] = (string) !is_null($node_data) ? $node_data['fa_icon_selected'] : '';
-
-                    array_push($arrData, $arrayColumns);
+                    $arrData[] = $arrayColumns;
                 }
             }
 
@@ -492,17 +499,8 @@ if (null !== $post_type) {
                 $dataFolder['id']
             );
 
-            // Update timestamp
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => time(),
-                    'updated_at' => time(),
-                ),
-                'type = %s AND intitule = %s',
-                'timestamp',
-                'last_folder_change'
-            );
+            // Invalidate cache for users with access to this folder
+            invalidateCacheForFolderUsers((int) $dataFolder['id']);
 
             //Add complexity
             DB::update(
@@ -523,11 +521,68 @@ if (null !== $post_type) {
 
             $tree->rebuild();
 
+            // Emit WebSocket event for real-time notification
+            emitFolderEvent(
+                'updated',
+                (int) $dataFolder['id'],
+                $inputData['title'] ?? $dataFolder['title'],
+                $session->get('user-login') ?? '',
+                (int) $inputData['parentId'],
+                (int) $session->get('user-id')
+            );
+
+            // Build updated row data so the client can update the row without a full table rebuild
+            // getNode() always returns an object when the id is valid (tree was just rebuilt above)
+            $rowData = null;
+            $updatedNode = $tree->getNode((int) $dataFolder['id']);
+            $pathNodes = $tree->getPath((int) $dataFolder['id'], false);
+            $arrayPath = [];
+            $arrayParents = [];
+            foreach ($pathNodes as $pn) {
+                $arrayPath[] = $pn->title;
+                $arrayParents[] = (int) $pn->id;
+            }
+            $nbItemsRow = DB::queryFirstRow(
+                'SELECT COUNT(*) AS cnt FROM ' . prefixTable('items') . ' WHERE id_tree = %i AND inactif = %i',
+                (int) $dataFolder['id'],
+                0
+            );
+            $complexityValue = (int) $inputData['complexity'];
+            $rowData = [
+                'id'             => (int) $dataFolder['id'],
+                'numOfChildren'  => (int) (($updatedNode->nright - $updatedNode->nleft - 1) / 2),
+                'level'          => (int) $updatedNode->nlevel,
+                'parentId'       => (int) $inputData['parentId'],
+                'title'          => $inputData['title'],
+                'nbItems'        => $nbItemsRow !== null ? (int) $nbItemsRow['cnt'] : 0,
+                'path'           => $arrayPath,
+                'parents'        => $arrayParents,
+                'folderComplexity' => isset(TP_PW_COMPLEXITY[$complexityValue][1])
+                    ? [
+                        'text'  => TP_PW_COMPLEXITY[$complexityValue][1],
+                        'value' => TP_PW_COMPLEXITY[$complexityValue][0],
+                        'class' => TP_PW_COMPLEXITY[$complexityValue][2],
+                    ]
+                    : '',
+                'renewalPeriod'  => isset($folderParameters['renewal_period'])
+                    ? (int) $folderParameters['renewal_period']
+                    : (int) $dataFolder['renewal_period'],
+                'add_is_blocked' => isset($folderParameters['bloquer_creation'])
+                    ? (int) $folderParameters['bloquer_creation']
+                    : (int) $dataFolder['bloquer_creation'],
+                'edit_is_blocked'=> isset($folderParameters['bloquer_modification'])
+                    ? (int) $folderParameters['bloquer_modification']
+                    : (int) $dataFolder['bloquer_modification'],
+                'icon'           => $folderParameters['fa_icon'],
+                'iconSelected'   => $folderParameters['fa_icon_selected'],
+            ];
+
             echo prepareExchangedData(
                 array(
-                    'error' => $error,
-                    'message' => $errorMessage,
+                    'error'               => $error,
+                    'message'             => $errorMessage,
                     'info_parent_changed' => $parentChanged,
+                    'rowData'             => $rowData,
                 ),
                 'encode'
             );
@@ -638,11 +693,62 @@ if (null !== $post_type) {
                 SessionManager::addRemoveFromSessionArray('user-accessible_folders', [$creationStatus['newId']], 'add');
             }
 
+            // Emit WebSocket event for real-time notification
+            if ($creationStatus['error'] === false && $creationStatus['newId'] !== 0) {
+                emitFolderEvent(
+                    'created',
+                    (int) $creationStatus['newId'],
+                    $inputData['title'] ?? '',
+                    $session->get('user-login') ?? '',
+                    (int) $inputData['parentId'],
+                    (int) $session->get('user-id')
+                );
+            }
+
+            // Build row data so the client can insert the row without a full table rebuild
+            $rowData = null;
+            if ($creationStatus['error'] === false && $creationStatus['newId'] !== 0) {
+                $newFolderId = (int) $creationStatus['newId'];
+                // getNode() always returns an object for a freshly created folder id
+                $newNode = $tree->getNode($newFolderId);
+                $pathNodes = $tree->getPath($newFolderId, false);
+                $arrayPath = [];
+                $arrayParents = [];
+                foreach ($pathNodes as $pn) {
+                    $arrayPath[] = $pn->title;
+                    $arrayParents[] = (int) $pn->id;
+                }
+                $complexityValue = (int) $inputData['complexity'];
+                $rowData = [
+                    'id'             => $newFolderId,
+                    'numOfChildren'  => 0,
+                    'level'          => (int) $newNode->nlevel,
+                    'parentId'       => (int) $inputData['parentId'],
+                    'title'          => $inputData['title'],
+                    'nbItems'        => 0,
+                    'path'           => $arrayPath,
+                    'parents'        => $arrayParents,
+                    'folderComplexity' => isset(TP_PW_COMPLEXITY[$complexityValue][1])
+                        ? [
+                            'text'  => TP_PW_COMPLEXITY[$complexityValue][1],
+                            'value' => TP_PW_COMPLEXITY[$complexityValue][0],
+                            'class' => TP_PW_COMPLEXITY[$complexityValue][2],
+                        ]
+                        : '',
+                    'renewalPeriod'  => (int) ($inputData['duration'] ?? 0),
+                    'add_is_blocked' => (int) ($inputData['create_auth_without'] ?? 0),
+                    'edit_is_blocked'=> (int) ($inputData['edit_auth_without'] ?? 0),
+                    'icon'           => empty($inputData['icon']) ? TP_DEFAULT_ICON : $inputData['icon'],
+                    'iconSelected'   => empty($inputData['icon_selected']) ? TP_DEFAULT_ICON_SELECTED : $inputData['icon_selected'],
+                ];
+            }
+
             echo prepareExchangedData(
                 array(
-                    'error' => $creationStatus['error'],
-                    'message' => $creationStatus['error'] === true ? $lang->get('error_not_allowed_to') : $lang->get('folder_created') ,
-                    'newId' => $creationStatus['newId'],
+                    'error'   => $creationStatus['error'],
+                    'message' => $creationStatus['error'] === true ? $lang->get('error_not_allowed_to') : $lang->get('folder_created'),
+                    'newId'   => $creationStatus['newId'],
+                    'rowData' => $rowData,
                 ),
                 'encode'
             );
@@ -722,6 +828,7 @@ if (null !== $post_type) {
 
             //decrypt and retreive data in JSON format
             $folderForDel = array();
+            $foldersDeletedInfo = array(); // For WebSocket notifications
 
             // Start transaction
             DB::startTransaction();
@@ -808,6 +915,13 @@ if (null !== $post_type) {
                             //array for delete folder
                             $folderForDel[] = $thisSubFolders->id;
 
+                            // Store info for WebSocket notification
+                            $foldersDeletedInfo[] = [
+                                'folder_id' => (int) $thisSubFolders->id,
+                                'title' => (string) $thisSubFolders->title,
+                                'parent_id' => (int) $thisSubFolders->parent_id,
+                            ];
+
                             //delete items & logs
                             $itemsInSubFolder = DB::query(
                                 'SELECT id FROM ' . prefixTable('items') . ' 
@@ -851,46 +965,43 @@ if (null !== $post_type) {
                 }
             }
 
-            // Add new task for building user cache tree
-            if ((int) $session->get('user-admin') !== 1) {
-                DB::insert(
-                    prefixTable('background_tasks'),
-                    array(
-                        'created_at' => time(),
-                        'process_type' => 'user_build_cache_tree',
-                        'arguments' => json_encode([
-                            'user_id' => (int) $session->get('user-id'),
-                        ], JSON_HEX_QUOT | JSON_HEX_TAG),
-                        'updated_at' => null,
-                        'finished_at' => null,
-                        'output' => null,
-                    )
+            // Collect affected users BEFORE deleting folders/roles
+            $folderForDel = array_unique($folderForDel);
+            $affectedUserIds = [];
+            if (!empty($folderForDel)) {
+                $affectedUserIds = DB::queryFirstColumn(
+                    'SELECT DISTINCT ur.user_id FROM ' . prefixTable('users_roles') . ' ur
+                    JOIN ' . prefixTable('roles_values') . ' rv ON ur.role_id = rv.role_id
+                    WHERE rv.folder_id IN %ls',
+                    $folderForDel
                 );
             }
 
             // delete folders
-            $folderForDel = array_unique($folderForDel);
             foreach ($folderForDel as $fol) {
                 DB::delete(prefixTable('nested_tree'), 'id = %i', $fol);
             }
 
-            // Update timestamp
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => time(),
-                    'updated_at' => time(),
-                ),
-                'type = %s AND intitule = %s',
-                'timestamp',
-                'last_folder_change'
-            );
+            // Invalidate cache for affected users
+            invalidateCacheForFolderUsers(0, $affectedUserIds);
 
             // Commit transaction
             DB::commit();
 
             //rebuild tree
             $tree->rebuild();
+
+            // Emit WebSocket events for deleted folders
+            foreach ($foldersDeletedInfo as $deletedFolder) {
+                emitFolderEvent(
+                    'deleted',
+                    (int) $deletedFolder['folder_id'],
+                    $deletedFolder['title'],
+                    $session->get('user-login') ?? '',
+                    (int) $deletedFolder['parent_id'],
+                    (int) $session->get('user-id')
+                );
+            }
 
             echo prepareExchangedData(
                 array(
@@ -1261,17 +1372,8 @@ if (null !== $post_type) {
             // rebuild tree
             $tree->rebuild();
 
-            // Update timestamp
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => time(),
-                    'updated_at' => time(),
-                ),
-                'type = %s AND intitule = %s',
-                'timestamp',
-                'last_folder_change'
-            );
+            // Invalidate cache for users with access to destination folder
+            invalidateCacheForFolderUsers((int) $post_target_folder_id);
 
             $data = array(
                 'error' => '',

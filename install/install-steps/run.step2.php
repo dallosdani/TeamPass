@@ -79,8 +79,19 @@ switch ($type) {
 
     case 'extension':
         $extension = $inputData['name'] ?? '';
-        if ($extension && extension_loaded($extension)) {
-            $response['success'] = true;
+        if ($extension) {
+            // pcntl and posix are CLI-only extensions, not available in web SAPI
+            // Use shell check to verify they are installed for CLI
+            if (in_array($extension, ['pcntl', 'posix'], true)) {
+                $output = [];
+                $code = -1;
+                exec('php -m 2>/dev/null', $output, $code);
+                if ($code === 0 && in_array($extension, $output, true)) {
+                    $response['success'] = true;
+                }
+            } elseif (extension_loaded($extension)) {
+                $response['success'] = true;
+            }
         }
         break;
 
@@ -93,6 +104,34 @@ switch ($type) {
     case 'execution_time':
         $limit = (int) ($inputData['limit'] ?? 0);
         if ($limit > 0 && ini_get('max_execution_time') >= $limit) {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'opcache':
+        // Check that the Zend OPcache extension is present and enabled for the web SAPI
+        if (extension_loaded('Zend OPcache') && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN)) {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'php_fpm':
+        // Check that PHP is running under PHP-FPM (fpm-fcgi SAPI)
+        if (PHP_SAPI === 'fpm-fcgi') {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'apcu':
+        // Check that APCu extension is present and enabled for the web SAPI
+        if (extension_loaded('apcu') && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN)) {
+            $response['success'] = true;
+        }
+        break;
+
+    case 'redis':
+        // Check that ext-redis is loaded (required for Redis session storage)
+        if (extension_loaded('redis')) {
             $response['success'] = true;
         }
         break;

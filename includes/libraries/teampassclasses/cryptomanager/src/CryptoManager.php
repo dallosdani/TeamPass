@@ -274,6 +274,13 @@ class CryptoManager
                     throw new Exception('AES decryption failed (openssl returned false)');
                 }
 
+                // AES-CBC has no authentication — wrong key derivation (e.g. v1 SHA-1 data decrypted
+                // with v3 SHA-256 key) silently produces binary garbage instead of throwing.
+                // Since all TeamPass stored data is UTF-8 text, non-UTF-8 output means wrong key.
+                if ($decrypted !== '' && mb_check_encoding($decrypted, 'UTF-8') === false) {
+                    throw new Exception('AES decryption failed (binary output detected, likely v1 data)');
+                }
+
                 // Success with v3
                 return $decrypted;
             } catch (Exception $e) {
@@ -403,7 +410,7 @@ class CryptoManager
      * Create AES cipher instance with custom options
      *
      * @param string $mode AES mode (cbc, ctr, ecb, cfb, ofb, gcm)
-     * @return AES|\Crypt_AES AES cipher instance
+     * @return AES AES cipher instance
      * @throws Exception
      */
     public static function createAESCipher(string $mode = 'cbc'): object

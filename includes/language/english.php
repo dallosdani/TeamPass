@@ -2089,4 +2089,5 @@ return array(
     'network_security_table_missing' => 'Network security table is missing. Please create it before using this feature.',
     'network_security_auto_comment_current_ip' => 'Automatically added current admin IP',
     'network_security_auto_comment_server_ip' => 'Automatically added TeamPass server IP',
+    'network_security_remote_addr' => 'Client remote address',    
     );

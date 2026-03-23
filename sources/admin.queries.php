@@ -2057,6 +2057,17 @@ switch ($post_type) {
             );
             break;
         }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
 
         echo prepareExchangedData(
             [
@@ -2083,6 +2094,17 @@ switch ($post_type) {
                 [
                     'error' => true,
                     'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
                 ],
                 'encode'
             );
@@ -2157,6 +2179,17 @@ switch ($post_type) {
                 [
                     'error' => true,
                     'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
                 ],
                 'encode'
             );
@@ -2246,6 +2279,17 @@ switch ($post_type) {
             );
             break;
         }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
 
         $dataReceived = prepareExchangedData($post_data, 'decode');
         $ruleId = isset($dataReceived['id']) === true ? (int) $dataReceived['id'] : 0;
@@ -2272,6 +2316,17 @@ switch ($post_type) {
                 [
                     'error' => true,
                     'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
                 ],
                 'encode'
             );
@@ -2314,6 +2369,17 @@ switch ($post_type) {
                 [
                     'error' => true,
                     'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
                 ],
                 'encode'
             );

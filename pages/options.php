@@ -1000,7 +1000,7 @@ $zones = timezone_list();
                             </div>
                         </div>
                     </div>
-                    <div class='tab-pane fade' id='settings-tab-logging' role='tabpanel' aria-labelledby='settings-nav-logging' data-section-label='<?php echo $lang->get('settings_category_logging_title'); ?>'> role='tabpanel' aria-labelledby='settings-nav-logging' data-section-label='<?php echo $lang->get('settings_category_logging_title'); ?>'>
+                    <div class='tab-pane fade' id='settings-tab-logging' role='tabpanel' aria-labelledby='settings-nav-logging' data-section-label='<?php echo $lang->get('settings_category_logging_title'); ?>'>
 <div class='card card-info'>
                     <div class='card-header'>
                         <h3 class='card-title'><i class="fa-solid fa-clipboard-list mr-2"></i><?php echo $lang->get('settings_category_logging_title'); ?>

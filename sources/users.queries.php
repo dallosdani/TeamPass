@@ -3330,6 +3330,17 @@ if (null !== $post_type) {
                 break;
             }
 
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
+
             $result = listDeletedUsers();
 
             echo prepareExchangedData(
@@ -3356,6 +3367,17 @@ if (null !== $post_type) {
                 break;
             }
 
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
+
             echo prepareExchangedData(
                 array(
                     'error' => false,
@@ -3373,6 +3395,17 @@ if (null !== $post_type) {
                     array(
                         'error' => true,
                         'message' => $lang->get('key_is_not_correct'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
+
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
                     ),
                     'encode'
                 );
@@ -3414,11 +3447,7 @@ if (null !== $post_type) {
                 break;
             }
 
-            // Same rights as manage_user_disable_status
-            if (
-                (int) $session->get('user-admin') !== 1
-                && (int) $session->get('user-can_manage_all_users') !== 1
-            ) {
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
                 echo prepareExchangedData(
                     array(
                         'error' => true,
@@ -3473,6 +3502,17 @@ if (null !== $post_type) {
                 break;
             }
 
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
+
             $userIds = isset($dataReceived['user_ids']) && is_array($dataReceived['user_ids'])
                 ? array_map('intval', $dataReceived['user_ids'])
                 : array();
@@ -3508,8 +3548,7 @@ if (null !== $post_type) {
                 break;
             }
 
-            // Check if user is admin
-            if ($session->get('user-admin') !== 1 && $session->get('user-can_manage_all_users') !== 1) {
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
                 echo prepareExchangedData(
                     [
                         'error' => true,
@@ -3567,8 +3606,7 @@ break;
                 break;
             }
 
-            // Check if user is admin
-            if ($session->get('user-admin') !== 1 && $session->get('user-can_manage_all_users') !== 1) {
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
                 echo prepareExchangedData(
                     [
                         'error' => true,
@@ -3632,8 +3670,7 @@ break;
                 break;
             }
 
-            // Check if user is admin
-            if ($session->get('user-admin') !== 1 && $session->get('user-can_manage_all_users') !== 1) {
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
                 echo prepareExchangedData(
                     [
                         'error' => true,
@@ -3741,8 +3778,7 @@ break;
                 break;
             }
 
-            // Check if user is admin
-            if ($session->get('user-admin') !== 1 && $session->get('user-can_manage_all_users') !== 1) {
+            if (canAccessInactiveAndDeletedUsersPanels() === false) {
                 echo prepareExchangedData(
                     [
                         'error' => true,
@@ -3915,6 +3951,13 @@ break;
             echo 'Non';
         }
     }
+}
+
+function canAccessInactiveAndDeletedUsersPanels(): bool
+{
+    $session = SessionManager::getSession();
+
+    return (int) $session->get('user-admin') === 1;
 }
 
 /**

@@ -2045,6 +2045,386 @@ switch ($post_type) {
         echo '[{"result" : "' . addslashes($lang->get('done')) . '" , "error" : ""}]';
         break;
 
+
+    case 'network_get_rules':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                    'settings' => [
+                        'network_blacklist_enabled' => (int) ($SETTINGS['network_blacklist_enabled'] ?? 0),
+                        'network_whitelist_enabled' => (int) ($SETTINGS['network_whitelist_enabled'] ?? 0),
+                        'network_security_mode' => (string) ($SETTINGS['network_security_mode'] ?? 'direct'),
+                        'network_security_header' => (string) ($SETTINGS['network_security_header'] ?? 'x-forwarded-for'),
+                        'network_trusted_proxies' => (string) ($SETTINGS['network_trusted_proxies'] ?? ''),
+                    ],
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'network_save_settings':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $blacklistEnabled = isset($dataReceived['network_blacklist_enabled']) === true && (int) $dataReceived['network_blacklist_enabled'] === 1 ? '1' : '0';
+        $whitelistEnabled = isset($dataReceived['network_whitelist_enabled']) === true && (int) $dataReceived['network_whitelist_enabled'] === 1 ? '1' : '0';
+        $securityMode = (string) ($dataReceived['network_security_mode'] ?? 'direct');
+        $securityHeader = strtolower(trim((string) ($dataReceived['network_security_header'] ?? 'x-forwarded-for')));
+        $trustedProxies = trim((string) ($dataReceived['network_trusted_proxies'] ?? ''));
+
+        if (in_array($securityMode, ['direct', 'reverse_proxy'], true) === false) {
+            $securityMode = 'direct';
+        }
+        if (in_array($securityHeader, ['x-forwarded-for', 'x-real-ip'], true) === false) {
+            $securityHeader = 'x-forwarded-for';
+        }
+
+        teampassSaveAdminSetting('network_blacklist_enabled', $blacklistEnabled);
+        teampassSaveAdminSetting('network_whitelist_enabled', $whitelistEnabled);
+        teampassSaveAdminSetting('network_security_mode', $securityMode);
+        teampassSaveAdminSetting('network_security_header', $securityHeader);
+        teampassSaveAdminSetting('network_trusted_proxies', $trustedProxies);
+
+        $SETTINGS['network_blacklist_enabled'] = $blacklistEnabled;
+        $SETTINGS['network_whitelist_enabled'] = $whitelistEnabled;
+        $SETTINGS['network_security_mode'] = $securityMode;
+        $SETTINGS['network_security_header'] = $securityHeader;
+        $SETTINGS['network_trusted_proxies'] = $trustedProxies;
+
+        if ($whitelistEnabled === '1') {
+            $networkContext = teampassGetClientIpForSecurity($SETTINGS);
+            $currentIp = isset($networkContext['detected_ip']) === true ? (string) $networkContext['detected_ip'] : '';
+            $serverIp = isset($networkContext['server_ip']) === true ? (string) $networkContext['server_ip'] : '';
+            $userId = (int) ($session->get('user-id') ?? 0);
+
+            if ($currentIp !== '') {
+                teampassEnsureNetworkAclRule('whitelist', $currentIp, (string) $lang->get('network_security_auto_comment_current_ip'), $userId);
+            }
+            if ($serverIp !== '') {
+                teampassEnsureNetworkAclRule('whitelist', $serverIp, (string) $lang->get('network_security_auto_comment_server_ip'), $userId);
+            }
+        }
+
+        ConfigManager::invalidateCache();
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                    'settings' => [
+                        'network_blacklist_enabled' => (int) $blacklistEnabled,
+                        'network_whitelist_enabled' => (int) $whitelistEnabled,
+                        'network_security_mode' => $securityMode,
+                        'network_security_header' => $securityHeader,
+                        'network_trusted_proxies' => $trustedProxies,
+                    ],
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'network_save_rule':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $ruleId = isset($dataReceived['id']) === true ? (int) $dataReceived['id'] : 0;
+        $listType = (string) ($dataReceived['list_type'] ?? '');
+        $ruleDefinition = teampassNormalizeIpv4Rule((string) ($dataReceived['rule_definition'] ?? ''));
+        $comment = trim((string) ($dataReceived['comment'] ?? ''));
+        $enabled = isset($dataReceived['enabled']) === true && (int) $dataReceived['enabled'] === 1 ? 1 : 0;
+        $userId = (int) ($session->get('user-id') ?? 0);
+
+        if (teampassNetworkAclTableExists() === false) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('network_security_table_missing'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        if (in_array($listType, ['whitelist', 'blacklist'], true) === false || $ruleDefinition === null) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('network_security_invalid_rule'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        if ($ruleId > 0) {
+            DB::update(
+                prefixTable('network_acl'),
+                [
+                    'type' => $listType,
+                    'rule_definition' => $ruleDefinition,
+                    'comment' => $comment,
+                    'enabled' => $enabled,
+                    'updated_at' => time(),
+                    'updated_by' => $userId,
+                ],
+                'id = %i',
+                $ruleId
+            );
+        } else {
+            DB::insert(
+                prefixTable('network_acl'),
+                [
+                    'type' => $listType,
+                    'rule_definition' => $ruleDefinition,
+                    'comment' => $comment,
+                    'enabled' => $enabled,
+                    'created_at' => time(),
+                    'updated_at' => time(),
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]
+            );
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'network_delete_rule':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $ruleId = isset($dataReceived['id']) === true ? (int) $dataReceived['id'] : 0;
+        if ($ruleId > 0 && teampassNetworkAclTableExists() === true) {
+            DB::delete(prefixTable('network_acl'), 'id = %i', $ruleId);
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'network_toggle_rule':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $ruleId = isset($dataReceived['id']) === true ? (int) $dataReceived['id'] : 0;
+        $enabled = isset($dataReceived['enabled']) === true && (int) $dataReceived['enabled'] === 1 ? 1 : 0;
+        $userId = (int) ($session->get('user-id') ?? 0);
+        if ($ruleId > 0 && teampassNetworkAclTableExists() === true) {
+            DB::update(
+                prefixTable('network_acl'),
+                [
+                    'enabled' => $enabled,
+                    'updated_at' => time(),
+                    'updated_by' => $userId,
+                ],
+                'id = %i',
+                $ruleId
+            );
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'network_add_special_rule':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        // Is admin?
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $source = (string) ($dataReceived['source'] ?? '');
+        $networkContext = teampassGetClientIpForSecurity($SETTINGS);
+        $userId = (int) ($session->get('user-id') ?? 0);
+        $ruleValue = '';
+        $comment = '';
+
+        if ($source === 'current_ip') {
+            $ruleValue = (string) ($networkContext['detected_ip'] ?? '');
+            $comment = (string) $lang->get('network_security_auto_comment_current_ip');
+        } elseif ($source === 'server_ip') {
+            $ruleValue = (string) ($networkContext['server_ip'] ?? '');
+            $comment = (string) $lang->get('network_security_auto_comment_server_ip');
+        }
+
+        if ($ruleValue === '' || teampassEnsureNetworkAclRule('whitelist', $ruleValue, $comment, $userId) === false) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('network_security_invalid_rule'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'context' => teampassGetNetworkContextForAdmin($SETTINGS),
+                    'rules' => teampassLoadNetworkAclRules(false),
+                ],
+            ],
+            'encode'
+        );
+        break;
+
     case 'save_option_change':
         // Check KEY and rights
         if ($post_key !== $session->get('key')) {

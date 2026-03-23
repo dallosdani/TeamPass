@@ -694,7 +694,12 @@ class DatabaseInstaller
             array('admin', 'phpseclibv3_native', '1'),
             array('admin', 'websocket_enabled', '0'),
             array('admin', 'websocket_port', '8080'),
-            array('admin', 'websocket_host', '127.0.0.1')
+            array('admin', 'websocket_host', '127.0.0.1'),
+            array('admin', 'network_blacklist_enabled', '0'),
+            array('admin', 'network_whitelist_enabled', '0'),
+            array('admin', 'network_security_mode', 'direct'),
+            array('admin', 'network_security_header', 'x-forwarded-for'),
+            array('admin', 'network_trusted_proxies', '')
         );
         foreach ($aMiscVal as $elem) {
             //Check if exists before inserting
@@ -1724,16 +1729,39 @@ class DatabaseInstaller
     {
         DB::query(
             "CREATE TABLE IF NOT EXISTS `" . $this->inputData['tablePrefix'] . "websocket_tokens` (
-        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,                                                           
-        `user_id` INT UNSIGNED NOT NULL,                                                                        
-        `token` VARCHAR(64) NOT NULL,                                                                           
-        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,                                                       
-        `expires_at` TIMESTAMP NOT NULL,                                                                        
-        `used` TINYINT(1) UNSIGNED DEFAULT 0,                                                                   
-        UNIQUE INDEX `idx_token` (`token`),                                                                     
-        INDEX `idx_user` (`user_id`),                                                                           
-        INDEX `idx_expires` (`expires_at`)                                                                      
+        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        `user_id` INT UNSIGNED NOT NULL,
+        `token` VARCHAR(64) NOT NULL,
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        `expires_at` TIMESTAMP NOT NULL,
+        `used` TINYINT(1) UNSIGNED DEFAULT 0,
+        UNIQUE INDEX `idx_token` (`token`),
+        INDEX `idx_user` (`user_id`),
+        INDEX `idx_expires` (`expires_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    // Create table network_acl
+    private function network_acl()
+    {
+        DB::query(
+            'CREATE TABLE IF NOT EXISTS `' . $this->inputData['tablePrefix'] . "network_acl` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `type` ENUM('whitelist', 'blacklist') NOT NULL,
+        `rule_definition` VARCHAR(50) NOT NULL COMMENT 'IPv4 or CIDR IPv4 rule',
+        `comment` VARCHAR(255) NOT NULL DEFAULT '',
+        `enabled` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
+        `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+        `updated_at` INT UNSIGNED NOT NULL DEFAULT 0,
+        `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+        `updated_by` INT UNSIGNED NOT NULL DEFAULT 0,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uniq_type_rule` (`type`, `rule_definition`),
+        KEY `idx_type_enabled` (`type`, `enabled`),
+        KEY `idx_enabled` (`enabled`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='Network ACL rules for IPv4 whitelist and blacklist'"
         );
     }
 

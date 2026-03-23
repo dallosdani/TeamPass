@@ -176,6 +176,87 @@ mysqli_query(
 );
 // --->
 
+
+// <---
+// ==========================================
+// Network ACL: tables and settings for IPv4 whitelist / blacklist
+// ==========================================
+mysqli_query(
+    $db_link,
+    'CREATE TABLE IF NOT EXISTS `' . $pre . "network_acl` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `type` ENUM('whitelist', 'blacklist') NOT NULL,
+            `rule_definition` VARCHAR(50) NOT NULL COMMENT 'IPv4 or CIDR IPv4 rule',
+            `comment` VARCHAR(255) NOT NULL DEFAULT '',
+            `enabled` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
+            `created_at` INT UNSIGNED NOT NULL DEFAULT 0,
+            `updated_at` INT UNSIGNED NOT NULL DEFAULT 0,
+            `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+            `updated_by` INT UNSIGNED NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_type_rule` (`type`, `rule_definition`),
+            KEY `idx_type_enabled` (`type`, `enabled`),
+            KEY `idx_enabled` (`enabled`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='Network ACL rules for IPv4 whitelist and blacklist';"
+);
+
+// Ensure indexes exist on network ACL table
+$result = mysqli_query(
+    $db_link,
+    "SHOW INDEX FROM `" . $pre . "network_acl` WHERE Key_name = 'uniq_type_rule';"
+);
+if ($result !== false && mysqli_num_rows($result) === 0) {
+    mysqli_query(
+        $db_link,
+        "ALTER TABLE `" . $pre . "network_acl`
+        ADD UNIQUE INDEX `uniq_type_rule` (`type`, `rule_definition`);"
+    );
+}
+
+$result = mysqli_query(
+    $db_link,
+    "SHOW INDEX FROM `" . $pre . "network_acl` WHERE Key_name = 'idx_type_enabled';"
+);
+if ($result !== false && mysqli_num_rows($result) === 0) {
+    mysqli_query(
+        $db_link,
+        "ALTER TABLE `" . $pre . "network_acl`
+        ADD INDEX `idx_type_enabled` (`type`, `enabled`);"
+    );
+}
+
+$result = mysqli_query(
+    $db_link,
+    "SHOW INDEX FROM `" . $pre . "network_acl` WHERE Key_name = 'idx_enabled';"
+);
+if ($result !== false && mysqli_num_rows($result) === 0) {
+    mysqli_query(
+        $db_link,
+        "ALTER TABLE `" . $pre . "network_acl`
+        ADD INDEX `idx_enabled` (`enabled`);"
+    );
+}
+
+// Insert default settings for Network ACL
+$networkAclDefaults = [
+    'network_blacklist_enabled' => '0',
+    'network_whitelist_enabled' => '0',
+    'network_security_mode'     => 'direct',
+    'network_security_header'   => 'x-forwarded-for',
+    'network_trusted_proxies'   => '',
+];
+foreach ($networkAclDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
+
 // <---
 // ==========================================
 // roles_values: Clean up duplicates and add UNIQUE constraint

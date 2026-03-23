@@ -78,6 +78,10 @@ date_default_timezone_set($SETTINGS['timezone'] ?? 'UTC');
 
 // Set header properties
 header('Content-type: text/html; charset=utf-8');
+// Prepare network security context
+$tpNetworkContext = teampassGetNetworkContextForAdmin($SETTINGS);
+$tpNetworkRules = teampassLoadNetworkAclRules(false);
+
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
 // --------------------------------- //
@@ -794,9 +798,204 @@ $zones = timezone_list();
                                     </span>
                                 </h3>
                             </div>
-                            <div class='card-body'>
-                                <div class='alert alert-secondary mb-0'>
-                                    <?php echo $lang->get('settings_category_networks_under_construction'); ?>
+                            <div class='card-body' id='network-security-block'>
+                                <div id='network-security-alert' class='alert d-none'></div>
+
+                                <div class='card card-outline card-primary mb-3'>
+                                    <div class='card-header'>
+                                        <h3 class='card-title'><?php echo $lang->get('network_security_general_settings_title'); ?></h3>
+                                    </div>
+                                    <div class='card-body'>
+                                        <div class='row mb-3 option' data-keywords='network security whitelist blacklist proxy waf'>
+                                            <div class='col-10'>
+                                                <?php echo $lang->get('network_security_enable_blacklist'); ?>
+                                            </div>
+                                            <div class='col-2 text-right'>
+                                                <div class='toggle toggle-modern' id='network_blacklist_enabled_toggle' data-toggle-on='<?php echo isset($SETTINGS['network_blacklist_enabled']) === true && (int) $SETTINGS['network_blacklist_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='network_blacklist_enabled_input' value='<?php echo isset($SETTINGS['network_blacklist_enabled']) && (int) $SETTINGS['network_blacklist_enabled'] === 1 ? 1 : 0; ?>' />
+                                            </div>
+                                        </div>
+                                        <div class='row mb-3 option' data-keywords='network security whitelist allow access'>
+                                            <div class='col-10'>
+                                                <?php echo $lang->get('network_security_enable_whitelist'); ?>
+                                                <small class='form-text text-muted'><?php echo $lang->get('network_security_enable_whitelist_tip'); ?></small>
+                                            </div>
+                                            <div class='col-2 text-right'>
+                                                <div class='toggle toggle-modern' id='network_whitelist_enabled_toggle' data-toggle-on='<?php echo isset($SETTINGS['network_whitelist_enabled']) === true && (int) $SETTINGS['network_whitelist_enabled'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='network_whitelist_enabled_input' value='<?php echo isset($SETTINGS['network_whitelist_enabled']) && (int) $SETTINGS['network_whitelist_enabled'] === 1 ? 1 : 0; ?>' />
+                                            </div>
+                                        </div>
+                                        <div class='row mb-3 option' data-keywords='reverse proxy waf x-forwarded-for x-real-ip'>
+                                            <div class='col-6'>
+                                                <label for='network_security_mode'><?php echo $lang->get('network_security_mode'); ?></label>
+                                            </div>
+                                            <div class='col-6'>
+                                                <select class='form-control form-control-sm' id='network_security_mode'>
+                                                    <option value='direct' <?php echo ($SETTINGS['network_security_mode'] ?? 'direct') === 'direct' ? 'selected' : ''; ?>><?php echo $lang->get('network_security_mode_direct'); ?></option>
+                                                    <option value='reverse_proxy' <?php echo ($SETTINGS['network_security_mode'] ?? 'direct') === 'reverse_proxy' ? 'selected' : ''; ?>><?php echo $lang->get('network_security_mode_reverse_proxy'); ?></option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class='row mb-3 option' data-keywords='x-forwarded-for x-real-ip reverse proxy header'>
+                                            <div class='col-6'>
+                                                <label for='network_security_header'><?php echo $lang->get('network_security_header'); ?></label>
+                                            </div>
+                                            <div class='col-6'>
+                                                <select class='form-control form-control-sm' id='network_security_header'>
+                                                    <option value='x-forwarded-for' <?php echo ($SETTINGS['network_security_header'] ?? 'x-forwarded-for') === 'x-forwarded-for' ? 'selected' : ''; ?>>X-Forwarded-For</option>
+                                                    <option value='x-real-ip' <?php echo ($SETTINGS['network_security_header'] ?? 'x-forwarded-for') === 'x-real-ip' ? 'selected' : ''; ?>>X-Real-IP</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class='row mb-0 option' data-keywords='trusted proxies waf reverse proxy'>
+                                            <div class='col-6'>
+                                                <label for='network_trusted_proxies'><?php echo $lang->get('network_security_trusted_proxies'); ?></label>
+                                                <small class='form-text text-muted'><?php echo $lang->get('network_security_trusted_proxies_tip'); ?></small>
+                                            </div>
+                                            <div class='col-6'>
+                                                <textarea class='form-control form-control-sm' id='network_trusted_proxies' rows='4'><?php echo htmlspecialchars((string) ($SETTINGS['network_trusted_proxies'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <div class='mt-3 text-right'>
+                                            <button type='button' class='btn btn-primary btn-sm' id='network-security-save-settings'><?php echo $lang->get('network_security_save_settings'); ?></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class='card card-outline card-secondary mb-3'>
+                                    <div class='card-header'>
+                                        <h3 class='card-title'><?php echo $lang->get('network_security_detected_context_title'); ?></h3>
+                                    </div>
+                                    <div class='card-body'>
+                                        <div class='row'>
+                                            <div class='col-md-6'>
+                                                <dl class='row mb-0'>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_detected_ip'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-detected-ip'><?php echo htmlspecialchars((string) ($tpNetworkContext['detected_ip'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></dd>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_remote_addr'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-remote-addr'><?php echo htmlspecialchars((string) ($tpNetworkContext['remote_addr'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></dd>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_server_ip'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-server-ip'><?php echo htmlspecialchars((string) ($tpNetworkContext['server_ip'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></dd>
+                                                </dl>
+                                            </div>
+                                            <div class='col-md-6'>
+                                                <dl class='row mb-0'>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_mode'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-context-mode'><?php echo htmlspecialchars((string) ($tpNetworkContext['mode'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></dd>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_header'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-context-header'><?php echo htmlspecialchars((string) ($tpNetworkContext['header_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></dd>
+                                                    <dt class='col-sm-5'><?php echo $lang->get('network_security_proxy_status'); ?></dt>
+                                                    <dd class='col-sm-7' id='network-context-proxy-used'><?php echo isset($tpNetworkContext['trusted_proxy_used']) === true && $tpNetworkContext['trusted_proxy_used'] === true ? $lang->get('yes') : $lang->get('no'); ?></dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                        <div class='mt-3'>
+                                            <button type='button' class='btn btn-outline-primary btn-sm mr-2' id='network-add-current-ip'><?php echo $lang->get('network_security_add_current_ip'); ?></button>
+                                            <button type='button' class='btn btn-outline-secondary btn-sm' id='network-add-server-ip'><?php echo $lang->get('network_security_add_server_ip'); ?></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                        <div class='card card-outline card-success mb-3'>
+                                            <div class='card-header'>
+                                                <h3 class='card-title'><?php echo $lang->get('network_security_whitelist_title'); ?></h3>
+                                            </div>
+                                            <div class='card-body'>
+                                                <input type='hidden' id='network-whitelist-rule-id' value='0'>
+                                                <div class='form-group option' data-keywords='whitelist ip cidr'>
+                                                    <label for='network-whitelist-rule-definition'><?php echo $lang->get('network_security_rule'); ?></label>
+                                                    <input type='text' class='form-control form-control-sm' id='network-whitelist-rule-definition' value=''>
+                                                    <small class='form-text text-muted'><?php echo $lang->get('network_security_rule_format_tip'); ?></small>
+                                                </div>
+                                                <div class='form-group option' data-keywords='whitelist comment description'>
+                                                    <label for='network-whitelist-rule-comment'><?php echo $lang->get('network_security_comment'); ?></label>
+                                                    <input type='text' class='form-control form-control-sm' id='network-whitelist-rule-comment' value=''>
+                                                </div>
+                                                <div class='form-group'>
+                                                    <div class='custom-control custom-switch'>
+                                                        <input type='checkbox' class='custom-control-input' id='network-whitelist-rule-enabled' checked>
+                                                        <label class='custom-control-label' for='network-whitelist-rule-enabled'><?php echo $lang->get('network_security_rule_enabled'); ?></label>
+                                                    </div>
+                                                </div>
+                                                <div class='text-right mb-3'>
+                                                    <button type='button' class='btn btn-secondary btn-sm mr-2' id='network-whitelist-rule-reset'><?php echo $lang->get('network_security_reset_form'); ?></button>
+                                                    <button type='button' class='btn btn-success btn-sm' id='network-whitelist-rule-save'><?php echo $lang->get('network_security_save_rule'); ?></button>
+                                                </div>
+                                                <div class='table-responsive'>
+                                                    <table class='table table-sm table-striped'>
+                                                        <thead>
+                                                            <tr>
+                                                                <th><?php echo $lang->get('network_security_rule'); ?></th>
+                                                                <th><?php echo $lang->get('network_security_comment'); ?></th>
+                                                                <th><?php echo $lang->get('network_security_status'); ?></th>
+                                                                <th class='text-right'><?php echo $lang->get('network_security_actions'); ?></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id='network-whitelist-rules-body'>
+                                                            <?php foreach (($tpNetworkRules['whitelist'] ?? []) as $tpNetworkRule) { ?>
+                                                            <tr>
+                                                                <td><?php echo htmlspecialchars((string) $tpNetworkRule['rule_definition'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                                <td><?php echo htmlspecialchars((string) $tpNetworkRule['comment'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                                <td><?php echo (int) $tpNetworkRule['enabled'] === 1 ? $lang->get('enabled') : $lang->get('disabled'); ?></td>
+                                                                <td></td>
+                                                            </tr>
+                                                            <?php } ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                <div>
+                                        <div class='card card-outline card-danger mb-3'>
+                                            <div class='card-header'>
+                                                <h3 class='card-title'><?php echo $lang->get('network_security_blacklist_title'); ?></h3>
+                                            </div>
+                                            <div class='card-body'>
+                                                <input type='hidden' id='network-blacklist-rule-id' value='0'>
+                                                <div class='form-group option' data-keywords='blacklist ip cidr'>
+                                                    <label for='network-blacklist-rule-definition'><?php echo $lang->get('network_security_rule'); ?></label>
+                                                    <input type='text' class='form-control form-control-sm' id='network-blacklist-rule-definition' value=''>
+                                                    <small class='form-text text-muted'><?php echo $lang->get('network_security_rule_format_tip'); ?></small>
+                                                </div>
+                                                <div class='form-group option' data-keywords='blacklist comment description'>
+                                                    <label for='network-blacklist-rule-comment'><?php echo $lang->get('network_security_comment'); ?></label>
+                                                    <input type='text' class='form-control form-control-sm' id='network-blacklist-rule-comment' value=''>
+                                                </div>
+                                                <div class='form-group'>
+                                                    <div class='custom-control custom-switch'>
+                                                        <input type='checkbox' class='custom-control-input' id='network-blacklist-rule-enabled' checked>
+                                                        <label class='custom-control-label' for='network-blacklist-rule-enabled'><?php echo $lang->get('network_security_rule_enabled'); ?></label>
+                                                    </div>
+                                                </div>
+                                                <div class='text-right mb-3'>
+                                                    <button type='button' class='btn btn-secondary btn-sm mr-2' id='network-blacklist-rule-reset'><?php echo $lang->get('network_security_reset_form'); ?></button>
+                                                    <button type='button' class='btn btn-danger btn-sm' id='network-blacklist-rule-save'><?php echo $lang->get('network_security_save_rule'); ?></button>
+                                                </div>
+                                                <div class='table-responsive'>
+                                                    <table class='table table-sm table-striped'>
+                                                        <thead>
+                                                            <tr>
+                                                                <th><?php echo $lang->get('network_security_rule'); ?></th>
+                                                                <th><?php echo $lang->get('network_security_comment'); ?></th>
+                                                                <th><?php echo $lang->get('network_security_status'); ?></th>
+                                                                <th class='text-right'><?php echo $lang->get('network_security_actions'); ?></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id='network-blacklist-rules-body'>
+                                                            <?php foreach (($tpNetworkRules['blacklist'] ?? []) as $tpNetworkRule) { ?>
+                                                            <tr>
+                                                                <td><?php echo htmlspecialchars((string) $tpNetworkRule['rule_definition'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                                <td><?php echo htmlspecialchars((string) $tpNetworkRule['comment'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                                <td><?php echo (int) $tpNetworkRule['enabled'] === 1 ? $lang->get('enabled') : $lang->get('disabled'); ?></td>
+                                                                <td></td>
+                                                            </tr>
+                                                            <?php } ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
                                 </div>
                             </div>
                         </div>

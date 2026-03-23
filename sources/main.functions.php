@@ -1740,6 +1740,525 @@ function getClientIpServer(): string
     return $ipaddress;
 }
 
+
+/**
+ * Returns true if the network ACL table exists.
+ *
+ * @return bool
+ */
+function teampassNetworkAclTableExists(): bool
+{
+    try {
+        DB::query('SHOW TABLES LIKE %s', prefixTable('network_acl'));
+
+        return DB::count() > 0;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * Returns true if the value is a valid IPv4.
+ *
+ * @param string $value Value to check.
+ *
+ * @return bool
+ */
+function teampassIsValidIpv4(string $value): bool
+{
+    return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
+}
+
+/**
+ * Returns the IPv4 as an unsigned integer.
+ *
+ * @param string $ip IPv4.
+ *
+ * @return int|null
+ */
+function teampassIpv4ToUnsignedInt(string $ip): ?int
+{
+    $converted = ip2long($ip);
+    if ($converted === false) {
+        return null;
+    }
+
+    return (int) sprintf('%u', $converted);
+}
+
+/**
+ * Normalize a network ACL rule.
+ * Supports IPv4 and IPv4 CIDR only.
+ *
+ * @param string $rule Raw rule.
+ *
+ * @return string|null
+ */
+function teampassNormalizeIpv4Rule(string $rule): ?string
+{
+    $rule = trim($rule);
+    if ($rule === '') {
+        return null;
+    }
+
+    if (strpos($rule, '/') === false) {
+        return teampassIsValidIpv4($rule) ? $rule : null;
+    }
+
+    [$ipPart, $maskPart] = array_pad(explode('/', $rule, 2), 2, '');
+    $ipPart = trim($ipPart);
+    $maskPart = trim($maskPart);
+
+    if (teampassIsValidIpv4($ipPart) === false) {
+        return null;
+    }
+
+    if ($maskPart === '' || ctype_digit($maskPart) === false) {
+        return null;
+    }
+
+    $mask = (int) $maskPart;
+    if ($mask < 0 || $mask > 32) {
+        return null;
+    }
+
+    $ipLong = teampassIpv4ToUnsignedInt($ipPart);
+    if ($ipLong === null) {
+        return null;
+    }
+
+    $maskLong = $mask === 0 ? 0 : ((~0 << (32 - $mask)) & 0xFFFFFFFF);
+    $networkLong = $ipLong & $maskLong;
+    $networkIp = long2ip((int) $networkLong);
+    if ($networkIp === false) {
+        return null;
+    }
+
+    return $networkIp . '/' . $mask;
+}
+
+/**
+ * Returns true if the IP matches the rule.
+ *
+ * @param string $ip   IPv4.
+ * @param string $rule IPv4 or IPv4 CIDR.
+ *
+ * @return bool
+ */
+function teampassIpv4MatchesRule(string $ip, string $rule): bool
+{
+    $normalizedRule = teampassNormalizeIpv4Rule($rule);
+    if ($normalizedRule === null || teampassIsValidIpv4($ip) === false) {
+        return false;
+    }
+
+    if (strpos($normalizedRule, '/') === false) {
+        return hash_equals($normalizedRule, $ip);
+    }
+
+    [$networkIp, $maskPart] = explode('/', $normalizedRule, 2);
+    $mask = (int) $maskPart;
+
+    $ipLong = teampassIpv4ToUnsignedInt($ip);
+    $networkLong = teampassIpv4ToUnsignedInt($networkIp);
+    if ($ipLong === null || $networkLong === null) {
+        return false;
+    }
+
+    $maskLong = $mask === 0 ? 0 : ((~0 << (32 - $mask)) & 0xFFFFFFFF);
+
+    return ($ipLong & $maskLong) === ($networkLong & $maskLong);
+}
+
+/**
+ * Returns the trusted proxy rules from settings.
+ *
+ * @param array $settings TeamPass settings.
+ *
+ * @return array<int, string>
+ */
+function teampassGetTrustedProxyRules(array $settings): array
+{
+    $rawValue = isset($settings['network_trusted_proxies']) === true ? (string) $settings['network_trusted_proxies'] : '';
+    if ($rawValue === '') {
+        return [];
+    }
+
+    $parts = preg_split('/[\r\n,;]+/', $rawValue);
+    if ($parts === false) {
+        return [];
+    }
+
+    $rules = [];
+    foreach ($parts as $part) {
+        $normalizedRule = teampassNormalizeIpv4Rule((string) $part);
+        if ($normalizedRule !== null) {
+            $rules[] = $normalizedRule;
+        }
+    }
+
+    return array_values(array_unique($rules));
+}
+
+/**
+ * Returns true if the remote address is a trusted proxy.
+ *
+ * @param string $remoteAddr        Remote address.
+ * @param array  $trustedProxyRules Rules list.
+ *
+ * @return bool
+ */
+function teampassIsTrustedProxy(string $remoteAddr, array $trustedProxyRules): bool
+{
+    if (teampassIsValidIpv4($remoteAddr) === false) {
+        return false;
+    }
+
+    foreach ($trustedProxyRules as $rule) {
+        if (teampassIpv4MatchesRule($remoteAddr, (string) $rule) === true) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Extract the first valid IPv4 from a proxy header.
+ *
+ * @param string $headerValue Header value.
+ *
+ * @return string|null
+ */
+function teampassExtractClientIpv4FromHeader(string $headerValue): ?string
+{
+    $parts = array_map('trim', explode(',', $headerValue));
+    foreach ($parts as $part) {
+        if (teampassIsValidIpv4($part) === true) {
+            return $part;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Returns the configured security header name.
+ *
+ * @param array $settings Settings.
+ *
+ * @return string
+ */
+function teampassGetSecurityHeaderName(array $settings): string
+{
+    $header = strtolower(trim((string) ($settings['network_security_header'] ?? 'x-forwarded-for')));
+    $allowedHeaders = ['x-forwarded-for', 'x-real-ip'];
+
+    return in_array($header, $allowedHeaders, true) === true ? $header : 'x-forwarded-for';
+}
+
+/**
+ * Returns a candidate IPv4 for the TeamPass server.
+ *
+ * @return string|null
+ */
+function teampassGetServerIpv4Candidate(): ?string
+{
+    $serverAddr = isset($_SERVER['SERVER_ADDR']) === true ? trim((string) $_SERVER['SERVER_ADDR']) : '';
+    if (teampassIsValidIpv4($serverAddr) === true) {
+        return $serverAddr;
+    }
+
+    $hostname = gethostname();
+    if ($hostname === false || $hostname === '') {
+        return null;
+    }
+
+    $resolvedIp = gethostbyname($hostname);
+
+    return teampassIsValidIpv4($resolvedIp) === true ? $resolvedIp : null;
+}
+
+/**
+ * Returns the client IPv4 used for security decisions.
+ *
+ * @param array $settings Settings.
+ *
+ * @return array<string, mixed>
+ */
+function teampassGetClientIpForSecurity(array $settings): array
+{
+    $mode = strtolower(trim((string) ($settings['network_security_mode'] ?? 'direct')));
+    if (in_array($mode, ['direct', 'reverse_proxy'], true) === false) {
+        $mode = 'direct';
+    }
+
+    $remoteAddr = isset($_SERVER['REMOTE_ADDR']) === true ? trim((string) $_SERVER['REMOTE_ADDR']) : '';
+    $headerName = teampassGetSecurityHeaderName($settings);
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $headerName));
+    $headerValue = isset($_SERVER[$serverKey]) === true ? trim((string) $_SERVER[$serverKey]) : '';
+    $trustedProxyRules = teampassGetTrustedProxyRules($settings);
+    $isTrustedProxy = $mode === 'reverse_proxy' && teampassIsTrustedProxy($remoteAddr, $trustedProxyRules) === true;
+    $headerIp = $isTrustedProxy === true ? teampassExtractClientIpv4FromHeader($headerValue) : null;
+    $detectedIp = $headerIp ?? (teampassIsValidIpv4($remoteAddr) === true ? $remoteAddr : null);
+
+    return [
+        'detected_ip' => $detectedIp,
+        'remote_addr' => $remoteAddr,
+        'mode' => $mode,
+        'header_name' => $headerName,
+        'header_value' => $headerValue,
+        'trusted_proxy_used' => $isTrustedProxy,
+        'trusted_proxy_rules' => $trustedProxyRules,
+        'server_ip' => teampassGetServerIpv4Candidate(),
+    ];
+}
+
+/**
+ * Loads network ACL rules.
+ *
+ * @param bool $onlyEnabled Only enabled rules.
+ *
+ * @return array<string, array<int, array<string, mixed>>>
+ */
+function teampassLoadNetworkAclRules(bool $onlyEnabled = false): array
+{
+    $result = [
+        'whitelist' => [],
+        'blacklist' => [],
+    ];
+
+    if (teampassNetworkAclTableExists() === false) {
+        return $result;
+    }
+
+    $query = 'SELECT id, type, rule_definition, comment, enabled, created_at, updated_at, created_by, updated_by '
+        . 'FROM ' . prefixTable('network_acl') . ' '
+        . 'WHERE type IN (%s, %s)';
+
+    $params = ['whitelist', 'blacklist'];
+    if ($onlyEnabled === true) {
+        $query .= ' AND enabled = %i';
+        $params[] = 1;
+    }
+    $query .= ' ORDER BY type ASC, rule_definition ASC, id ASC';
+
+    $rows = DB::query($query, ...$params);
+    foreach ($rows as $row) {
+        $type = (string) ($row['type'] ?? '');
+        if (isset($result[$type]) === false) {
+            continue;
+        }
+
+        $result[$type][] = [
+            'id' => (int) ($row['id'] ?? 0),
+            'type' => $type,
+            'rule_definition' => (string) ($row['rule_definition'] ?? ''),
+            'comment' => (string) ($row['comment'] ?? ''),
+            'enabled' => (int) ($row['enabled'] ?? 0),
+            'created_at' => (int) ($row['created_at'] ?? 0),
+            'updated_at' => (int) ($row['updated_at'] ?? 0),
+            'created_by' => (int) ($row['created_by'] ?? 0),
+            'updated_by' => (int) ($row['updated_by'] ?? 0),
+        ];
+    }
+
+    return $result;
+}
+
+/**
+ * Evaluate access against the current ACL.
+ *
+ * @param array       $settings Settings.
+ * @param string|null $clientIp Client IP.
+ * @param array       $rules    ACL rules.
+ *
+ * @return array<string, mixed>
+ */
+function teampassEvaluateNetworkAclAccess(array $settings, ?string $clientIp, array $rules): array
+{
+    $result = [
+        'checked' => teampassNetworkAclTableExists(),
+        'allowed' => true,
+        'reason' => 'allowed',
+        'matched_rule' => null,
+    ];
+
+    if ($result['checked'] === false) {
+        return $result;
+    }
+
+    $blacklistEnabled = (int) ($settings['network_blacklist_enabled'] ?? 0) === 1;
+    $whitelistEnabled = (int) ($settings['network_whitelist_enabled'] ?? 0) === 1;
+
+    if ($clientIp === null || teampassIsValidIpv4($clientIp) === false) {
+        if ($blacklistEnabled === true || $whitelistEnabled === true) {
+            $result['allowed'] = false;
+            $result['reason'] = 'invalid_client_ip';
+        }
+
+        return $result;
+    }
+
+    if ($blacklistEnabled === true) {
+        foreach (($rules['blacklist'] ?? []) as $rule) {
+            if ((int) ($rule['enabled'] ?? 0) !== 1) {
+                continue;
+            }
+            if (teampassIpv4MatchesRule($clientIp, (string) ($rule['rule_definition'] ?? '')) === true) {
+                $result['allowed'] = false;
+                $result['reason'] = 'blacklist_match';
+                $result['matched_rule'] = $rule;
+
+                return $result;
+            }
+        }
+    }
+
+    if ($whitelistEnabled === true) {
+        foreach (($rules['whitelist'] ?? []) as $rule) {
+            if ((int) ($rule['enabled'] ?? 0) !== 1) {
+                continue;
+            }
+            if (teampassIpv4MatchesRule($clientIp, (string) ($rule['rule_definition'] ?? '')) === true) {
+                return $result;
+            }
+        }
+
+        $result['allowed'] = false;
+        $result['reason'] = 'whitelist_no_match';
+    }
+
+    return $result;
+}
+
+/**
+ * Save an admin setting in teampass_misc.
+ *
+ * @param string $field Field name.
+ * @param string $value Field value.
+ *
+ * @return void
+ */
+function teampassSaveAdminSetting(string $field, string $value): void
+{
+    DB::query(
+        'SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s',
+        'admin',
+        $field
+    );
+
+    if (DB::count() === 0) {
+        DB::insert(
+            prefixTable('misc'),
+            [
+                'valeur' => $value,
+                'type' => 'admin',
+                'intitule' => $field,
+                'created_at' => time(),
+            ]
+        );
+
+        return;
+    }
+
+    DB::update(
+        prefixTable('misc'),
+        [
+            'valeur' => $value,
+            'updated_at' => time(),
+        ],
+        'type = %s AND intitule = %s',
+        'admin',
+        $field
+    );
+}
+
+/**
+ * Ensure that a rule exists in the ACL table.
+ *
+ * @param string $type           whitelist|blacklist.
+ * @param string $ruleDefinition IPv4 or CIDR.
+ * @param string $comment        Optional comment.
+ * @param int    $userId         User id.
+ *
+ * @return bool
+ */
+function teampassEnsureNetworkAclRule(string $type, string $ruleDefinition, string $comment, int $userId): bool
+{
+    if (teampassNetworkAclTableExists() === false) {
+        return false;
+    }
+
+    $normalizedType = in_array($type, ['whitelist', 'blacklist'], true) === true ? $type : '';
+    $normalizedRule = teampassNormalizeIpv4Rule($ruleDefinition);
+    if ($normalizedType === '' || $normalizedRule === null) {
+        return false;
+    }
+
+    $existingRow = DB::queryFirstRow(
+        'SELECT id, comment, enabled FROM ' . prefixTable('network_acl') . ' WHERE type = %s AND rule_definition = %s',
+        $normalizedType,
+        $normalizedRule
+    );
+
+    if (empty($existingRow) === true) {
+        DB::insert(
+            prefixTable('network_acl'),
+            [
+                'type' => $normalizedType,
+                'rule_definition' => $normalizedRule,
+                'comment' => trim($comment),
+                'enabled' => 1,
+                'created_at' => time(),
+                'updated_at' => time(),
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ]
+        );
+
+        return true;
+    }
+
+    $updateData = [
+        'enabled' => 1,
+        'updated_at' => time(),
+        'updated_by' => $userId,
+    ];
+    if (trim((string) ($existingRow['comment'] ?? '')) === '' && trim($comment) !== '') {
+        $updateData['comment'] = trim($comment);
+    }
+
+    DB::update(
+        prefixTable('network_acl'),
+        $updateData,
+        'id = %i',
+        (int) $existingRow['id']
+    );
+
+    return true;
+}
+
+/**
+ * Build a network context for admin pages.
+ *
+ * @param array $settings Settings.
+ *
+ * @return array<string, mixed>
+ */
+function teampassGetNetworkContextForAdmin(array $settings): array
+{
+    $context = teampassGetClientIpForSecurity($settings);
+    $rules = teampassLoadNetworkAclRules(true);
+    $evaluation = teampassEvaluateNetworkAclAccess($settings, $context['detected_ip'], $rules);
+
+    $context['acl_checked'] = $evaluation['checked'];
+    $context['acl_allowed'] = $evaluation['allowed'];
+    $context['acl_reason'] = $evaluation['reason'];
+
+    return $context;
+}
+
 /**
  * Escape all HTML, JavaScript, and CSS.
  *

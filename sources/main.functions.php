@@ -1830,7 +1830,7 @@ function teampassNormalizeIpv4Rule(string $rule): ?string
     $maskLong = $mask === 0 ? 0 : ((~0 << (32 - $mask)) & 0xFFFFFFFF);
     $networkLong = $ipLong & $maskLong;
     $networkIp = long2ip((int) $networkLong);
-    if ($networkIp === false) {
+    if ($networkIp == false) {
         return null;
     }
 

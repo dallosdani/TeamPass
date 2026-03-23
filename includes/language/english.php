@@ -2065,7 +2065,6 @@ return array(
     'network_security_save_settings' => 'Save network settings',
     'network_security_detected_context_title' => 'Detected connection context',
     'network_security_detected_ip' => 'Detected client IP',
-    'network_security_remote_addr' => 'REMOTE_ADDR',
     'network_security_server_ip' => 'Server IPv4',
     'network_security_proxy_status' => 'Trusted proxy used',
     'network_security_add_current_ip' => 'Add current detected IP to whitelist',

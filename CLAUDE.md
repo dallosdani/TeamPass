@@ -686,7 +686,7 @@ curl -X GET "https://your-teampass.com/api/item/getOtp?id=123" \
 
 ## Code Patterns and Conventions
 
-PHP Code requires to fit PHPStan level 2.
+PHP Code requires to fit PHPStan level 4.
 
 ### PHP Code Style
 

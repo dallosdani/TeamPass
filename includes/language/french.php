@@ -2095,4 +2095,5 @@ return array(
     'network_security_table_missing' => 'La table de sécurité réseau est absente. Merci de la créer avant d\'utiliser cette fonctionnalité.',
     'network_security_auto_comment_current_ip' => 'IP admin actuelle ajoutée automatiquement',
     'network_security_auto_comment_server_ip' => 'IP du serveur TeamPass ajoutée automatiquement',
+    'network_security_remote_addr' => 'Adresse distante du client',
 );

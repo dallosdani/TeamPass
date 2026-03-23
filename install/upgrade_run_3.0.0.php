@@ -1349,13 +1349,6 @@ if (!$exists) {
     mysqli_query($db_link, "ALTER TABLE `" . $pre . "misc` CHANGE COLUMN `id` `increment_id` INT(12) NOT NULL AUTO_INCREMENT");
 }
 
-// Alter table misc
-mysqli_query(
-    $db_link,
-    "ALTER TABLE `" . $pre . "misc`
-        MODIFY COLUMN `valeur` varchar(500) NOT NULL;"
-);
-
 // Alter table nested_tree
 mysqli_query(
     $db_link,
@@ -1564,7 +1557,6 @@ $alterClauses = [
     'MODIFY COLUMN `isAdministratedByRole` tinyint(5) NOT NULL DEFAULT 0',
     'MODIFY COLUMN `avatar` VARCHAR(1000) DEFAULT NULL',
     'MODIFY COLUMN `avatar_thumb` VARCHAR(1000) DEFAULT NULL',
-    'MODIFY COLUMN `agses_usercardid` VARCHAR(50) NOT NULL DEFAULT \'0\'',
     'MODIFY COLUMN `encrypted_psk` text DEFAULT NULL',
 ];
 

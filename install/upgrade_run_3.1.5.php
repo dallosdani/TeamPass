@@ -88,7 +88,7 @@ $error = [];
 // Do init checks
 $columnNeedsPasswordMigrationExists = DB::queryFirstRow(
     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_NAME = '" . $pre . "usersusers'
+    WHERE TABLE_NAME = '" . $pre . "users'
     AND COLUMN_NAME = 'needs_password_migration'"
 );
 

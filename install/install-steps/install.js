@@ -290,10 +290,12 @@ function performStep5() {
         { id: 'check51', action: 'users_roles' },
         { id: 'check52', action: 'users_favorites' },
         { id: 'check53', action: 'users_latest_items' },
-        { id: 'check54', action: 'websocket_events' },
-        { id: 'check55', action: 'websocket_connections' },
-        { id: 'check56', action: 'websocket_tokens' },
-        { id: 'check57', action: 'network_acl' }
+        { id: 'check54', action: 'users_options_favorites' },
+        { id: 'check55', action: 'encryption_migration_stats' },
+        { id: 'check56', action: 'websocket_events' },
+        { id: 'check57', action: 'websocket_connections' },
+        { id: 'check58', action: 'websocket_tokens' },
+        { id: 'check59', action: 'network_acl' }
     ];
     
     let errorOccurred = false; // Variable to track errors

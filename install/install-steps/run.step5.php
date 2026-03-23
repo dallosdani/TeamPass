@@ -691,10 +691,13 @@ class DatabaseInstaller
             array('admin', 'inactive_users_mgmt_last_status', ''),
             array('admin', 'inactive_users_mgmt_last_message', ''),
             array('admin', 'inactive_users_mgmt_last_details', ''),
-            array('admin', 'phpseclibv3_native', '1'),
             array('admin', 'websocket_enabled', '0'),
             array('admin', 'websocket_port', '8080'),
             array('admin', 'websocket_host', '127.0.0.1'),
+            array('admin', 'redis_session_enabled', '0'),
+            array('admin', 'redis_host', '127.0.0.1'),
+            array('admin', 'redis_port', '6379'),
+            array('admin', 'redis_prefix', 'teampass_sess_'),
             array('admin', 'network_blacklist_enabled', '0'),
             array('admin', 'network_whitelist_enabled', '0'),
             array('admin', 'network_security_mode', 'direct'),
@@ -1058,7 +1061,8 @@ class DatabaseInstaller
             `role_id` int(12) NOT NULL,
             `folder_id` int(12) NOT NULL,
             `type` varchar(5) NOT NULL DEFAULT 'R',
-            KEY `role_id_idx` (`role_id`)
+            KEY `role_id_idx` (`role_id`),
+            UNIQUE KEY `idx_role_folder_unique` (`role_id`, `folder_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
     }
@@ -1681,6 +1685,44 @@ class DatabaseInstaller
                 KEY `item_idx` (`item_id`),
                 KEY `accessed_idx` (`accessed_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+        );
+    }
+
+    // Create table users_options_favorites
+    private function users_options_favorites()
+    {
+        DB::query(
+            "CREATE TABLE IF NOT EXISTS `" . $this->inputData['tablePrefix'] . "users_options_favorites` (
+                `id` INT(12) NOT NULL AUTO_INCREMENT,
+                `user_id` INT(12) NOT NULL,
+                `option_key` VARCHAR(100) NOT NULL,
+                `position` INT(12) NOT NULL DEFAULT 1,
+                `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uniq_user_option` (`user_id`, `option_key`),
+                KEY `idx_user_id` (`user_id`),
+                KEY `idx_user_position` (`user_id`, `position`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            COMMENT='Options page favorites stored per administrator';"
+        );
+    }
+
+    // Create table encryption_migration_stats
+    private function encryption_migration_stats()
+    {
+        DB::query(
+            "CREATE TABLE IF NOT EXISTS `" . $this->inputData['tablePrefix'] . "encryption_migration_stats` (
+                `id` int(12) NOT NULL AUTO_INCREMENT,
+                `table_name` varchar(100) NOT NULL,
+                `total_records` int(12) NOT NULL DEFAULT 0,
+                `v1_records` int(12) NOT NULL DEFAULT 0,
+                `v3_records` int(12) NOT NULL DEFAULT 0,
+                `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `table_name` (`table_name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            COMMENT='Tracks phpseclib v1 to v3 migration progress';"
         );
     }
 

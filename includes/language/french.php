@@ -2071,7 +2071,6 @@ return array(
     'network_security_save_settings' => 'Enregistrer les paramètres réseau',
     'network_security_detected_context_title' => 'Contexte réseau détecté',
     'network_security_detected_ip' => 'IP cliente détectée',
-    'network_security_remote_addr' => 'REMOTE_ADDR',
     'network_security_server_ip' => 'IPv4 du serveur',
     'network_security_proxy_status' => 'Proxy de confiance utilisé',
     'network_security_add_current_ip' => 'Ajouter l\'IP détectée actuelle à la liste blanche',

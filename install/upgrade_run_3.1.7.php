@@ -120,21 +120,6 @@ mysqli_query(
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             COMMENT='WebSocket connection tracking for monitoring';"
 );
-mysqli_query(
-    $db_link,
-    'CREATE TABLE IF NOT EXISTS `' . $pre . "websocket_tokens` (
-        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,                                                           
-        `user_id` INT UNSIGNED NOT NULL,                                                                        
-        `token` VARCHAR(64) NOT NULL,                                                                           
-        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,                                                       
-        `expires_at` TIMESTAMP NOT NULL,                                                                        
-        `used` TINYINT(1) UNSIGNED DEFAULT 0,                                                                   
-        UNIQUE INDEX `idx_token` (`token`),                                                                     
-        INDEX `idx_user` (`user_id`),                                                                           
-        INDEX `idx_expires` (`expires_at`)                                                                      
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-);
-
 // WebSocket authentication tokens table
 mysqli_query(
     $db_link,

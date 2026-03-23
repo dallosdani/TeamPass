@@ -167,7 +167,15 @@ function count_never_connected_active_users() : int
 }
 
 
-$deleted_users_count = count_deleted_users();
+$canAccessInactiveAndDeletedUsers = (int) $session->get('user-admin') === 1;
+$canUseLdapSync = $canAccessInactiveAndDeletedUsers === true
+    && isset($SETTINGS['ldap_mode']) === true
+    && (int) $SETTINGS['ldap_mode'] === 1;
+$canUseOauth2Sync = $canAccessInactiveAndDeletedUsers === true
+    && isset($SETTINGS['oauth2_enabled']) === true
+    && (int) $SETTINGS['oauth2_enabled'] === 1;
+
+$deleted_users_count = $canAccessInactiveAndDeletedUsers === true ? count_deleted_users() : 0;
 
 // Prepare the CSS class for blinking and the badge for the count.
 $blink_class = '';
@@ -182,7 +190,7 @@ if ($deleted_users_count > 0) {
 }
 
 
-$inactive_never_connected_count = count_never_connected_active_users();
+$inactive_never_connected_count = $canAccessInactiveAndDeletedUsers === true ? count_never_connected_active_users() : 0;
 $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
 ?>
 
@@ -215,21 +223,24 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                         <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="refresh">
                             <i class="fa-solid fa-sync-alt mr-2"></i><?php echo $lang->get('refresh'); ?>
                         </button><?php
-                        if (isset($SETTINGS['ldap_mode']) === true && (int) $SETTINGS['ldap_mode'] === 1 && (int) $session->get('user-admin') === 1) {
-                        '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
-                            <i class="fa-solid fa-address-card mr-2"></i>' . $lang->get('ldap_synchronization') . '
-                        </button>
-                        
-                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
-                            <i class="fa-solid fa-plug mr-2"></i>' . $lang->get('oauth2_synchronization') . '
-                        </button>
-                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 <?php echo $inactive_blink_class; ?>" data-action="inactive-users">
-                            <i class="fa-solid fa-user-clock mr-2"></i>' . $lang->get('inactive_users') . '
-                        </button>
+                        if ($canUseLdapSync === true) {
+                            echo '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="ldap-sync">
+                                <i class="fa-solid fa-address-card mr-2"></i>' . $lang->get('ldap_synchronization') . '
+                            </button>';
+                        }
+                        if ($canUseOauth2Sync === true) {
+                            echo '<button type="button" class="btn btn-primary btn-sm tp-action mr-2" data-action="oauth2-sync">
+                                <i class="fa-solid fa-plug mr-2"></i>' . $lang->get('oauth2_synchronization') . '
+                            </button>';
+                        }
+                        if ($canAccessInactiveAndDeletedUsers === true) {
+                            echo '<button type="button" class="btn btn-primary btn-sm tp-action mr-2 ' . $inactive_blink_class . '" data-action="inactive-users">
+                                <i class="fa-solid fa-user-clock mr-2"></i>' . $lang->get('inactive_users') . '
+                            </button>';
 
-                        <button type="button" class="btn btn-primary btn-sm tp-action mr-2 ' . $blink_class . '" data-action="deleted-users">
-                            <i class="fa-solid fa-user-xmark mr-2"></i>' . $lang->get('deleted_users') . $count_badge_html . '
-                        </button>';
+                            echo '<button type="button" class="btn btn-primary btn-sm tp-action mr-2 ' . $blink_class . '" data-action="deleted-users">
+                                <i class="fa-solid fa-user-xmark mr-2"></i>' . $lang->get('deleted_users') . $count_badge_html . '
+                            </button>';
                         }
                         ?>
                     </h3>
@@ -672,6 +683,7 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
 
     
 
+    <?php if ($canAccessInactiveAndDeletedUsers === true) { ?>
     <div class="row hidden extra-form user-content with-header-menu" id="inactive-users-section" data-content="inactive-users">
         <div class="card-header">
             <h5><?php echo $lang->get('inactive_users'); ?></h5>
@@ -768,6 +780,8 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
             </div>
         </div>
     </div>
+
+    <?php } ?>
 
     <!-- Shared confirmation modal for user actions (inactive / deleted) -->
     <div class="modal fade" id="users-action-modal" tabindex="-1" role="dialog" aria-hidden="true">

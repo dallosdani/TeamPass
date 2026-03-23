@@ -196,6 +196,76 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         function escapeHtml(value) {
             return $('<div>').text((value || '').toString()).html();
         }
+        function norm01(value) {
+            return String(value) === '1' ? '1' : '0';
+        }
+
+        function applyToggleState(toggleId, on) {
+            const $t = $('#' + toggleId);
+            const $i = $('#' + toggleId.replace('_toggle', '_input'));
+            const val = on ? '1' : '0';
+
+            if ($i.length) {
+                $i.val(val);
+            }
+
+            try {
+                $t.attr('data-toggle-on', on ? 'true' : 'false');
+            } catch (e) {}
+
+            try {
+                if (typeof $t.toggles === 'function') {
+                    try {
+                        $t.toggles(on);
+                    } catch (e1) {
+                        $t.toggles({on: on});
+                    }
+                }
+            } catch (e) {}
+
+            try {
+                if (typeof $t.bootstrapSwitch === 'function') {
+                    $t.bootstrapSwitch('state', on, true);
+                }
+            } catch (e) {}
+
+            try {
+                if (typeof $t.bootstrapToggle === 'function') {
+                    $t.bootstrapToggle(on ? 'on' : 'off');
+                }
+            } catch (e) {}
+
+            try {
+                $t.toggleClass('on', on).toggleClass('off', !on).toggleClass('active', on);
+            } catch (e) {}
+        }
+
+        function bindToggleFix(toggleId) {
+            const $t = $('#' + toggleId);
+            const $i = $('#' + toggleId.replace('_toggle', '_input'));
+
+            if (!$t.length || !$i.length) {
+                return;
+            }
+
+            $t.on('mousedown', function() {
+                $t.data('tp_prev_state', norm01($i.val()));
+            });
+
+            $t.on('click', function() {
+                setTimeout(function() {
+                    const prev = $t.data('tp_prev_state');
+                    let now = norm01($i.val());
+
+                    if (prev === now) {
+                        now = prev === '1' ? '0' : '1';
+                    }
+
+                    $i.val(now);
+                }, 0);
+            });
+        }
+
 
         function getOptionControl($option) {
             let $control = $option.find('.toggle[id]').first();
@@ -752,5 +822,339 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     // Init module when ready
     $(function() {
         tpIum.init();
+    });
+
+
+    const tpNetworkAcl = (function() {
+        const sessionKey = "<?php echo $session->get('key'); ?>";
+        const t = {
+            server_answer_error: "<?php echo addslashes($lang->get('server_answer_error')); ?>",
+            enabled: "<?php echo addslashes($lang->get('enabled')); ?>",
+            disabled: "<?php echo addslashes($lang->get('disabled')); ?>",
+            edit: "<?php echo addslashes($lang->get('network_security_edit')); ?>",
+            delete_label: "<?php echo addslashes($lang->get('network_security_delete')); ?>",
+            enable_label: "<?php echo addslashes($lang->get('network_security_enable')); ?>",
+            disable_label: "<?php echo addslashes($lang->get('network_security_disable')); ?>",
+            no_rule: "<?php echo addslashes($lang->get('network_security_no_rule')); ?>",
+            yes: "<?php echo addslashes($lang->get('yes')); ?>",
+            no: "<?php echo addslashes($lang->get('no')); ?>",
+            saved: "<?php echo addslashes($lang->get('done')); ?>"
+        };
+
+        function safeDecode(resp) {
+            try {
+                if ((resp || '').toString().trim() === '') {
+                    return { error: true, message: t.server_answer_error };
+                }
+                return prepareExchangedData(resp, 'decode', sessionKey);
+            } catch (e) {
+                return { error: true, message: t.server_answer_error };
+            }
+        }
+
+        function ajax(type, payload, cb) {
+            $.post(
+                'sources/admin.queries.php',
+                {
+                    type: type,
+                    data: prepareExchangedData(JSON.stringify(payload || {}), 'encode', sessionKey),
+                    key: sessionKey
+                },
+                function(resp) {
+                    const decoded = safeDecode(resp);
+                    if (typeof cb === 'function') {
+                        cb(decoded);
+                    }
+                }
+            );
+        }
+
+        function escapeHtml(value) {
+            return $('<div>').text((value || '').toString()).html();
+        }
+        function norm01(value) {
+            return String(value) === '1' ? '1' : '0';
+        }
+
+        function applyToggleState(toggleId, on) {
+            const $t = $('#' + toggleId);
+            const $i = $('#' + toggleId.replace('_toggle', '_input'));
+            const val = on ? '1' : '0';
+
+            if ($i.length) {
+                $i.val(val);
+            }
+
+            try {
+                $t.attr('data-toggle-on', on ? 'true' : 'false');
+            } catch (e) {}
+
+            try {
+                if (typeof $t.toggles === 'function') {
+                    try {
+                        $t.toggles(on);
+                    } catch (e1) {
+                        $t.toggles({on: on});
+                    }
+                }
+            } catch (e) {}
+
+            try {
+                if (typeof $t.bootstrapSwitch === 'function') {
+                    $t.bootstrapSwitch('state', on, true);
+                }
+            } catch (e) {}
+
+            try {
+                if (typeof $t.bootstrapToggle === 'function') {
+                    $t.bootstrapToggle(on ? 'on' : 'off');
+                }
+            } catch (e) {}
+
+            try {
+                $t.toggleClass('on', on).toggleClass('off', !on).toggleClass('active', on);
+            } catch (e) {}
+        }
+
+        function bindToggleFix(toggleId) {
+            const $t = $('#' + toggleId);
+            const $i = $('#' + toggleId.replace('_toggle', '_input'));
+
+            if (!$t.length || !$i.length) {
+                return;
+            }
+
+            $t.on('mousedown', function() {
+                $t.data('tp_prev_state', norm01($i.val()));
+            });
+
+            $t.on('click', function() {
+                setTimeout(function() {
+                    const prev = $t.data('tp_prev_state');
+                    let now = norm01($i.val());
+
+                    if (prev === now) {
+                        now = prev === '1' ? '0' : '1';
+                    }
+
+                    $i.val(now);
+                }, 0);
+            });
+        }
+
+
+        function showAlert(type, message) {
+            const $alert = $('#network-security-alert');
+            if (!$alert.length) {
+                return;
+            }
+
+            $alert.removeClass('d-none alert-success alert-danger alert-warning alert-info')
+                .addClass('alert-' + type)
+                .text(message || '');
+        }
+
+        function applyContext(context) {
+            context = context || {};
+            $('#network-detected-ip').text((context.detected_ip || '').toString());
+            $('#network-remote-addr').text((context.remote_addr || '').toString());
+            $('#network-server-ip').text((context.server_ip || '').toString());
+            $('#network-context-mode').text((context.mode || '').toString());
+            $('#network-context-header').text((context.header_name || '').toString());
+            $('#network-context-proxy-used').text(context.trusted_proxy_used ? t.yes : t.no);
+        }
+
+        function buildRow(rule) {
+            const enabled = parseInt(rule.enabled || 0, 10) === 1;
+            const nextEnabled = enabled ? 0 : 1;
+            const toggleClass = enabled ? 'btn-outline-warning' : 'btn-outline-success';
+            const toggleTitle = enabled ? t.disable_label : t.enable_label;
+            const toggleIcon = enabled ? 'fa-toggle-off' : 'fa-toggle-on';
+
+            return '' +
+                '<tr>' +
+                    '<td>' + escapeHtml(rule.rule_definition || '') + '</td>' +
+                    '<td>' + escapeHtml(rule.comment || '') + '</td>' +
+                    '<td>' + (enabled ? escapeHtml(t.enabled) : escapeHtml(t.disabled)) + '</td>' +
+                    '<td class="text-right text-nowrap">' +
+                        '<button type="button" class="btn btn-xs btn-outline-primary mr-1 network-rule-edit" title="' + escapeHtml(t.edit) + '" aria-label="' + escapeHtml(t.edit) + '" data-id="' + escapeHtml(rule.id) + '" data-type="' + escapeHtml(rule.type) + '" data-rule="' + escapeHtml(rule.rule_definition || '') + '" data-comment="' + escapeHtml(rule.comment || '') + '" data-enabled="' + escapeHtml(enabled ? '1' : '0') + '"><i class="fa-solid fa-pen-to-square"></i></button>' +
+                        '<button type="button" class="btn btn-xs ' + toggleClass + ' mr-1 network-rule-toggle" title="' + escapeHtml(toggleTitle) + '" aria-label="' + escapeHtml(toggleTitle) + '" data-id="' + escapeHtml(rule.id) + '" data-enabled="' + escapeHtml(String(nextEnabled)) + '"><i class="fa-solid ' + toggleIcon + '"></i></button>' +
+                        '<button type="button" class="btn btn-xs btn-outline-danger network-rule-delete" title="' + escapeHtml(t.delete_label) + '" aria-label="' + escapeHtml(t.delete_label) + '" data-id="' + escapeHtml(rule.id) + '"><i class="fa-solid fa-trash"></i></button>' +
+                    '</td>' +
+                '</tr>';
+        }
+
+        function renderRules(rules) {
+            const whitelist = Array.isArray(rules && rules.whitelist) ? rules.whitelist : [];
+            const blacklist = Array.isArray(rules && rules.blacklist) ? rules.blacklist : [];
+
+            $('#network-whitelist-rules-body').html(whitelist.length ? whitelist.map(buildRow).join('') : '<tr><td colspan="4" class="text-center text-muted">' + escapeHtml(t.no_rule) + '</td></tr>');
+            $('#network-blacklist-rules-body').html(blacklist.length ? blacklist.map(buildRow).join('') : '<tr><td colspan="4" class="text-center text-muted">' + escapeHtml(t.no_rule) + '</td></tr>');
+        }
+
+        function applySettings(settings) {
+            settings = settings || {};
+            applyToggleState('network_blacklist_enabled_toggle', String(settings.network_blacklist_enabled || '0') === '1');
+            applyToggleState('network_whitelist_enabled_toggle', String(settings.network_whitelist_enabled || '0') === '1');
+            $('#network_security_mode').val((settings.network_security_mode || 'direct').toString());
+            $('#network_security_header').val((settings.network_security_header || 'x-forwarded-for').toString());
+            $('#network_trusted_proxies').val((settings.network_trusted_proxies || '').toString());
+        }
+
+        function resetForm(listType) {
+            $('#network-' + listType + '-rule-id').val('0');
+            $('#network-' + listType + '-rule-definition').val('');
+            $('#network-' + listType + '-rule-comment').val('');
+            $('#network-' + listType + '-rule-enabled').prop('checked', true);
+        }
+
+        function loadAll() {
+            ajax('network_get_rules', {}, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+                const result = response.result || {};
+                applyContext(result.context || {});
+                renderRules(result.rules || {});
+                applySettings(result.settings || {});
+            });
+        }
+
+        function saveSettings() {
+            const payload = {
+                network_blacklist_enabled: norm01($('#network_blacklist_enabled_input').val()) === '1' ? 1 : 0,
+                network_whitelist_enabled: norm01($('#network_whitelist_enabled_input').val()) === '1' ? 1 : 0,
+                network_security_mode: $('#network_security_mode').val(),
+                network_security_header: $('#network_security_header').val(),
+                network_trusted_proxies: $('#network_trusted_proxies').val()
+            };
+
+            ajax('network_save_settings', payload, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+                const result = response.result || {};
+                applyContext(result.context || {});
+                renderRules(result.rules || {});
+                applySettings(result.settings || payload);
+                showAlert('success', response.message || '');
+            });
+        }
+
+        function saveRule(listType) {
+            ajax('network_save_rule', {
+                id: $('#network-' + listType + '-rule-id').val(),
+                list_type: listType,
+                rule_definition: $('#network-' + listType + '-rule-definition').val(),
+                comment: $('#network-' + listType + '-rule-comment').val(),
+                enabled: $('#network-' + listType + '-rule-enabled').is(':checked') ? 1 : 0
+            }, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+                const result = response.result || {};
+                applyContext(result.context || {});
+                renderRules(result.rules || {});
+                resetForm(listType);
+                showAlert('success', response.message || '');
+            });
+        }
+
+        function addSpecialRule(source) {
+            ajax('network_add_special_rule', { source: source }, function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+                const result = response.result || {};
+                applyContext(result.context || {});
+                renderRules(result.rules || {});
+                showAlert('success', response.message || '');
+            });
+        }
+
+        function bindEvents() {
+            $(document).on('click', '#network-security-save-settings', function(e) {
+                e.preventDefault();
+                saveSettings();
+            });
+            $(document).on('click', '#network-add-current-ip', function(e) {
+                e.preventDefault();
+                addSpecialRule('current_ip');
+            });
+            $(document).on('click', '#network-add-server-ip', function(e) {
+                e.preventDefault();
+                addSpecialRule('server_ip');
+            });
+            $(document).on('click', '#network-whitelist-rule-save', function(e) {
+                e.preventDefault();
+                saveRule('whitelist');
+            });
+            $(document).on('click', '#network-blacklist-rule-save', function(e) {
+                e.preventDefault();
+                saveRule('blacklist');
+            });
+            $(document).on('click', '#network-whitelist-rule-reset', function(e) {
+                e.preventDefault();
+                resetForm('whitelist');
+            });
+            $(document).on('click', '#network-blacklist-rule-reset', function(e) {
+                e.preventDefault();
+                resetForm('blacklist');
+            });
+            $(document).on('click', '.network-rule-edit', function() {
+                const listType = ($(this).data('type') || '').toString();
+                if (listType !== 'whitelist' && listType !== 'blacklist') {
+                    return;
+                }
+                $('#network-' + listType + '-rule-id').val(($(this).data('id') || '0').toString());
+                $('#network-' + listType + '-rule-definition').val(($(this).data('rule') || '').toString());
+                $('#network-' + listType + '-rule-comment').val(($(this).data('comment') || '').toString());
+                $('#network-' + listType + '-rule-enabled').prop('checked', String($(this).data('enabled') || '0') === '1');
+            });
+            $(document).on('click', '.network-rule-delete', function() {
+                ajax('network_delete_rule', { id: $(this).data('id') }, function(response) {
+                    if (!response || response.error) {
+                        showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                        return;
+                    }
+                    const result = response.result || {};
+                    applyContext(result.context || {});
+                    renderRules(result.rules || {});
+                    showAlert('success', response.message || '');
+                });
+            });
+            $(document).on('click', '.network-rule-toggle', function() {
+                ajax('network_toggle_rule', { id: $(this).data('id'), enabled: $(this).data('enabled') }, function(response) {
+                    if (!response || response.error) {
+                        showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                        return;
+                    }
+                    const result = response.result || {};
+                    applyContext(result.context || {});
+                    renderRules(result.rules || {});
+                    showAlert('success', response.message || '');
+                });
+            });
+        }
+
+        function init() {
+            if (!$('#network-security-block').length) {
+                return;
+            }
+            bindToggleFix('network_blacklist_enabled_toggle');
+            bindToggleFix('network_whitelist_enabled_toggle');
+            bindEvents();
+            loadAll();
+        }
+
+        return { init: init };
+    })();
+
+    $(function() {
+        tpNetworkAcl.init();
     });
 </script>

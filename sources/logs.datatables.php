@@ -969,26 +969,8 @@ if (isset($params['action']) && $params['action'] === 'connections') {
         $args = json_decode($record['arguments'], true);
         $args = is_array($args) ? $args : [];
 
-        if (in_array($record['process_type'], array('create_user_keys', 'item_copy')) === true) {
-            $newUserId = $args['new_user_id'] ?? ($args['user_id'] ?? null);
-            if (empty($newUserId) === false) {
-                $data_user = DB::queryFirstRow(
-                    'SELECT name, lastname FROM ' . prefixTable('users') . '
-                    WHERE id = %i',
-                    (int) $newUserId
-                );
-                if (DB::count() > 0) {
-                    $sOutput .= '"'.$data_user['name'].' '.$data_user['lastname'].'", ';
-                } else {
-                    $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>", ';
-                }
-            } else {
-                $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>", ';
-            }
-        } elseif ($record['process_type'] === 'send_email') {
-            $receiver = $args['receiver_name'] ?? ($args['login'] ?? ($args['email'] ?? null));
-            $sOutput .= '"'.(empty($receiver) ? '<i class=\"fa-solid fa-user-slash\"></i>' : $receiver).'", ';
-        }
+        $sOutput .= '"'.resolveBackgroundTaskUserDisplay($args, (string) $record['process_type']).'", ';
+
         // col6
         $sOutput .= '""';
         //Finish the line
@@ -1101,44 +1083,7 @@ if (isset($params['action']) && $params['action'] === 'connections') {
         // col6
         $arguments = json_decode($record['arguments'], true);
         $arguments = is_array($arguments) ? $arguments : [];
-        $newUserId = array_key_exists('new_user_id', $arguments) ? 
-            $arguments['new_user_id'] : 
-            (array_key_exists('user_id', $arguments) ? $arguments['user_id'] : null);
-        if ($record['process_type'] === 'create_user_keys' && is_null($newUserId) === false && empty($newUserId) === false) {
-            $data_user = DB::queryFirstRow(
-                'SELECT name, lastname, login FROM ' . prefixTable('users') . '
-                WHERE id = %i',
-                $newUserId
-            );
-            if (DB::count() > 0) {
-                $txt = (isset($data_user['name']) === true ? $data_user['name'] : '').(isset($data_user['lastname']) === true ? ' '.$data_user['lastname'] : '');
-                $sOutput .= '"'.(empty($txt) === false ? $txt : $data_user['login']).'"';
-            } else {
-                $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>"';
-            }
-        } elseif ($record['process_type'] === 'send_email') {
-            $user = $arguments['receiver_name'] ?? ($arguments['login'] ?? ($arguments['email'] ?? null));
-            $sOutput .= '"'.(is_null($user) === true || empty($user) === true ? '<i class=\"fa-solid fa-user-slash\"></i>' : $user).'"';
-        } elseif ($record['process_type'] === 'user_build_cache_tree') {
-            $user = $arguments['user_id'] ?? null;
-            if (empty($user) === false) {
-                $data_user = DB::queryFirstRow(
-                    'SELECT name, lastname, login FROM ' . prefixTable('users') . '
-                    WHERE id = %i',
-                    (int) $user
-                );
-                if (DB::count() > 0) {
-                    $txt = (isset($data_user['name']) === true ? $data_user['name'] : '').(isset($data_user['lastname']) === true ? ' '.$data_user['lastname'] : '');
-                    $sOutput .= '"'.(empty($txt) === false ? $txt : $data_user['login']).'"';
-                } else {
-                    $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>"';
-                }
-            } else {
-                $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>"';
-            }
-        } else {
-            $sOutput .= '"<i class=\"fa-solid fa-user-slash\"></i>"';
-        }
+        $sOutput .= '"'.resolveBackgroundTaskUserDisplay($arguments, (string) $record['process_type']).'"';
         //Finish the line
         $sOutput .= '],';
     }
@@ -1155,6 +1100,83 @@ if (isset($params['action']) && $params['action'] === 'connections') {
 echo (string) $sOutput;
 
 
+
+
+function getBackgroundTaskUserDisplayFromUserId($userId): string
+{
+    if (empty($userId) === true) {
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    $dataUser = DB::queryFirstRow(
+        'SELECT name, lastname, login FROM ' . prefixTable('users') . '
+        WHERE id = %i
+        LIMIT 1',
+        (int) $userId
+    );
+
+    if (DB::count() === 0 || $dataUser === null) {
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    $dataUser = secureOutput($dataUser, ['name', 'lastname', 'login']);
+    $displayName = trim(
+        (string) ($dataUser['name'] ?? '') . ' ' . (string) ($dataUser['lastname'] ?? '')
+    );
+
+    if ($displayName === '') {
+        $displayName = trim((string) ($dataUser['login'] ?? ''));
+    }
+
+    return $displayName === '' ? "<i class='fa-solid fa-user-slash'></i>" : $displayName;
+}
+
+function resolveBackgroundTaskUserDisplay(array $arguments, string $processType): string
+{
+    if (in_array($processType, ['create_user_keys', 'item_copy', 'user_build_cache_tree'], true) === true) {
+        $userId = $arguments['new_user_id'] ?? ($arguments['user_id'] ?? null);
+        return getBackgroundTaskUserDisplayFromUserId($userId);
+    }
+
+    if ($processType === 'send_email') {
+        $receiverName = trim((string) ($arguments['receiver_name'] ?? ($arguments['login'] ?? '')));
+        if ($receiverName !== '') {
+            return secureOutput($receiverName);
+        }
+
+        $email = trim((string) ($arguments['receivers'] ?? ($arguments['email'] ?? '')));
+        if ($email !== '') {
+            $dataUser = DB::queryFirstRow(
+                'SELECT name, lastname, login FROM ' . prefixTable('users') . '
+                WHERE email = %s
+                ORDER BY id DESC
+                LIMIT 1',
+                $email
+            );
+
+            if (DB::count() > 0 && $dataUser !== null) {
+                $dataUser = secureOutput($dataUser, ['name', 'lastname', 'login']);
+                $displayName = trim(
+                    (string) ($dataUser['name'] ?? '') . ' ' . (string) ($dataUser['lastname'] ?? '')
+                );
+
+                if ($displayName === '') {
+                    $displayName = trim((string) ($dataUser['login'] ?? ''));
+                }
+
+                if ($displayName !== '') {
+                    return $displayName;
+                }
+            }
+
+            return secureOutput(htmlspecialchars($email, ENT_QUOTES, 'UTF-8'));
+        }
+
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    return "<i class='fa-solid fa-user-slash'></i>";
+}
 
 function getSubtaskProgress($id)
 {

@@ -2089,4 +2089,5 @@ return array(
     'network_security_auto_comment_current_ip' => 'Automatically added current admin IP',
     'network_security_auto_comment_server_ip' => 'Automatically added TeamPass server IP',
     'network_security_remote_addr' => 'Client remote address',
+    'password_generation_not_compliant_with_folder_complexity' => 'The selected password generation options do not allow reaching the folder required complexity. Please adjust the options or the length and try again.',
     );

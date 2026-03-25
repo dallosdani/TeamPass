@@ -581,6 +581,13 @@ trait UserHandlerTrait {
         // Config 3: send new password
         // COnfig 4: send new encryption code
         if (isset($arguments['send_email']) === true && (int) $arguments['send_email'] === 1 && !empty($userInfo['email'])) {
+            $receiverName = trim(
+                (string) ($userInfo['name'] ?? '') . ' ' . (string) ($userInfo['lastname'] ?? '')
+            );
+            if ($receiverName === '') {
+                $receiverName = (string) ($userInfo['login'] ?? '');
+            }
+
             sendMailToUser(
                 filter_var($userInfo['email'], FILTER_SANITIZE_EMAIL),
                 // @scrutinizer ignore-type
@@ -594,7 +601,8 @@ trait UserHandlerTrait {
                     FILTER_SANITIZE_FULL_SPECIAL_CHARS
                 ),
                 false,
-                $arguments['new_user_pwd']
+                $arguments['new_user_pwd'],
+                $receiverName
             );
         }
 

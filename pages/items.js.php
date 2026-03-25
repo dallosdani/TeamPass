@@ -107,6 +107,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         intervalId = false,
         editionLockInterval = null,
         debugJavascript = false,
+        websocketEnabledForItems = <?php echo isset($SETTINGS['websocket_enabled']) === true ? (int) $SETTINGS['websocket_enabled'] : 0; ?>,
+        itemDetailsFallbackDelay = 2500,
+        pendingItemDetailsFallback = null,
         loadingToast = '';
 
     /**
@@ -911,7 +914,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 // Select tab#1
                 $('#form-item-nav-pills li:first-child a').tab('show');
                 // Preselect
-                $('#pwd-definition-size').val(String(getDefaultPasswordGenerationSize()));
+                $('#pwd-definition-size').val(20);
                 // Set type of action
                 $('#form-item-button-save').data('action', 'new_item');
                 // Does this folder contain Custom Fields
@@ -3075,99 +3078,249 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         return Number.isNaN(maximumSize) ? 20 : maximumSize;
     }
 
-    function getDefaultPasswordGenerationSize() {
-        const configuredDefaultSize = parseInt($('#pwd-definition-size').data('default-size'), 10);
-        const minimumSize = getPasswordGenerationMinimumSize();
-        const maximumSize = getPasswordGenerationMaximumSize();
+    function getTargetComplexityBand(requiredComplexity) {
+        const normalizedRequiredComplexity = parseInt(requiredComplexity, 10);
+        const scoreThresholds = Array.isArray(pwdOptions.ui.scores)
+            ? pwdOptions.ui.scores
+                .map(function(score) {
+                    return parseInt(score, 10);
+                })
+                .filter(function(score) {
+                    return Number.isNaN(score) === false;
+                })
+                .sort(function(a, b) {
+                    return a - b;
+                })
+            : [];
+        const lowerBound = Number.isNaN(normalizedRequiredComplexity) ? 0 : normalizedRequiredComplexity;
+        let upperBound = Number.POSITIVE_INFINITY;
+        const thresholdIndex = scoreThresholds.indexOf(lowerBound);
 
-        if (Number.isNaN(configuredDefaultSize) === true) {
-            return Math.min(maximumSize, Math.max(minimumSize, 14));
+        if (thresholdIndex !== -1 && scoreThresholds[thresholdIndex + 1] !== undefined) {
+            upperBound = scoreThresholds[thresholdIndex + 1] - 1;
         }
 
-        return Math.min(maximumSize, Math.max(minimumSize, configuredDefaultSize));
+        return {
+            lowerBound: lowerBound,
+            upperBound: upperBound,
+        };
+    }
+
+    function isComplexityInsideBand(generatedComplexity, complexityBand) {
+        if (generatedComplexity < complexityBand.lowerBound) {
+            return false;
+        }
+
+        if (Number.isFinite(complexityBand.upperBound) === true && generatedComplexity > complexityBand.upperBound) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function getComplexityDistanceFromBand(generatedComplexity, complexityBand) {
+        if (generatedComplexity < complexityBand.lowerBound) {
+            return complexityBand.lowerBound - generatedComplexity;
+        }
+
+        if (Number.isFinite(complexityBand.upperBound) === true && generatedComplexity > complexityBand.upperBound) {
+            return generatedComplexity - complexityBand.upperBound;
+        }
+
+        return 0;
+    }
+
+    function rememberBestPasswordCandidate(bestCandidate, candidate, complexityBand) {
+        if (!candidate) {
+            return bestCandidate;
+        }
+
+        const enrichedCandidate = $.extend({}, candidate, {
+            complexityDistanceFromBand: getComplexityDistanceFromBand(candidate.generatedComplexity ?? 0, complexityBand),
+            matchesRequestedComplexity: isComplexityInsideBand(candidate.generatedComplexity ?? 0, complexityBand),
+            exceedsRequestedComplexity: Number.isFinite(complexityBand.upperBound) === true
+                && (candidate.generatedComplexity ?? 0) > complexityBand.upperBound,
+            generationSize: parseInt(candidate.generationOptions?.size, 10) || 0,
+        });
+
+        if (!bestCandidate) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.matchesRequestedComplexity === true && bestCandidate.matchesRequestedComplexity !== true) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.matchesRequestedComplexity !== true && bestCandidate.matchesRequestedComplexity === true) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.exceedsRequestedComplexity === false && bestCandidate.exceedsRequestedComplexity === true) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.exceedsRequestedComplexity === true && bestCandidate.exceedsRequestedComplexity === false) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.complexityDistanceFromBand < bestCandidate.complexityDistanceFromBand) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.complexityDistanceFromBand > bestCandidate.complexityDistanceFromBand) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.generationSize < bestCandidate.generationSize) {
+            return enrichedCandidate;
+        }
+
+        return bestCandidate;
+    }
+
+    function setPasswordGenerationOptionState(selector, isChecked) {
+        const checkbox = $(selector);
+        checkbox.prop('checked', isChecked);
+        checkbox.closest('label').toggleClass('active', isChecked);
+    }
+
+    function buildPasswordGenerationOptions(passwordGenerationOptions, currentSize, requiredComplexity) {
+        const effectiveOptions = $.extend({}, passwordGenerationOptions);
+        const minimumSize = getPasswordGenerationMinimumSize();
+        const maximumSize = getPasswordGenerationMaximumSize();
+        const normalizedCurrentSize = parseInt(currentSize, 10);
+
+        effectiveOptions.size = Math.min(
+            maximumSize,
+            Math.max(minimumSize, Number.isNaN(normalizedCurrentSize) ? 20 : normalizedCurrentSize)
+        );
+
+        if (requiredComplexity > 0) {
+            effectiveOptions.secure_pwd = true;
+            effectiveOptions.lowercase = true;
+            effectiveOptions.capitalize = true;
+            effectiveOptions.numerals = true;
+            effectiveOptions.symbols = true;
+        }
+
+        return effectiveOptions;
+    }
+
+    function applyPasswordGenerationOptions(generationOptions) {
+        if (!generationOptions) {
+            return;
+        }
+
+        $('#pwd-definition-size').val(String(generationOptions.size));
+        setPasswordGenerationOptionState('#pwd-definition-lcl', generationOptions.lowercase === true);
+        setPasswordGenerationOptionState('#pwd-definition-ucl', generationOptions.capitalize === true);
+        setPasswordGenerationOptionState('#pwd-definition-numeric', generationOptions.numerals === true);
+        setPasswordGenerationOptionState('#pwd-definition-symbols', generationOptions.symbols === true);
+        setPasswordGenerationOptionState('#pwd-definition-secure', generationOptions.secure_pwd === true);
     }
 
     function generatePasswordRespectingFolderComplexity(elementId, passwordGenerationOptions, requiredComplexity, searchState = null) {
-        const normalizedRequiredComplexity = parseInt(requiredComplexity, 10) || 0;
-
-        if (elementId !== 'form-item-password' || normalizedRequiredComplexity <= 0) {
+        if (elementId !== 'form-item-password' || requiredComplexity <= 0) {
             return requestGeneratedPassword(passwordGenerationOptions).then(function(data) {
                 if (data.error == 'true') {
                     return data;
                 }
 
                 data.key = normalizeGeneratedPassword(data.key ?? '');
+                data.generationOptions = $.extend({}, passwordGenerationOptions);
 
                 return data;
             });
         }
 
-        if (searchState === null) {
-            const requestedSize = parseInt(passwordGenerationOptions.size, 10);
-            const minimumSize = getPasswordGenerationMinimumSize();
-            const maximumSize = getPasswordGenerationMaximumSize();
-            const normalizedRequestedSize = Number.isNaN(requestedSize) === true
-                ? getDefaultPasswordGenerationSize()
-                : Math.min(maximumSize, Math.max(minimumSize, requestedSize));
+        const complexityBand = getTargetComplexityBand(requiredComplexity);
+        const minimumSize = getPasswordGenerationMinimumSize();
+        const maximumSize = getPasswordGenerationMaximumSize();
+        const requestedSize = parseInt(passwordGenerationOptions.size, 10);
+        const initialSize = Math.min(
+            maximumSize,
+            Math.max(minimumSize, Number.isNaN(requestedSize) ? 20 : requestedSize)
+        );
 
+        if (searchState === null) {
             searchState = {
-                attemptsForCurrentSize: 0,
-                attemptsPerSize: 5,
-                currentSize: normalizedRequestedSize,
-                maximumSize: maximumSize,
-                originalPassword: $('#form-item-password').val(),
+                currentSize: initialSize,
+                lowerTriedSizes: {},
+                upperTriedSizes: {},
+                direction: 0,
+                totalAttempts: 0,
+                bestCandidate: null,
             };
         }
 
-        const generationOptions = $.extend({}, passwordGenerationOptions, {
-            size: String(searchState.currentSize),
-        });
+        const effectiveOptions = buildPasswordGenerationOptions(
+            passwordGenerationOptions,
+            searchState.currentSize,
+            requiredComplexity
+        );
 
-        return requestGeneratedPassword(generationOptions).then(function(data) {
+        return requestGeneratedPassword(effectiveOptions).then(function(data) {
             if (data.error == 'true') {
                 return data;
             }
 
             const generatedPassword = normalizeGeneratedPassword(data.key ?? '');
             data.key = generatedPassword;
+            data.generationOptions = effectiveOptions;
 
             return syncItemPasswordComplexity(generatedPassword).then(function(generatedComplexity) {
                 data.generatedComplexity = generatedComplexity;
-                data.generatedSize = searchState.currentSize;
+                searchState.totalAttempts += 1;
+                searchState.bestCandidate = rememberBestPasswordCandidate(
+                    searchState.bestCandidate,
+                    data,
+                    complexityBand
+                );
 
-                if (generatedComplexity >= normalizedRequiredComplexity) {
+                if (isComplexityInsideBand(generatedComplexity, complexityBand) === true) {
                     return data;
                 }
 
-                searchState.attemptsForCurrentSize += 1;
-
-                if (searchState.attemptsForCurrentSize < searchState.attemptsPerSize) {
-                    return generatePasswordRespectingFolderComplexity(
-                        elementId,
-                        passwordGenerationOptions,
-                        normalizedRequiredComplexity,
-                        searchState
-                    );
+                if (generatedComplexity < complexityBand.lowerBound) {
+                    searchState.lowerTriedSizes[effectiveOptions.size] = true;
+                    searchState.direction = 1;
+                } else {
+                    searchState.upperTriedSizes[effectiveOptions.size] = true;
+                    searchState.direction = -1;
                 }
 
-                if (searchState.currentSize < searchState.maximumSize) {
-                    searchState.currentSize += 1;
-                    searchState.attemptsForCurrentSize = 0;
-
-                    return generatePasswordRespectingFolderComplexity(
-                        elementId,
-                        passwordGenerationOptions,
-                        normalizedRequiredComplexity,
-                        searchState
-                    );
+                if (searchState.totalAttempts >= (maximumSize - minimumSize + 1)) {
+                    return searchState.bestCandidate ?? data;
                 }
 
-                return syncItemPasswordComplexity(searchState.originalPassword ?? '').then(function() {
-                    return {
-                        error: 'true',
-                        error_msg: '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
-                    };
-                });
+                let nextSize = searchState.currentSize + searchState.direction;
+
+                while (nextSize >= minimumSize && nextSize <= maximumSize) {
+                    if (searchState.direction === 1 && searchState.lowerTriedSizes[nextSize] === true) {
+                        nextSize += 1;
+                        continue;
+                    }
+
+                    if (searchState.direction === -1 && searchState.upperTriedSizes[nextSize] === true) {
+                        nextSize -= 1;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (nextSize < minimumSize || nextSize > maximumSize) {
+                    return searchState.bestCandidate ?? data;
+                }
+
+                searchState.currentSize = nextSize;
+
+                return generatePasswordRespectingFolderComplexity(
+                    elementId,
+                    passwordGenerationOptions,
+                    requiredComplexity,
+                    searchState
+                );
             });
         });
     }
@@ -3779,12 +3932,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
 
                                 // Reload item details
-                                // If an encryption task was created, the WebSocket task_completed
-                                // event will trigger Details() when encryption finishes.
-                                // Otherwise, call Details() immediately (no duplication risk).
-                                if (encryptionTaskCreated !== true) {
-                                    Details(store.get('teampassItem').id, 'show', true);
-                                }
+                                // When an encryption task exists, prefer the WebSocket refresh path
+                                // but keep a timed fallback for instances where WebSocket is disabled
+                                // or unavailable so the page does not stay stuck on the loading state.
+                                reloadItemDetailsAfterSave(store.get('teampassItem').id, encryptionTaskCreated);
                                 return;
 
                             } else if ($('#form-item-button-save').data('action') === 'new_item') {
@@ -3855,12 +4006,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
 
                                 // Load item details
-                                // If an encryption task was created, the WebSocket task_completed
-                                // event will trigger Details() when encryption finishes.
-                                // Otherwise (personal folder), call Details() immediately.
-                                if (data.encryption_task_created !== true) {
-                                    Details(data.item_id, 'show', true);
-                                }
+                                // When an encryption task exists, prefer the WebSocket refresh path
+                                // but keep a timed fallback for instances where WebSocket is disabled
+                                // or unavailable so the page does not stay stuck on the loading state.
+                                reloadItemDetailsAfterSave(data.item_id, data.encryption_task_created === true);
                                 return;
                             } else {
                                 refreshTree($('#form-item-folder').val(), true);
@@ -5667,7 +5816,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         $('.form-item').removeClass('hidden');
                         $('#folders-tree-card').addClass('hidden');
                     }
-                    $('#pwd-definition-size').val(String(getDefaultPasswordGenerationSize()));
+                    $('#pwd-definition-size').val(data.pw_length);
 
                     // Store current item id in the DOM (cannot be updated in
                     // an other tab or window)
@@ -7279,7 +7428,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         var passwordGenerationOptions = {
             type: 'generate_password',
             type_category: 'action_user',
-            size: $('#pwd-definition-size').val() ?? getDefaultPasswordGenerationSize(),
+            size: $('#pwd-definition-size').val() ?? 20,
             lowercase: $('#pwd-definition-lcl').prop('checked'),
             numerals: $('#pwd-definition-numeric').prop('checked'),
             capitalize: $('#pwd-definition-ucl').prop('checked'),
@@ -7309,12 +7458,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 return false;
             }
 
-            if (elementId === 'form-item-password' && typeof data.generatedSize !== 'undefined') {
-                $('#pwd-definition-size').val(String(data.generatedSize));
-            }
-
             $('#' + elementId).val(data.key).focus();
             if (elementId === 'form-item-password') {
+                applyPasswordGenerationOptions(data.generationOptions ?? null);
                 syncItemPasswordComplexity(data.key ?? '');
             }
 
@@ -7514,6 +7660,40 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         return splitCounter.join('/');
     }
 
+    function clearPendingItemDetailsFallback()
+    {
+        if (pendingItemDetailsFallback !== null) {
+            window.clearTimeout(pendingItemDetailsFallback);
+            pendingItemDetailsFallback = null;
+        }
+    }
+
+    function reloadItemDetailsAfterSave(itemId, encryptionTaskCreated)
+    {
+        var normalizedItemId = parseInt(itemId, 10);
+        var websocketExpected = parseInt(websocketEnabledForItems, 10) === 1;
+        var websocketClientAvailable = typeof window.tpWsSubscribeToFolder === 'function' || typeof window.refreshItemDetails === 'function';
+
+        clearPendingItemDetailsFallback();
+
+        if (isNaN(normalizedItemId) === true || normalizedItemId <= 0) {
+            return;
+        }
+
+        if (encryptionTaskCreated !== true || websocketExpected === false || websocketClientAvailable === false) {
+            Details(normalizedItemId, 'show', true);
+            return;
+        }
+
+        pendingItemDetailsFallback = window.setTimeout(function() {
+            pendingItemDetailsFallback = null;
+
+            if ($('#items-details-container .delete-after-usage').length > 0) {
+                Details(normalizedItemId, 'show', true);
+            }
+        }, itemDetailsFallbackDelay);
+    }
+
     $(document).ready(function() {
         let saveInProgress = false;
 
@@ -7564,6 +7744,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
         // WebSocket: Expose item details refresh for real-time updates
         window.refreshItemDetails = function(itemId) {
+            clearPendingItemDetailsFallback();
             Details(itemId, 'show', true);
         };
 

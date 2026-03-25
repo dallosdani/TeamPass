@@ -642,7 +642,7 @@ return array(
     'mask_pw' => 'Afficher/Masquer le mot de passe',
     'max_last_items' => 'Nombre maximum d’éléments dernièrement vus (par défaut 10)',
     'minutes' => 'minutes',
-    'name' => 'Nom',
+    'name' => 'Prénom',
     'nb_false_login_attempts' => 'Nombre de tentatives de connexion erronées avant blocage (0 pour désactiver)',
     'nb_items' => 'Nombre d’éléments',
     'new_label' => 'Nouvel intitulé',

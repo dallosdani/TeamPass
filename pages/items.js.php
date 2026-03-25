@@ -3087,45 +3087,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         return Math.min(maximumSize, Math.max(minimumSize, configuredDefaultSize));
     }
 
-    function rememberBestPasswordCandidate(bestCandidate, candidate, requiredComplexity) {
-        if (!candidate) {
-            return bestCandidate;
-        }
-
-        const generatedComplexity = parseInt(candidate.generatedComplexity ?? 0, 10) || 0;
-        const meetsRequiredComplexity = generatedComplexity >= requiredComplexity;
-        const complexityDistance = meetsRequiredComplexity === true
-            ? generatedComplexity - requiredComplexity
-            : requiredComplexity - generatedComplexity;
-        const enrichedCandidate = $.extend({}, candidate, {
-            generatedComplexity: generatedComplexity,
-            meetsRequiredComplexity: meetsRequiredComplexity,
-            complexityDistance: complexityDistance,
-        });
-
-        if (!bestCandidate) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.meetsRequiredComplexity === true && bestCandidate.meetsRequiredComplexity !== true) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.meetsRequiredComplexity !== true && bestCandidate.meetsRequiredComplexity === true) {
-            return bestCandidate;
-        }
-
-        if (enrichedCandidate.complexityDistance < bestCandidate.complexityDistance) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.complexityDistance > bestCandidate.complexityDistance) {
-            return bestCandidate;
-        }
-
-        return bestCandidate;
-    }
-
     function generatePasswordRespectingFolderComplexity(elementId, passwordGenerationOptions, requiredComplexity, searchState = null) {
         const normalizedRequiredComplexity = parseInt(requiredComplexity, 10) || 0;
 
@@ -3142,15 +3103,27 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         }
 
         if (searchState === null) {
+            const requestedSize = parseInt(passwordGenerationOptions.size, 10);
+            const minimumSize = getPasswordGenerationMinimumSize();
+            const maximumSize = getPasswordGenerationMaximumSize();
+            const normalizedRequestedSize = Number.isNaN(requestedSize) === true
+                ? getDefaultPasswordGenerationSize()
+                : Math.min(maximumSize, Math.max(minimumSize, requestedSize));
+
             searchState = {
-                totalAttempts: 0,
-                maxAttempts: 25,
-                bestCandidate: null,
+                attemptsForCurrentSize: 0,
+                attemptsPerSize: 5,
+                currentSize: normalizedRequestedSize,
+                maximumSize: maximumSize,
                 originalPassword: $('#form-item-password').val(),
             };
         }
 
-        return requestGeneratedPassword(passwordGenerationOptions).then(function(data) {
+        const generationOptions = $.extend({}, passwordGenerationOptions, {
+            size: String(searchState.currentSize),
+        });
+
+        return requestGeneratedPassword(generationOptions).then(function(data) {
             if (data.error == 'true') {
                 return data;
             }
@@ -3160,32 +3133,41 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             return syncItemPasswordComplexity(generatedPassword).then(function(generatedComplexity) {
                 data.generatedComplexity = generatedComplexity;
-                searchState.totalAttempts += 1;
-                searchState.bestCandidate = rememberBestPasswordCandidate(
-                    searchState.bestCandidate,
-                    data,
-                    normalizedRequiredComplexity
-                );
+                data.generatedSize = searchState.currentSize;
 
                 if (generatedComplexity >= normalizedRequiredComplexity) {
                     return data;
                 }
 
-                if (searchState.totalAttempts >= searchState.maxAttempts) {
-                    return syncItemPasswordComplexity(searchState.originalPassword ?? '').then(function() {
-                        return {
-                            error: 'true',
-                            error_msg: '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
-                        };
-                    });
+                searchState.attemptsForCurrentSize += 1;
+
+                if (searchState.attemptsForCurrentSize < searchState.attemptsPerSize) {
+                    return generatePasswordRespectingFolderComplexity(
+                        elementId,
+                        passwordGenerationOptions,
+                        normalizedRequiredComplexity,
+                        searchState
+                    );
                 }
 
-                return generatePasswordRespectingFolderComplexity(
-                    elementId,
-                    passwordGenerationOptions,
-                    normalizedRequiredComplexity,
-                    searchState
-                );
+                if (searchState.currentSize < searchState.maximumSize) {
+                    searchState.currentSize += 1;
+                    searchState.attemptsForCurrentSize = 0;
+
+                    return generatePasswordRespectingFolderComplexity(
+                        elementId,
+                        passwordGenerationOptions,
+                        normalizedRequiredComplexity,
+                        searchState
+                    );
+                }
+
+                return syncItemPasswordComplexity(searchState.originalPassword ?? '').then(function() {
+                    return {
+                        error: 'true',
+                        error_msg: '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
+                    };
+                });
             });
         });
     }
@@ -7325,6 +7307,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     }
                 );
                 return false;
+            }
+
+            if (elementId === 'form-item-password' && typeof data.generatedSize !== 'undefined') {
+                $('#pwd-definition-size').val(String(data.generatedSize));
             }
 
             $('#' + elementId).val(data.key).focus();

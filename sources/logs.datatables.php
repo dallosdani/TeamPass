@@ -1133,8 +1133,13 @@ function getBackgroundTaskUserDisplayFromUserId($userId): string
 
 function resolveBackgroundTaskUserDisplay(array $arguments, string $processType): string
 {
-    if (in_array($processType, ['create_user_keys', 'item_copy', 'user_build_cache_tree'], true) === true) {
+    if (in_array($processType, ['create_user_keys', 'user_build_cache_tree', 'migrate_user_personal_items'], true) === true) {
         $userId = $arguments['new_user_id'] ?? ($arguments['user_id'] ?? null);
+        return getBackgroundTaskUserDisplayFromUserId($userId);
+    }
+
+    if (in_array($processType, ['item_copy', 'new_item', 'item_update_create_keys', 'update_item'], true) === true) {
+        $userId = $arguments['author'] ?? ($arguments['user_id'] ?? ($arguments['owner_id'] ?? null));
         return getBackgroundTaskUserDisplayFromUserId($userId);
     }
 

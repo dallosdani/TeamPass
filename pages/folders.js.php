@@ -83,29 +83,6 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     // Clear
     $('#folders-search').val('');
 
-    const _foldersDepthStorageKey = 'teampass.folders.depth'
-
-    function getStoredFoldersDepth() {
-        try {
-            const storedDepth = sessionStorage.getItem(_foldersDepthStorageKey)
-            return storedDepth === null || storedDepth === '' ? 'all' : storedDepth
-        } catch (e) {
-            return 'all'
-        }
-    }
-
-    function storeFoldersDepth(depth) {
-        try {
-            if (depth === null || depth === undefined || depth === '') {
-                sessionStorage.removeItem(_foldersDepthStorageKey)
-            } else {
-                sessionStorage.setItem(_foldersDepthStorageKey, String(depth))
-            }
-        } catch (e) {
-            // Ignore browser storage errors and keep default UI behaviour
-        }
-    }
-
     // Generation counter: incremented on each buildTable() call so stale batch loops self-cancel
     var _buildGeneration = 0
 
@@ -424,7 +401,9 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                         for (let x = 1; x < max_folder_depth; x++) {
                             $('#folders-depth').append('<option value="' + x + '">' + x + '</option>')
                         }
-                        const storedDepth = getStoredFoldersDepth()
+                        const storedDepth = store.get('teampassUser') && store.get('teampassUser').foldersDepthFilter !== undefined
+                            ? store.get('teampassUser').foldersDepthFilter
+                            : 'all'
                         const depthToApply = $('#folders-depth option[value="' + storedDepth + '"]').length > 0 ? storedDepth : 'all'
                         $('#folders-depth').val(depthToApply).trigger('change')
 
@@ -684,7 +663,12 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
     }
 
     $(document).on('change', '#folders-depth', function() {
-        storeFoldersDepth($(this).val())
+        const depth = $(this).val()
+        if (depth !== null && depth !== '') {
+            store.update('teampassUser', function(teampassUser) {
+                teampassUser.foldersDepthFilter = depth
+            })
+        }
         applyFilters()
     })
     $(document).on('change', '#folders-complexity', applyFilters)

@@ -224,11 +224,14 @@ if ((int) $session_user_admin === 1) {
                                             <div class="input-group-prepend">
                                                 <div class="input-group-text"><?php echo $lang->get('size'); ?></div>
                                             </div>
-                                            <select class="form-control form-control-sm w-10" id="pwd-definition-size">
+                                            <?php
+                                            $defaultPasswordLength = max(4, min((int) ($SETTINGS['pwd_default_length'] ?? 14), (int) $SETTINGS['pwd_maximum_length']));
+                                            ?>
+                                            <select class="form-control form-control-sm w-10" id="pwd-definition-size" data-default-size="<?php echo $defaultPasswordLength; ?>">
                                                 <?php
                                                 for ($i = 4; $i <= $SETTINGS['pwd_maximum_length']; ++$i) {
                                                     echo '
-                                                <option>' . $i . '</option>';
+                                                <option' . ($i === $defaultPasswordLength ? ' selected' : '') . '>' . $i . '</option>';
                                                 }
                                                 ?>
                                             </select>

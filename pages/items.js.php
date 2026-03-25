@@ -107,6 +107,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         intervalId = false,
         editionLockInterval = null,
         debugJavascript = false,
+        websocketEnabledForItems = <?php echo isset($SETTINGS['websocket_enabled']) === true ? (int) $SETTINGS['websocket_enabled'] : 0; ?>,
+        itemDetailsFallbackDelay = 2500,
+        pendingItemDetailsFallback = null,
         loadingToast = '';
 
     /**
@@ -1806,10 +1809,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         '<?php echo $lang->get('success'); ?>',
                         { timeOut: 1000 }
                     );
-                    // Refresh tree
+                    // Refresh tree and let the selected folder reload the items list only once
+                    startedItemsListQuery = false;
                     refreshTree(folderId, true);
-                    // Refresh items list to remove deleted item
-                    ListerItems(folderId, '', 0);
                     // Close
                     if (closeItemCard === true) {
                         closeItemDetailsCard();
@@ -2729,21 +2731,25 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 );
                 
                 // Launch deletion
-                $(document).on('click', '#warningModalButtonAction', {itemKey:$(this).data('item-key')}, function(event2) {
-                    event2.preventDefault();
-                    
-                    goDeleteItem(
-                        itemIdToDelete,
-                        '',
-                        selectedFolderId,
-                        '',
-                        false
-                    );
-                    $('#warningModal').modal('hide');
-                });
-                $(document).on('click', '#warningModalButtonClose', function() {
-                    requestRunning = false;
-                });
+                $(document)
+                    .off('click.tpDeleteItemConfirm', '#warningModalButtonAction')
+                    .one('click.tpDeleteItemConfirm', '#warningModalButtonAction', {itemKey:$(this).data('item-key')}, function(event2) {
+                        event2.preventDefault();
+
+                        goDeleteItem(
+                            itemIdToDelete,
+                            '',
+                            selectedFolderId,
+                            '',
+                            false
+                        );
+                        $('#warningModal').modal('hide');
+                    });
+                $(document)
+                    .off('click.tpDeleteItemConfirm', '#warningModalButtonClose')
+                    .one('click.tpDeleteItemConfirm', '#warningModalButtonClose', function() {
+                        requestRunning = false;
+                    });
             });
         });
 
@@ -3002,7 +3008,232 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         }
     };
     $('#form-item-password').pwstrength(pwdOptions);
-    
+
+    function normalizeGeneratedPassword(generatedPassword) {
+        if (Array.isArray(generatedPassword) === true) {
+            return generatedPassword.length > 0 ? String(generatedPassword[0] ?? '') : '';
+        }
+
+        if (typeof generatedPassword === 'string') {
+            return generatedPassword;
+        }
+
+        return generatedPassword === null || typeof generatedPassword === 'undefined' ? '' : String(generatedPassword);
+    }
+
+    function syncItemPasswordComplexity(passwordValue = null) {
+        const normalizedPassword = normalizeGeneratedPassword(passwordValue);
+        if (normalizedPassword !== '') {
+            $('#form-item-password').val(normalizedPassword);
+        }
+
+        $('#form-item-password-complex').val(0);
+        $('#form-item-password').pwstrength('forceUpdate');
+
+        return new Promise(function(resolve) {
+            let attempts = 0;
+            let lastScore = null;
+
+            function readUpdatedComplexity() {
+                const raw = parseInt($('#form-item-password-complex').val(), 10);
+                const passwordComplexityScore = Number.isNaN(raw) ? 0 : raw;
+
+                if (attempts >= 2 && passwordComplexityScore === lastScore) {
+                    resolve(passwordComplexityScore);
+                    return;
+                }
+
+                lastScore = passwordComplexityScore;
+                attempts += 1;
+                setTimeout(readUpdatedComplexity, 25);
+            }
+
+            setTimeout(readUpdatedComplexity, 25);
+        });
+    }
+
+    function requestGeneratedPassword(passwordGenerationOptions) {
+        return $.post(
+            'sources/main.queries.php',
+            passwordGenerationOptions
+        ).then(function(data) {
+            return prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
+        });
+    }
+
+    function rememberBestPasswordCandidate(bestCandidate, candidate, complexityBand) {
+        if (!candidate) {
+            return bestCandidate;
+        }
+
+        const score = candidate.generatedComplexity ?? 0;
+        const insideBand = score >= complexityBand.lowerBound
+            && (!Number.isFinite(complexityBand.upperBound) || score <= complexityBand.upperBound);
+        const exceedsBand = Number.isFinite(complexityBand.upperBound) && score > complexityBand.upperBound;
+        const distanceFromBand = score < complexityBand.lowerBound
+            ? complexityBand.lowerBound - score
+            : (exceedsBand ? score - complexityBand.upperBound : 0);
+
+        const enrichedCandidate = $.extend({}, candidate, {
+            complexityDistanceFromBand: distanceFromBand,
+            matchesRequestedComplexity: insideBand,
+            exceedsRequestedComplexity: exceedsBand,
+            generationSize: parseInt(candidate.generationOptions?.size, 10) || 0,
+        });
+
+        if (!bestCandidate) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.matchesRequestedComplexity === true && bestCandidate.matchesRequestedComplexity !== true) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.matchesRequestedComplexity !== true && bestCandidate.matchesRequestedComplexity === true) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.exceedsRequestedComplexity === false && bestCandidate.exceedsRequestedComplexity === true) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.exceedsRequestedComplexity === true && bestCandidate.exceedsRequestedComplexity === false) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.complexityDistanceFromBand < bestCandidate.complexityDistanceFromBand) {
+            return enrichedCandidate;
+        }
+
+        if (enrichedCandidate.complexityDistanceFromBand > bestCandidate.complexityDistanceFromBand) {
+            return bestCandidate;
+        }
+
+        if (enrichedCandidate.generationSize < bestCandidate.generationSize) {
+            return enrichedCandidate;
+        }
+
+        return bestCandidate;
+    }
+
+    function generatePasswordRespectingFolderComplexity(elementId, passwordGenerationOptions, requiredComplexity, searchState = null) {
+        const minSize = parseInt($('#pwd-definition-size option:first').val(), 10) || 4;
+        const maxSize = parseInt($('#pwd-definition-size option:last').val(), 10) || 20;
+
+        if (elementId !== 'form-item-password' || requiredComplexity <= 0) {
+            return requestGeneratedPassword(passwordGenerationOptions).then(function(data) {
+                if (data.error == 'true') {
+                    return data;
+                }
+
+                data.key = normalizeGeneratedPassword(data.key ?? '');
+                data.generationOptions = $.extend({}, passwordGenerationOptions);
+
+                return data;
+            });
+        }
+
+        // Determine the target complexity band from pwdOptions thresholds
+        const scoreThresholds = Array.isArray(pwdOptions.ui.scores)
+            ? pwdOptions.ui.scores.map(Number).filter(function(s) { return !Number.isNaN(s); }).sort(function(a, b) { return a - b; })
+            : [];
+        const lowerBound = parseInt(requiredComplexity, 10) || 0;
+        const thresholdIndex = scoreThresholds.indexOf(lowerBound);
+        const complexityBand = {
+            lowerBound: lowerBound,
+            upperBound: (thresholdIndex !== -1 && scoreThresholds[thresholdIndex + 1] !== undefined)
+                ? scoreThresholds[thresholdIndex + 1] - 1
+                : Number.POSITIVE_INFINITY,
+        };
+
+        const requestedSize = parseInt(passwordGenerationOptions.size, 10);
+        const initialSize = Math.min(maxSize, Math.max(minSize, Number.isNaN(requestedSize) ? 20 : requestedSize));
+
+        if (searchState === null) {
+            searchState = {
+                currentSize: initialSize,
+                lowerTriedSizes: {},
+                upperTriedSizes: {},
+                direction: 0,
+                totalAttempts: 0,
+                bestCandidate: null,
+            };
+        }
+
+        // Force all character types to maximize reach toward the target complexity
+        const effectiveOptions = $.extend({}, passwordGenerationOptions, {
+            size: Math.min(maxSize, Math.max(minSize, parseInt(searchState.currentSize, 10) || 20)),
+            secure_pwd: true,
+            lowercase: true,
+            capitalize: true,
+            numerals: true,
+            symbols: true,
+        });
+
+        return requestGeneratedPassword(effectiveOptions).then(function(data) {
+            if (data.error == 'true') {
+                return data;
+            }
+
+            const generatedPassword = normalizeGeneratedPassword(data.key ?? '');
+            data.key = generatedPassword;
+            data.generationOptions = effectiveOptions;
+
+            return syncItemPasswordComplexity(generatedPassword).then(function(generatedComplexity) {
+                data.generatedComplexity = generatedComplexity;
+                searchState.totalAttempts += 1;
+                searchState.bestCandidate = rememberBestPasswordCandidate(
+                    searchState.bestCandidate,
+                    data,
+                    complexityBand
+                );
+
+                const insideBand = generatedComplexity >= complexityBand.lowerBound
+                    && (!Number.isFinite(complexityBand.upperBound) || generatedComplexity <= complexityBand.upperBound);
+
+                if (insideBand === true) {
+                    return data;
+                }
+
+                if (generatedComplexity < complexityBand.lowerBound) {
+                    searchState.lowerTriedSizes[effectiveOptions.size] = true;
+                    searchState.direction = 1;
+                } else {
+                    searchState.upperTriedSizes[effectiveOptions.size] = true;
+                    searchState.direction = -1;
+                }
+
+                if (searchState.totalAttempts >= (maxSize - minSize + 1)) {
+                    return searchState.bestCandidate ?? data;
+                }
+
+                let nextSize = searchState.currentSize + searchState.direction;
+
+                while (nextSize >= minSize && nextSize <= maxSize) {
+                    if (searchState.lowerTriedSizes[nextSize] === true || searchState.upperTriedSizes[nextSize] === true) {
+                        nextSize += searchState.direction;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (nextSize < minSize || nextSize > maxSize) {
+                    return searchState.bestCandidate ?? data;
+                }
+
+                searchState.currentSize = nextSize;
+
+                return generatePasswordRespectingFolderComplexity(
+                    elementId,
+                    passwordGenerationOptions,
+                    requiredComplexity,
+                    searchState
+                );
+            });
+        });
+    }
+
 
 
     /**
@@ -3610,12 +3841,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
 
                                 // Reload item details
-                                // If an encryption task was created, the WebSocket task_completed
-                                // event will trigger Details() when encryption finishes.
-                                // Otherwise, call Details() immediately (no duplication risk).
-                                if (encryptionTaskCreated !== true) {
-                                    Details(store.get('teampassItem').id, 'show', true);
-                                }
+                                // When an encryption task exists, prefer the WebSocket refresh path
+                                // but keep a timed fallback for instances where WebSocket is disabled
+                                // or unavailable so the page does not stay stuck on the loading state.
+                                reloadItemDetailsAfterSave(store.get('teampassItem').id, encryptionTaskCreated);
                                 return;
 
                             } else if ($('#form-item-button-save').data('action') === 'new_item') {
@@ -3686,12 +3915,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 loadingToast = toastr.info('<?php echo $lang->get('loading_item'); ?> ... <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>', '', { timeOut: 0 });
 
                                 // Load item details
-                                // If an encryption task was created, the WebSocket task_completed
-                                // event will trigger Details() when encryption finishes.
-                                // Otherwise (personal folder), call Details() immediately.
-                                if (data.encryption_task_created !== true) {
-                                    Details(data.item_id, 'show', true);
-                                }
+                                // When an encryption task exists, prefer the WebSocket refresh path
+                                // but keep a timed fallback for instances where WebSocket is disabled
+                                // or unavailable so the page does not stay stuck on the loading state.
+                                reloadItemDetailsAfterSave(data.item_id, data.encryption_task_created === true);
                                 return;
                             } else {
                                 refreshTree($('#form-item-folder').val(), true);
@@ -3839,7 +4066,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 store.get('teampassItem').id
             ).then(item_pwd => {
                 if (item_pwd || item_pwd === '') {
-                    $('#form-item-password').val(item_pwd);
+                    syncItemPasswordComplexity(item_pwd);
 
                     $('#card-item-visibility').html(store.get('teampassItem').itemVisibility);
                     $('#card-item-minimum-complexity').html(store.get('teampassItem').itemMinimumComplexity);
@@ -3859,8 +4086,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     // Initial 'user did a change'
                     userDidAChange = false;
 
-                    // Force update of simplepassmeter
-                    $('#form-item-password').pwstrength("forceUpdate");
                     $('#form-item-label').focus();
 
                     // Set type of action
@@ -5540,7 +5765,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     $('#form-item-icon').val(data.fa_icon);
                     $('#form-item-icon-show').html(itemIcon);
 
-                    $('#form-item-password').pwstrength("forceUpdate");
+                    syncItemPasswordComplexity('');
                     $('#form-item-label').focus();
 
                     // Editor for description field
@@ -6201,14 +6426,14 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                             // Finished
                             return false;
                         } else {
-                            // Retrieve the password
+                            // Retrieve the password and synchronize the complexity meter
                             getItemPassword(
                                 'at_password_shown_edit_form',
                                 'item_id',
                                 id
                             ).then(item_pwd => {
-                                if (item_pwd) {
-                                    $('#form-item-password').val(item_pwd);
+                                if (item_pwd || item_pwd === '') {
+                                    syncItemPasswordComplexity(item_pwd);
                                 }
                             });
                         }
@@ -7109,48 +7334,69 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             secure_pwd = true;
         }
 
-        $.post(
-            "sources/main.queries.php", {
-                type: "generate_password",
-                type_category: 'action_user',
-                size: $('#pwd-definition-size').val() ?? 20,
-                lowercase: $('#pwd-definition-lcl').prop("checked"),
-                numerals: $('#pwd-definition-numeric').prop("checked"),
-                capitalize: $('#pwd-definition-ucl').prop("checked"),
-                symbols: $('#pwd-definition-symbols').prop("checked"),
-                secure_pwd: secure_pwd,
-                force: "false",
-                key: "<?php echo $session->get('key'); ?>"
-            },
-            function(data) {
-                data = prepareExchangedData(data, "decode", "<?php echo $session->get('key'); ?>");
-                if (debugJavascript === true) console.log(data)
-                if (data.error == "true") {
-                    // error
-                    toastr.remove();
-                    toastr.error(
-                        data.error_msg,
-                        '<?php echo $lang->get('error'); ?>', {
-                            timeOut: 5000,
-                            progressBar: true
-                        }
-                    );
-                    return false;
-                } else {
-                    $("#" + elementId).val(data.key).focus();
+        var passwordGenerationOptions = {
+            type: 'generate_password',
+            type_category: 'action_user',
+            size: $('#pwd-definition-size').val() ?? 20,
+            lowercase: $('#pwd-definition-lcl').prop('checked'),
+            numerals: $('#pwd-definition-numeric').prop('checked'),
+            capitalize: $('#pwd-definition-ucl').prop('checked'),
+            symbols: $('#pwd-definition-symbols').prop('checked'),
+            secure_pwd: secure_pwd,
+            force: 'false',
+            key: '<?php echo $session->get('key'); ?>'
+        };
+        var requiredComplexity = elementId === 'form-item-password' ? parseInt(store.get('teampassItem').folderComplexity, 10) || 0 : 0;
 
-                    // Form has changed
-                    userDidAChange = true;
-                    if (debugJavascript === true) console.log('User did a change during generate_password > ' + userDidAChange);
-                    //$('#' + elementId).attr('data-change-ongoing', true);;
-
-                    $("#form-item-password").pwstrength("forceUpdate");
-
-                    // SHow button in sticky footer
-                    //$('#form-item-buttons').addClass('sticky-footer');
-                }
+        generatePasswordRespectingFolderComplexity(
+            elementId,
+            passwordGenerationOptions,
+            requiredComplexity
+        ).done(function(data) {
+            if (debugJavascript === true) console.log(data)
+            if (data.error == 'true') {
+                // error
+                toastr.remove();
+                toastr.error(
+                    data.error_msg,
+                    '<?php echo $lang->get('error'); ?>', {
+                        timeOut: 5000,
+                        progressBar: true
+                    }
+                );
+                return false;
             }
-        );
+
+            if (data.matchesRequestedComplexity === false) {
+                toastr.warning(
+                    '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
+                    '', { timeOut: 8000, progressBar: true }
+                );
+            }
+
+            $('#' + elementId).val(data.key).focus();
+            if (elementId === 'form-item-password' && data.generationOptions) {
+                const opts = data.generationOptions;
+                $('#pwd-definition-size').val(String(opts.size));
+                $.each({
+                    '#pwd-definition-lcl': opts.lowercase,
+                    '#pwd-definition-ucl': opts.capitalize,
+                    '#pwd-definition-numeric': opts.numerals,
+                    '#pwd-definition-symbols': opts.symbols,
+                    '#pwd-definition-secure': opts.secure_pwd,
+                }, function(sel, checked) {
+                    $(sel).prop('checked', checked === true).closest('label').toggleClass('active', checked === true);
+                });
+                syncItemPasswordComplexity(data.key ?? '');
+            }
+
+            // Form has changed
+            userDidAChange = true;
+            if (debugJavascript === true) console.log('User did a change during generate_password > ' + userDidAChange);
+
+            // SHow button in sticky footer
+            //$('#form-item-buttons').addClass('sticky-footer');
+        });
     });
 
     /**
@@ -7340,6 +7586,39 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         return splitCounter.join('/');
     }
 
+    function clearPendingItemDetailsFallback()
+    {
+        if (pendingItemDetailsFallback !== null) {
+            window.clearTimeout(pendingItemDetailsFallback);
+            pendingItemDetailsFallback = null;
+        }
+    }
+
+    function reloadItemDetailsAfterSave(itemId, encryptionTaskCreated)
+    {
+        var normalizedItemId = parseInt(itemId, 10);
+        var websocketExpected = parseInt(websocketEnabledForItems, 10) === 1;
+
+        clearPendingItemDetailsFallback();
+
+        if (isNaN(normalizedItemId) === true || normalizedItemId <= 0) {
+            return;
+        }
+
+        if (encryptionTaskCreated !== true || websocketExpected === false) {
+            Details(normalizedItemId, 'show', true);
+            return;
+        }
+
+        pendingItemDetailsFallback = window.setTimeout(function() {
+            pendingItemDetailsFallback = null;
+
+            if ($('#items-details-container .delete-after-usage').length > 0) {
+                Details(normalizedItemId, 'show', true);
+            }
+        }, itemDetailsFallbackDelay);
+    }
+
     $(document).ready(function() {
         let saveInProgress = false;
 
@@ -7390,6 +7669,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
         // WebSocket: Expose item details refresh for real-time updates
         window.refreshItemDetails = function(itemId) {
+            clearPendingItemDetailsFallback();
             Details(itemId, 'show', true);
         };
 

@@ -475,6 +475,7 @@ if (null !== $post_type) {
                     array(
                         'error' => false,
                         'user_id' => $new_user_id,
+                        'user_password' => $password,
                         'message' => '',
                     ),
                     'encode'

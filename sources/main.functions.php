@@ -341,8 +341,11 @@ function identAdmin(string $idFonctions)
  *
  * @return array
  */
-function convertToArray($element): array
+function convertToArray(array|string|null $element): array
 {
+    if ($element === null) {
+        return [];
+    }
     if (is_string($element) === true) {
         if (empty($element) === true) {
             return [];

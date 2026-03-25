@@ -183,10 +183,14 @@ class ActiveDirectoryExtra extends BaseGroup
                 if ($idAttribute === 'objectguid') {
                     try {
                         $bin = $group[$idAttribute][0];
-                        $adGroupId = strtolower(vsprintf(
-                            '%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x',
-                            array_values(unpack('C16', $bin))
-                        ));
+                        // Use ldaprecord's Guid class which correctly handles
+                        // Windows mixed-endian byte order for objectGUID.
+                        // Direct byte-sequential unpacking produces a byte-swapped
+                        // UUID for the first three segments, which never matches
+                        // the UUID shown in the Azure AD / AD portal.
+                        $adGroupId = strtolower(
+                            (new \LdapRecord\Models\Attributes\Guid($bin))->getValue()
+                        );
                     } catch (\Throwable $e) {
                         continue;
                     }

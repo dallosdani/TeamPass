@@ -1102,6 +1102,13 @@ echo (string) $sOutput;
 
 
 
+function normalizeBackgroundTaskDisplayValue($value): string
+{
+    $decodedValue = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    return htmlspecialchars($decodedValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+}
+
 function getBackgroundTaskUserDisplayFromUserId($userId): string
 {
     if (empty($userId) === true) {
@@ -1119,13 +1126,14 @@ function getBackgroundTaskUserDisplayFromUserId($userId): string
         return "<i class='fa-solid fa-user-slash'></i>";
     }
 
-    $dataUser = secureOutput($dataUser, ['name', 'lastname', 'login']);
     $displayName = trim(
-        (string) ($dataUser['name'] ?? '') . ' ' . (string) ($dataUser['lastname'] ?? '')
+        normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
+        . ' ' .
+        normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
     );
 
     if ($displayName === '') {
-        $displayName = trim((string) ($dataUser['login'] ?? ''));
+        $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
     }
 
     return $displayName === '' ? "<i class='fa-solid fa-user-slash'></i>" : $displayName;
@@ -1146,7 +1154,7 @@ function resolveBackgroundTaskUserDisplay(array $arguments, string $processType)
     if ($processType === 'send_email') {
         $receiverName = trim((string) ($arguments['receiver_name'] ?? ($arguments['login'] ?? '')));
         if ($receiverName !== '') {
-            return secureOutput($receiverName);
+            return normalizeBackgroundTaskDisplayValue($receiverName);
         }
 
         $email = trim((string) ($arguments['receivers'] ?? ($arguments['email'] ?? '')));
@@ -1160,13 +1168,14 @@ function resolveBackgroundTaskUserDisplay(array $arguments, string $processType)
             );
 
             if (DB::count() > 0 && $dataUser !== null) {
-                $dataUser = secureOutput($dataUser, ['name', 'lastname', 'login']);
                 $displayName = trim(
-                    (string) ($dataUser['name'] ?? '') . ' ' . (string) ($dataUser['lastname'] ?? '')
+                    normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
+                    . ' ' .
+                    normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
                 );
 
                 if ($displayName === '') {
-                    $displayName = trim((string) ($dataUser['login'] ?? ''));
+                    $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
                 }
 
                 if ($displayName !== '') {
@@ -1174,7 +1183,7 @@ function resolveBackgroundTaskUserDisplay(array $arguments, string $processType)
                 }
             }
 
-            return secureOutput(htmlspecialchars($email, ENT_QUOTES, 'UTF-8'));
+            return normalizeBackgroundTaskDisplayValue($email);
         }
 
         return "<i class='fa-solid fa-user-slash'></i>";

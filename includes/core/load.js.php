@@ -1171,6 +1171,13 @@ if (
     });
     
 
+    function resetAdminChangeUserPasswordDialogContext()
+    {
+        $('#admin_change_user_password_target_user, #admin_change_user_encryption_code_target_user').val('');
+        $('#dialog-admin-change-user-password-show-password-div').addClass('hidden');
+        $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+    }
+
     /**
     * ADMIN HAS DECIDED TO CHANGE THE USER'S AUTH PASSWORD
      */
@@ -1264,7 +1271,7 @@ if (
                             );
                         }
 
-                        $('#dialog-admin-change-user-password-do-show-password').iCheck('uncheck');                        
+                        resetAdminChangeUserPasswordDialogContext();
                         $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('generate_new_keys_end'); ?>');
                         // Show warning
                         toastr.remove();
@@ -1276,6 +1283,8 @@ if (
         }
     });
     $(document).on('click', '#dialog-admin-change-user-password-close', function() {
+        resetAdminChangeUserPasswordDialogContext();
+
         // HIde
         $('.content-header, .content').removeClass('hidden');
 
@@ -1349,6 +1358,7 @@ if (
 
                         // SHow form
                         $('#dialog-admin-change-user-password').addClass('hidden');
+                        resetAdminChangeUserPasswordDialogContext();
 
                         store.set(
                             'teampassUser', {

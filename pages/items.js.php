@@ -3009,12 +3009,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
     };
     $('#form-item-password').pwstrength(pwdOptions);
 
-    function getItemPasswordComplexityScore() {
-        const passwordComplexityScore = parseInt($('#form-item-password-complex').val(), 10);
-
-        return Number.isNaN(passwordComplexityScore) ? 0 : passwordComplexityScore;
-    }
-
     function normalizeGeneratedPassword(generatedPassword) {
         if (Array.isArray(generatedPassword) === true) {
             return generatedPassword.length > 0 ? String(generatedPassword[0] ?? '') : '';
@@ -3041,7 +3035,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             let lastScore = null;
 
             function readUpdatedComplexity() {
-                const passwordComplexityScore = getItemPasswordComplexityScore();
+                const raw = parseInt($('#form-item-password-complex').val(), 10);
+                const passwordComplexityScore = Number.isNaN(raw) ? 0 : raw;
 
                 if (attempts >= 2 && passwordComplexityScore === lastScore) {
                     resolve(passwordComplexityScore);
@@ -3066,80 +3061,23 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         });
     }
 
-    function getPasswordGenerationMinimumSize() {
-        const minimumSize = parseInt($('#pwd-definition-size option:first').val(), 10);
-
-        return Number.isNaN(minimumSize) ? 4 : minimumSize;
-    }
-
-    function getPasswordGenerationMaximumSize() {
-        const maximumSize = parseInt($('#pwd-definition-size option:last').val(), 10);
-
-        return Number.isNaN(maximumSize) ? 20 : maximumSize;
-    }
-
-    function getTargetComplexityBand(requiredComplexity) {
-        const normalizedRequiredComplexity = parseInt(requiredComplexity, 10);
-        const scoreThresholds = Array.isArray(pwdOptions.ui.scores)
-            ? pwdOptions.ui.scores
-                .map(function(score) {
-                    return parseInt(score, 10);
-                })
-                .filter(function(score) {
-                    return Number.isNaN(score) === false;
-                })
-                .sort(function(a, b) {
-                    return a - b;
-                })
-            : [];
-        const lowerBound = Number.isNaN(normalizedRequiredComplexity) ? 0 : normalizedRequiredComplexity;
-        let upperBound = Number.POSITIVE_INFINITY;
-        const thresholdIndex = scoreThresholds.indexOf(lowerBound);
-
-        if (thresholdIndex !== -1 && scoreThresholds[thresholdIndex + 1] !== undefined) {
-            upperBound = scoreThresholds[thresholdIndex + 1] - 1;
-        }
-
-        return {
-            lowerBound: lowerBound,
-            upperBound: upperBound,
-        };
-    }
-
-    function isComplexityInsideBand(generatedComplexity, complexityBand) {
-        if (generatedComplexity < complexityBand.lowerBound) {
-            return false;
-        }
-
-        if (Number.isFinite(complexityBand.upperBound) === true && generatedComplexity > complexityBand.upperBound) {
-            return false;
-        }
-
-        return true;
-    }
-
-    function getComplexityDistanceFromBand(generatedComplexity, complexityBand) {
-        if (generatedComplexity < complexityBand.lowerBound) {
-            return complexityBand.lowerBound - generatedComplexity;
-        }
-
-        if (Number.isFinite(complexityBand.upperBound) === true && generatedComplexity > complexityBand.upperBound) {
-            return generatedComplexity - complexityBand.upperBound;
-        }
-
-        return 0;
-    }
-
     function rememberBestPasswordCandidate(bestCandidate, candidate, complexityBand) {
         if (!candidate) {
             return bestCandidate;
         }
 
+        const score = candidate.generatedComplexity ?? 0;
+        const insideBand = score >= complexityBand.lowerBound
+            && (!Number.isFinite(complexityBand.upperBound) || score <= complexityBand.upperBound);
+        const exceedsBand = Number.isFinite(complexityBand.upperBound) && score > complexityBand.upperBound;
+        const distanceFromBand = score < complexityBand.lowerBound
+            ? complexityBand.lowerBound - score
+            : (exceedsBand ? score - complexityBand.upperBound : 0);
+
         const enrichedCandidate = $.extend({}, candidate, {
-            complexityDistanceFromBand: getComplexityDistanceFromBand(candidate.generatedComplexity ?? 0, complexityBand),
-            matchesRequestedComplexity: isComplexityInsideBand(candidate.generatedComplexity ?? 0, complexityBand),
-            exceedsRequestedComplexity: Number.isFinite(complexityBand.upperBound) === true
-                && (candidate.generatedComplexity ?? 0) > complexityBand.upperBound,
+            complexityDistanceFromBand: distanceFromBand,
+            matchesRequestedComplexity: insideBand,
+            exceedsRequestedComplexity: exceedsBand,
             generationSize: parseInt(candidate.generationOptions?.size, 10) || 0,
         });
 
@@ -3178,48 +3116,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         return bestCandidate;
     }
 
-    function setPasswordGenerationOptionState(selector, isChecked) {
-        const checkbox = $(selector);
-        checkbox.prop('checked', isChecked);
-        checkbox.closest('label').toggleClass('active', isChecked);
-    }
-
-    function buildPasswordGenerationOptions(passwordGenerationOptions, currentSize, requiredComplexity) {
-        const effectiveOptions = $.extend({}, passwordGenerationOptions);
-        const minimumSize = getPasswordGenerationMinimumSize();
-        const maximumSize = getPasswordGenerationMaximumSize();
-        const normalizedCurrentSize = parseInt(currentSize, 10);
-
-        effectiveOptions.size = Math.min(
-            maximumSize,
-            Math.max(minimumSize, Number.isNaN(normalizedCurrentSize) ? 20 : normalizedCurrentSize)
-        );
-
-        if (requiredComplexity > 0) {
-            effectiveOptions.secure_pwd = true;
-            effectiveOptions.lowercase = true;
-            effectiveOptions.capitalize = true;
-            effectiveOptions.numerals = true;
-            effectiveOptions.symbols = true;
-        }
-
-        return effectiveOptions;
-    }
-
-    function applyPasswordGenerationOptions(generationOptions) {
-        if (!generationOptions) {
-            return;
-        }
-
-        $('#pwd-definition-size').val(String(generationOptions.size));
-        setPasswordGenerationOptionState('#pwd-definition-lcl', generationOptions.lowercase === true);
-        setPasswordGenerationOptionState('#pwd-definition-ucl', generationOptions.capitalize === true);
-        setPasswordGenerationOptionState('#pwd-definition-numeric', generationOptions.numerals === true);
-        setPasswordGenerationOptionState('#pwd-definition-symbols', generationOptions.symbols === true);
-        setPasswordGenerationOptionState('#pwd-definition-secure', generationOptions.secure_pwd === true);
-    }
-
     function generatePasswordRespectingFolderComplexity(elementId, passwordGenerationOptions, requiredComplexity, searchState = null) {
+        const minSize = parseInt($('#pwd-definition-size option:first').val(), 10) || 4;
+        const maxSize = parseInt($('#pwd-definition-size option:last').val(), 10) || 20;
+
         if (elementId !== 'form-item-password' || requiredComplexity <= 0) {
             return requestGeneratedPassword(passwordGenerationOptions).then(function(data) {
                 if (data.error == 'true') {
@@ -3233,14 +3133,21 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             });
         }
 
-        const complexityBand = getTargetComplexityBand(requiredComplexity);
-        const minimumSize = getPasswordGenerationMinimumSize();
-        const maximumSize = getPasswordGenerationMaximumSize();
+        // Determine the target complexity band from pwdOptions thresholds
+        const scoreThresholds = Array.isArray(pwdOptions.ui.scores)
+            ? pwdOptions.ui.scores.map(Number).filter(function(s) { return !Number.isNaN(s); }).sort(function(a, b) { return a - b; })
+            : [];
+        const lowerBound = parseInt(requiredComplexity, 10) || 0;
+        const thresholdIndex = scoreThresholds.indexOf(lowerBound);
+        const complexityBand = {
+            lowerBound: lowerBound,
+            upperBound: (thresholdIndex !== -1 && scoreThresholds[thresholdIndex + 1] !== undefined)
+                ? scoreThresholds[thresholdIndex + 1] - 1
+                : Number.POSITIVE_INFINITY,
+        };
+
         const requestedSize = parseInt(passwordGenerationOptions.size, 10);
-        const initialSize = Math.min(
-            maximumSize,
-            Math.max(minimumSize, Number.isNaN(requestedSize) ? 20 : requestedSize)
-        );
+        const initialSize = Math.min(maxSize, Math.max(minSize, Number.isNaN(requestedSize) ? 20 : requestedSize));
 
         if (searchState === null) {
             searchState = {
@@ -3253,11 +3160,15 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             };
         }
 
-        const effectiveOptions = buildPasswordGenerationOptions(
-            passwordGenerationOptions,
-            searchState.currentSize,
-            requiredComplexity
-        );
+        // Force all character types to maximize reach toward the target complexity
+        const effectiveOptions = $.extend({}, passwordGenerationOptions, {
+            size: Math.min(maxSize, Math.max(minSize, parseInt(searchState.currentSize, 10) || 20)),
+            secure_pwd: true,
+            lowercase: true,
+            capitalize: true,
+            numerals: true,
+            symbols: true,
+        });
 
         return requestGeneratedPassword(effectiveOptions).then(function(data) {
             if (data.error == 'true') {
@@ -3277,7 +3188,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     complexityBand
                 );
 
-                if (isComplexityInsideBand(generatedComplexity, complexityBand) === true) {
+                const insideBand = generatedComplexity >= complexityBand.lowerBound
+                    && (!Number.isFinite(complexityBand.upperBound) || generatedComplexity <= complexityBand.upperBound);
+
+                if (insideBand === true) {
                     return data;
                 }
 
@@ -3289,27 +3203,22 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     searchState.direction = -1;
                 }
 
-                if (searchState.totalAttempts >= (maximumSize - minimumSize + 1)) {
+                if (searchState.totalAttempts >= (maxSize - minSize + 1)) {
                     return searchState.bestCandidate ?? data;
                 }
 
                 let nextSize = searchState.currentSize + searchState.direction;
 
-                while (nextSize >= minimumSize && nextSize <= maximumSize) {
-                    if (searchState.direction === 1 && searchState.lowerTriedSizes[nextSize] === true) {
-                        nextSize += 1;
-                        continue;
-                    }
-
-                    if (searchState.direction === -1 && searchState.upperTriedSizes[nextSize] === true) {
-                        nextSize -= 1;
+                while (nextSize >= minSize && nextSize <= maxSize) {
+                    if (searchState.lowerTriedSizes[nextSize] === true || searchState.upperTriedSizes[nextSize] === true) {
+                        nextSize += searchState.direction;
                         continue;
                     }
 
                     break;
                 }
 
-                if (nextSize < minimumSize || nextSize > maximumSize) {
+                if (nextSize < minSize || nextSize > maxSize) {
                     return searchState.bestCandidate ?? data;
                 }
 
@@ -7458,9 +7367,26 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 return false;
             }
 
+            if (data.matchesRequestedComplexity === false) {
+                toastr.warning(
+                    '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
+                    '', { timeOut: 8000, progressBar: true }
+                );
+            }
+
             $('#' + elementId).val(data.key).focus();
-            if (elementId === 'form-item-password') {
-                applyPasswordGenerationOptions(data.generationOptions ?? null);
+            if (elementId === 'form-item-password' && data.generationOptions) {
+                const opts = data.generationOptions;
+                $('#pwd-definition-size').val(String(opts.size));
+                $.each({
+                    '#pwd-definition-lcl': opts.lowercase,
+                    '#pwd-definition-ucl': opts.capitalize,
+                    '#pwd-definition-numeric': opts.numerals,
+                    '#pwd-definition-symbols': opts.symbols,
+                    '#pwd-definition-secure': opts.secure_pwd,
+                }, function(sel, checked) {
+                    $(sel).prop('checked', checked === true).closest('label').toggleClass('active', checked === true);
+                });
                 syncItemPasswordComplexity(data.key ?? '');
             }
 
@@ -7672,7 +7598,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
     {
         var normalizedItemId = parseInt(itemId, 10);
         var websocketExpected = parseInt(websocketEnabledForItems, 10) === 1;
-        var websocketClientAvailable = typeof window.tpWsSubscribeToFolder === 'function' || typeof window.refreshItemDetails === 'function';
 
         clearPendingItemDetailsFallback();
 
@@ -7680,7 +7605,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             return;
         }
 
-        if (encryptionTaskCreated !== true || websocketExpected === false || websocketClientAvailable === false) {
+        if (encryptionTaskCreated !== true || websocketExpected === false) {
             Details(normalizedItemId, 'show', true);
             return;
         }

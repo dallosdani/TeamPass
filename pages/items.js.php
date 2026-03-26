@@ -975,7 +975,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             }
 
             $.when(
-                getPrivilegesOnItem(item_tree_id, 1)
+                getPrivilegesOnItem(item_tree_id, 1, 'item_edit_current_folder')
             ).then(function(retData) {
                 if (retData.error === true) {
                     toastr.remove();
@@ -1020,8 +1020,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 // Remove validated class
                 $('#form-item').removeClass('was-validated');
 
-                // Now manage edtion
-                showItemEditForm(item_tree_id);
+                // Now manage edition using the folder resolved by backend.
+                showItemEditForm(
+                    retData.folderId !== undefined && retData.folderId !== ''
+                        ? parseInt(retData.folderId, 10)
+                        : item_tree_id
+                );
             });
 
             //
@@ -1607,20 +1611,84 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
 
 
+    let itemFolderRulesRefreshRequestId = 0;
+
+    /**
+     * Refresh the top rules of item form from backend for the selected folder.
+     * When opening an existing item for edition, the backend can resolve the
+     * current folder directly from the item to avoid stale UI state after a move.
+     */
+    function refreshItemFolderTopRules(folderId, context) {
+        context = context || '';
+
+        if (folderId === null || folderId === '' || typeof folderId === 'undefined') {
+            $('#card-item-visibility').html('');
+            $('#card-item-minimum-complexity').html('');
+            return $.Deferred().resolve({ error: true }).promise();
+        }
+
+        itemFolderRulesRefreshRequestId += 1;
+        const currentRequestId = itemFolderRulesRefreshRequestId;
+
+        $('#card-item-visibility').html('');
+        $('#card-item-minimum-complexity').html('');
+
+        return $.post(
+            'sources/items.queries.php', {
+                type: 'get_complixity_level',
+                folder_id: folderId,
+                context: context,
+                item_id: store.get('teampassItem') !== undefined && store.get('teampassItem').id !== undefined
+                    ? store.get('teampassItem').id
+                    : '',
+                key: '<?php echo $session->get('key'); ?>'
+            }
+        ).then(function(data) {
+            data = decodeQueryReturn(data, '<?php echo $session->get('key'); ?>', 'items.queries.php', 'get_complixity_level');
+
+            if (debugJavascript === true) {
+                console.log('refreshItemFolderTopRules');
+                console.log(data);
+            }
+
+            // Ignore outdated asynchronous responses when the user changes folder quickly.
+            if (currentRequestId !== itemFolderRulesRefreshRequestId) {
+                return data;
+            }
+
+            if (data.error === false) {
+                $('#card-item-visibility').html(data.visibility || '<?php echo $lang->get('none'); ?>');
+                $('#card-item-minimum-complexity').html(data.complexity === undefined ? '' : data.complexity);
+
+                store.update(
+                    'teampassItem',
+                    function(teampassItem) {
+                        teampassItem.folderId = data.folderId === undefined ? parseInt(folderId, 10) : parseInt(data.folderId, 10),
+                        teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
+                        teampassItem.folderComplexity = data.val === undefined ? '' : parseInt(data.val, 10),
+                        teampassItem.folderIsPersonal = data.personal === undefined ? '' : parseInt(data.personal, 10),
+                        teampassItem.itemMinimumComplexity = data.complexity === undefined ? '' : data.complexity,
+                        teampassItem.itemVisibility = data.visibility === undefined ? '' : data.visibility
+                    }
+                );
+
+                if (context === 'item_edit_current_folder' && data.folderId !== undefined) {
+                    const resolvedFolderId = String(data.folderId);
+                    if ($('#form-item-folder').val() !== resolvedFolderId) {
+                        $('#form-item-folder').val(resolvedFolderId);
+                    }
+                }
+            }
+
+            return data;
+        });
+    }
+
     /**
      * Adapt the top rules of item form on change of folders
      */
     $('#form-item-folder').change(function() {
-        if ($(this).val() !== null && store.get('teampass-folders') !== undefined) {
-            if (debugJavascript === true) {
-                console.log('teampass-folders');
-                console.log(store.get('teampass-folders'))
-            }
-            var folders = JSON.parse(store.get('teampass-folders'));
-            $('#card-item-visibility').html(folders[$(this).val()].visibilityRoles);
-            $('#card-item-minimum-complexity').html(folders[$(this).val()].complexity.text);
-        }
-
+        refreshItemFolderTopRules($(this).val());
     });
 
     /**
@@ -4068,11 +4136,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 if (item_pwd || item_pwd === '') {
                     syncItemPasswordComplexity(item_pwd);
 
-                    $('#card-item-visibility').html(store.get('teampassItem').itemVisibility);
-                    $('#card-item-minimum-complexity').html(store.get('teampassItem').itemMinimumComplexity);
+                    $('#card-item-visibility').html('');
+                    $('#card-item-minimum-complexity').html('');
 
-                    // Set selected folder id
-                    $('#form-item-folder').val(selectedFolderId).change();
+                    // Set selected folder id and refresh top rules from backend
+                    $('#form-item-folder').val(selectedFolderId);
+                    refreshItemFolderTopRules(selectedFolderId, 'item_edit_current_folder');
 
                     // show top back buttons
                     $('#but_back_top_left, #but_back_top_right').addClass('hidden');
@@ -4716,13 +4785,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
                     // Check if more items to be loaded
                     const call_to_be_continued = !!data.list_to_be_continued;
+                    const isNotAuthorized = data.error === 'not_authorized';
+                    const hasUniqueLoadData = typeof data.uniqueLoadData === 'string' && data.uniqueLoadData !== '';
 
-                    // Hide New button if restricted folder
-                    $('#btn-new-item').toggleClass('hidden', data.access_level === 10);
+                    // Hide New button if restricted folder or folder is not accessible
+                    $('#btn-new-item').toggleClass('hidden', data.access_level === 10 || isNotAuthorized === true);
                     
                     // to be done only in 1st list load
-                    if (call_to_be_continued === false) {
-                        var initialQueryData = $.parseJSON(data.uniqueLoadData);
+                    if (isNotAuthorized === true) {
+                        $('#items_folder_path').html('<i class="fa-solid fa-folder-open-o"></i>&nbsp;' + rebuildPath(data.arborescence));
+                    } else if (call_to_be_continued === false) {
+                        var initialQueryData = hasUniqueLoadData === true ? $.parseJSON(data.uniqueLoadData) : { path: [] };
 
                         // Update hidden variables
                         store.update(
@@ -4741,9 +4814,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                             initialQueryData.path.length > 0 ? rebuildPath(initialQueryData.path) : ''
                         );
 
-                    } else if (data.error === 'not_authorized') {
-                        $('#items_folder_path').html('<i class="fa-solid fa-folder-open-o"></i>&nbsp;' + rebuildPath(data.arborescence));
-                        
                     } else {
                         // Store query results
                         store.update(
@@ -5634,9 +5704,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         return false;
                     }
 
-                    // Show header info
-                    $('#card-item-visibility').html(store.get('teampassItem').itemVisibility);
-                    $('#card-item-minimum-complexity').html(store.get('teampassItem').itemMinimumComplexity);
+                    // Show header info.
+                    // For edition, clear the values first and let the backend reload the
+                    // effective folder rules to avoid displaying stale values coming from
+                    // a previously selected folder.
+                    if (actionType === 'edit') {
+                        $('#card-item-visibility').html('');
+                        $('#card-item-minimum-complexity').html('');
+                    } else {
+                        $('#card-item-visibility').html(store.get('teampassItem').itemVisibility);
+                        $('#card-item-minimum-complexity').html(store.get('teampassItem').itemMinimumComplexity);
+                    }
 
                     // Hide NEW button in case access_level <span 30
                     if (store.get('teampassItem').hasAccessLevel === 10) {
@@ -6404,8 +6482,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 if (actionType === 'show') {
                     loadItemHistory(store.get('teampassItem').id);
                 } else if (actionType === 'edit') {
+                    const currentItemFolderId = parseInt(data.folder, 10) || parseInt(store.get('teampassItem').tree_id, 10) || 0;
+
                     $.when(
-                        getPrivilegesOnItem(selectedFolderId, 1)
+                        getPrivilegesOnItem(currentItemFolderId, 1, 'item_edit_current_folder')
                     ).then(function(retData) {
                         if (debugJavascript === true) {
                             console.log('getPrivilegesOnItem 3');
@@ -6426,6 +6506,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                             // Finished
                             return false;
                         } else {
+                            if (retData.folderId !== undefined && retData.folderId !== '') {
+                                $('#form-item-folder').val(String(retData.folderId));
+                            }
+
                             // Retrieve the password and synchronize the complexity meter
                             getItemPassword(
                                 'at_password_shown_edit_form',
@@ -7262,8 +7346,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                             }
 
 
-                            // Display the visibility
+                            // Display the visibility and complexity for the current folder.
+                            // This direct edit path (pencil from the list) must stay aligned with
+                            // showItemEditForm()/refreshItemFolderTopRules so the header does not
+                            // remain empty after we cleared the stale values before opening edit.
                             $('#card-item-visibility').html(data.visibility || '<?php echo $lang->get('none'); ?>');
+                            $('#card-item-minimum-complexity').html(data.complexity === undefined ? '' : data.complexity);
 
                             // Prepare Select2
                             $('.select2').select2({
@@ -7293,7 +7381,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         store.update(
                             'teampassItem',
                             function(teampassItem) {
-                                teampassItem.folderId = val,
+                                teampassItem.folderId = data.folderId === undefined ? val : parseInt(data.folderId, 10),
+                                teampassItem.tree_id = data.folderId === undefined ? teampassItem.tree_id : parseInt(data.folderId, 10),
                                     teampassItem.error = data.error === undefined ? '' : data.error,
                                     teampassItem.message = data.message === undefined ? '' : data.message,
                                     teampassItem.folderComplexity = data.val === undefined ? '' : parseInt(data.val),
@@ -7312,6 +7401,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         resolve({
                             "error": data.error === undefined ? '' : data.error,
                             "message": data.message === undefined ? '' : data.message,
+                            "folderId": data.folderId === undefined ? val : parseInt(data.folderId, 10),
                         });
                     }
                 );

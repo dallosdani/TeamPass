@@ -403,10 +403,23 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
             <!-- Main Sidebar Container -->
             <aside class="main-sidebar sidebar-dark-primary elevation-4">
                 <!-- Brand Logo -->
-                <a href="<?php echo $cpassman_url . '/index.php?page=' . ((int) $session_user_admin === 1 ? 'admin' : 'items'); ?>" class="brand-link">
-                    <img src="includes/images/teampass-logo2-home.png" alt="Teampass Logo" class="brand-image">
-                    <span class="brand-text font-weight-light"><?php echo TP_TOOL_NAME; ?></span>
-                </a>
+                <div class="brand-link tp-brand-link">
+                    <a href="<?php echo $cpassman_url . '/index.php?page=' . ((int) $session_user_admin === 1 ? 'admin' : 'items'); ?>" class="tp-brand-home-link">
+                        <img src="includes/images/teampass-logo2-home.png" alt="Teampass Logo" class="brand-image">
+                        <span class="brand-text font-weight-light"><?php echo TP_TOOL_NAME; ?></span>
+                    </a>
+                    <?php if ((int) $session_user_admin === 1) { ?>
+                    <a
+                        id="tp-sidebar-version-badge"
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="tp-sidebar-version-badge infotip d-none"
+                        title=""
+                        aria-label=""
+                    ></a>
+                    <?php } ?>
+                </div>
 
                 <!-- Sidebar -->
                 <div class="sidebar">
@@ -1233,6 +1246,83 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
     <script type="text/javascript" src="plugins/bootstrap-add-clear/bootstrap-add-clear.min.js?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>"></script>
     <!-- DOMPurify -->
     <script type="text/javascript" src="plugins/DOMPurify/purify.min.js?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>"></script>
+
+    <style>
+        .tp-brand-link {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            overflow: hidden;
+        }
+
+        .tp-brand-home-link {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+            color: inherit;
+            text-decoration: none !important;
+        }
+
+        .tp-brand-home-link:hover,
+        .tp-brand-home-link:focus {
+            color: inherit;
+            text-decoration: none !important;
+        }
+
+        .tp-brand-home-link .brand-image {
+            float: none;
+            position: static;
+            margin: 0 0.5rem 0 0;
+            flex: 0 0 auto;
+        }
+
+        .tp-brand-home-link .brand-text {
+            display: block;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tp-sidebar-version-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 18px;
+            padding: 2px 7px;
+            margin-right: 8px;
+            border-radius: 999px;
+            flex: 0 0 auto;
+            font-size: 11.5px;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+            color: #ffffff !important;
+            background: #17a2b8;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+            text-decoration: none !important;
+        }
+
+        .tp-sidebar-version-badge:hover,
+        .tp-sidebar-version-badge:focus {
+            color: #ffffff !important;
+            background: #138496;
+            text-decoration: none !important;
+        }
+
+        .sidebar-collapse .tp-sidebar-version-badge,
+        .sidebar-closed .tp-sidebar-version-badge {
+            display: none !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .tp-sidebar-version-badge {
+                display: none !important;
+            }
+        }
+    </style>
 
     <?php
     $get['page'] = $request->query->filter('page', null, FILTER_SANITIZE_SPECIAL_CHARS);

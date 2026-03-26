@@ -1273,7 +1273,6 @@ if (
                             );
                         }
 
-                        $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
                         $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('generate_new_keys_end'); ?>');
                         resetAdminChangeUserPasswordDialogContext();
                         // Show warning

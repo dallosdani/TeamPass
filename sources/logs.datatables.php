@@ -41,6 +41,105 @@ use voku\helper\AntiXSS;
 // Load functions
 require_once 'main.functions.php';
 
+/**
+ * Normalize a display value: decode HTML entities then re-encode for safe output.
+ */
+function normalizeBackgroundTaskDisplayValue($value): string
+{
+    $decodedValue = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    return htmlspecialchars($decodedValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+}
+
+/**
+ * Return the display name for a user ID, or a user-slash icon if not found.
+ */
+function getBackgroundTaskUserDisplayFromUserId($userId): string
+{
+    if (empty($userId) === true) {
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    $dataUser = DB::queryFirstRow(
+        'SELECT name, lastname, login FROM ' . prefixTable('users') . '
+        WHERE id = %i
+        LIMIT 1',
+        (int) $userId
+    );
+
+    if (DB::count() === 0 || $dataUser === null) {
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    $displayName = trim(
+        normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
+        . ' ' .
+        normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
+    );
+
+    if ($displayName === '') {
+        $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
+    }
+
+    return $displayName === '' ? "<i class='fa-solid fa-user-slash'></i>" : $displayName;
+}
+
+/**
+ * Resolve the user display string for a background task row based on its process type and arguments.
+ */
+function resolveBackgroundTaskUserDisplay(array $arguments, string $processType): string
+{
+    if (in_array($processType, ['create_user_keys', 'user_build_cache_tree', 'migrate_user_personal_items'], true) === true) {
+        $userId = $arguments['new_user_id'] ?? ($arguments['user_id'] ?? null);
+        return getBackgroundTaskUserDisplayFromUserId($userId);
+    }
+
+    if (in_array($processType, ['item_copy', 'new_item', 'item_update_create_keys', 'update_item'], true) === true) {
+        $userId = $arguments['author'] ?? ($arguments['user_id'] ?? ($arguments['owner_id'] ?? null));
+        return getBackgroundTaskUserDisplayFromUserId($userId);
+    }
+
+    if ($processType === 'send_email') {
+        $receiverName = trim((string) ($arguments['receiver_name'] ?? ($arguments['login'] ?? '')));
+        if ($receiverName !== '') {
+            return normalizeBackgroundTaskDisplayValue($receiverName);
+        }
+
+        $email = trim((string) ($arguments['receivers'] ?? ($arguments['email'] ?? '')));
+        if ($email !== '') {
+            $dataUser = DB::queryFirstRow(
+                'SELECT name, lastname, login FROM ' . prefixTable('users') . '
+                WHERE email = %s
+                ORDER BY id DESC
+                LIMIT 1',
+                $email
+            );
+
+            if (DB::count() > 0 && $dataUser !== null) {
+                $displayName = trim(
+                    normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
+                    . ' ' .
+                    normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
+                );
+
+                if ($displayName === '') {
+                    $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
+                }
+
+                if ($displayName !== '') {
+                    return $displayName;
+                }
+            }
+
+            return normalizeBackgroundTaskDisplayValue($email);
+        }
+
+        return "<i class='fa-solid fa-user-slash'></i>";
+    }
+
+    return "<i class='fa-solid fa-user-slash'></i>";
+}
+
 // init
 loadClasses('DB');
 $session = SessionManager::getSession();
@@ -1098,99 +1197,6 @@ if (isset($params['action']) && $params['action'] === 'connections') {
 
 // deepcode ignore XSS: data comes from database. Before being stored it is clean with feature antiXss->xss_clean
 echo (string) $sOutput;
-
-
-
-
-function normalizeBackgroundTaskDisplayValue($value): string
-{
-    $decodedValue = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-    return htmlspecialchars($decodedValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
-}
-
-function getBackgroundTaskUserDisplayFromUserId($userId): string
-{
-    if (empty($userId) === true) {
-        return "<i class='fa-solid fa-user-slash'></i>";
-    }
-
-    $dataUser = DB::queryFirstRow(
-        'SELECT name, lastname, login FROM ' . prefixTable('users') . '
-        WHERE id = %i
-        LIMIT 1',
-        (int) $userId
-    );
-
-    if (DB::count() === 0 || $dataUser === null) {
-        return "<i class='fa-solid fa-user-slash'></i>";
-    }
-
-    $displayName = trim(
-        normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
-        . ' ' .
-        normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
-    );
-
-    if ($displayName === '') {
-        $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
-    }
-
-    return $displayName === '' ? "<i class='fa-solid fa-user-slash'></i>" : $displayName;
-}
-
-function resolveBackgroundTaskUserDisplay(array $arguments, string $processType): string
-{
-    if (in_array($processType, ['create_user_keys', 'user_build_cache_tree', 'migrate_user_personal_items'], true) === true) {
-        $userId = $arguments['new_user_id'] ?? ($arguments['user_id'] ?? null);
-        return getBackgroundTaskUserDisplayFromUserId($userId);
-    }
-
-    if (in_array($processType, ['item_copy', 'new_item', 'item_update_create_keys', 'update_item'], true) === true) {
-        $userId = $arguments['author'] ?? ($arguments['user_id'] ?? ($arguments['owner_id'] ?? null));
-        return getBackgroundTaskUserDisplayFromUserId($userId);
-    }
-
-    if ($processType === 'send_email') {
-        $receiverName = trim((string) ($arguments['receiver_name'] ?? ($arguments['login'] ?? '')));
-        if ($receiverName !== '') {
-            return normalizeBackgroundTaskDisplayValue($receiverName);
-        }
-
-        $email = trim((string) ($arguments['receivers'] ?? ($arguments['email'] ?? '')));
-        if ($email !== '') {
-            $dataUser = DB::queryFirstRow(
-                'SELECT name, lastname, login FROM ' . prefixTable('users') . '
-                WHERE email = %s
-                ORDER BY id DESC
-                LIMIT 1',
-                $email
-            );
-
-            if (DB::count() > 0 && $dataUser !== null) {
-                $displayName = trim(
-                    normalizeBackgroundTaskDisplayValue($dataUser['name'] ?? '')
-                    . ' ' .
-                    normalizeBackgroundTaskDisplayValue($dataUser['lastname'] ?? '')
-                );
-
-                if ($displayName === '') {
-                    $displayName = trim(normalizeBackgroundTaskDisplayValue($dataUser['login'] ?? ''));
-                }
-
-                if ($displayName !== '') {
-                    return $displayName;
-                }
-            }
-
-            return normalizeBackgroundTaskDisplayValue($email);
-        }
-
-        return "<i class='fa-solid fa-user-slash'></i>";
-    }
-
-    return "<i class='fa-solid fa-user-slash'></i>";
-}
 
 function getSubtaskProgress($id)
 {

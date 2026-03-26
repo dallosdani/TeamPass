@@ -4136,12 +4136,13 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 if (item_pwd || item_pwd === '') {
                     syncItemPasswordComplexity(item_pwd);
 
-                    $('#card-item-visibility').html('');
-                    $('#card-item-minimum-complexity').html('');
-
-                    // Set selected folder id and refresh top rules from backend
+                    // Set selected folder id.
+                    // getPrivilegesOnItem already called get_complixity_level and populated
+                    // the store with fresh visibility/complexity — read from it directly.
                     $('#form-item-folder').val(selectedFolderId);
-                    refreshItemFolderTopRules(selectedFolderId, 'item_edit_current_folder');
+                    const _editItem = store.get('teampassItem');
+                    $('#card-item-visibility').html(_editItem.itemVisibility || '<?php echo $lang->get('none'); ?>');
+                    $('#card-item-minimum-complexity').html(_editItem.itemMinimumComplexity || '');
 
                     // show top back buttons
                     $('#but_back_top_left, #but_back_top_right').addClass('hidden');

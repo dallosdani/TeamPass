@@ -1543,9 +1543,9 @@ switch ($inputData['type']) {
                         );
                         if (DB::count() > 0) {
                             // Delete associated sharekeys first
-                            DB::query(
-                                'DELETE FROM ' . prefixTable('sharekeys_fields') . '
-                                WHERE object_id = %i',
+                            DB::delete(
+                                prefixTable('sharekeys_fields'),
+                                'object_id = %i',
                                 $existingField['id']
                             );
                             // Then delete the field entry
@@ -5050,10 +5050,10 @@ switch ($inputData['type']) {
                 'at_del_file : ' . strval($data['name'])
             );
 
-            // DElete sharekeys
-            DB::query(
-                'DELETE FROM ' . prefixTable('sharekeys_files') . '
-                WHERE object_id = %i',
+            // Delete sharekeys
+            DB::delete(
+                prefixTable('sharekeys_files'),
+                'object_id = %i',
                 $fileId
             );
 
@@ -5271,9 +5271,9 @@ switch ($inputData['type']) {
             // Encrypt only for the user
 
             // Remove all item sharekeys items
-            DB::query(
-                'DELETE FROM ' . prefixTable('sharekeys_items') . '
-                WHERE object_id = %i AND user_id NOT IN %ls',
+            DB::delete(
+                prefixTable('sharekeys_items'),
+                'object_id = %i AND user_id NOT IN %ls',
                 $inputData['itemId'],
                 [$session->get('user-id'), TP_USER_ID]
             );
@@ -5287,9 +5287,9 @@ switch ($inputData['type']) {
                 $inputData['itemId']
             );
             foreach ($rows as $field) {
-                DB::query(
-                    'DELETE FROM ' . prefixTable('sharekeys_fields') . '
-                    WHERE object_id = %i AND user_id NOT IN %ls',
+                DB::delete(
+                    prefixTable('sharekeys_fields'),
+                    'object_id = %i AND user_id NOT IN %ls',
                     $field['id'],
                     [$session->get('user-id'), TP_USER_ID]
                 );
@@ -5304,9 +5304,9 @@ switch ($inputData['type']) {
                 $inputData['itemId']
             );
             foreach ($rows as $attachment) {
-                DB::query(
-                    'DELETE FROM ' . prefixTable('sharekeys_files') . '
-                    WHERE object_id = %i AND user_id NOT IN %ls',
+                DB::delete(
+                    prefixTable('sharekeys_files'),
+                    'object_id = %i AND user_id NOT IN %ls',
                     $attachment['id'],
                     [$session->get('user-id'), TP_USER_ID]
                 );
@@ -5598,11 +5598,11 @@ switch ($inputData['type']) {
                     // Encrypt only for the user
 
                     // Remove all item sharekeys items
-                    DB::query(
-                        'DELETE FROM ' . prefixTable('sharekeys_items') . '
-                        WHERE object_id = %i AND user_id NOT IN %ls',
+                    DB::delete(
+                        prefixTable('sharekeys_items'),
+                        'object_id = %i AND user_id NOT IN %ls',
                         $item_id,
-                        [$session->get('user-id'), TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+                        [$session->get('user-id'), TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
                     );
 
                     // Remove all item sharekeys fields
@@ -5614,9 +5614,9 @@ switch ($inputData['type']) {
                         $item_id
                     );
                     foreach ($rows as $field) {
-                        DB::query(
-                            'DELETE FROM ' . prefixTable('sharekeys_fields') . '
-                            WHERE object_id = %i AND user_id != %i',
+                        DB::delete(
+                            prefixTable('sharekeys_fields'),
+                            'object_id = %i AND user_id != %i',
                             $field['id'],
                             $session->get('user-id')
                         );
@@ -5631,9 +5631,9 @@ switch ($inputData['type']) {
                         $item_id
                     );
                     foreach ($rows as $attachment) {
-                        DB::query(
-                            'DELETE FROM ' . prefixTable('sharekeys_files') . '
-                            WHERE object_id = %i AND user_id != %i',
+                        DB::delete(
+                            prefixTable('sharekeys_files'),
+                            'object_id = %i AND user_id != %i',
                             $attachment['id'],
                             $session->get('user-id')
                         );
@@ -7250,11 +7250,23 @@ switch ($inputData['type']) {
             'decode'
         );
 
+        $checkItemId = (int) filter_var($dataReceived['itemId'], FILTER_SANITIZE_NUMBER_INT);
+        $checkTreeId = (int) filter_var($dataReceived['treeId'], FILTER_SANITIZE_NUMBER_INT);
+
+        // Client-side treeId may be stale if the item was moved since the page loaded.
+        // Resolve the item's actual current folder from the DB before checking rights.
+        if ($checkItemId > 0) {
+            $currentTreeId = getItemFolderIdFromDb($checkItemId);
+            if ($currentTreeId !== null) {
+                $checkTreeId = $currentTreeId;
+            }
+        }
+
         // Check rights
         $data = getCurrentAccessRights(
             (int) filter_var($dataReceived['userId'], FILTER_SANITIZE_NUMBER_INT),
-            (int) filter_var($dataReceived['itemId'], FILTER_SANITIZE_NUMBER_INT),
-            (int) filter_var($dataReceived['treeId'], FILTER_SANITIZE_NUMBER_INT),
+            $checkItemId,
+            $checkTreeId,
             (string) filter_var($dataReceived['action'], FILTER_SANITIZE_SPECIAL_CHARS),
         );
 
@@ -7485,13 +7497,6 @@ function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $a
 {
     $session = SessionManager::getSession();
 
-    if ($itemId > 0) {
-        $currentTreeId = getItemFolderIdFromDb($itemId);
-        if ($currentTreeId !== null) {
-            $treeId = $currentTreeId;
-        }
-    }
-    
     // Check if the item is locked and whether the current user can edit it
     $editionLock = isItemLocked($itemId, $session, $userId, $action);
 

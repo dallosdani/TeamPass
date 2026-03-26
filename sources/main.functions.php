@@ -3919,17 +3919,17 @@ function storeUsersShareKey(
     // created a race condition window where all sharekeys were absent.
     if ($deleteAll === true) {
         if (!empty($processedUserIds)) {
-            DB::query(
-                'DELETE FROM ' . prefixTable($object_name) . '
-                WHERE object_id = %i AND user_id NOT IN %li',
+            DB::delete(
+                prefixTable($object_name),
+                'object_id = %i AND user_id NOT IN %li',
                 $post_object_id,
                 $processedUserIds
             );
         } else {
             // No eligible users found: remove all sharekeys for this object
-            DB::query(
-                'DELETE FROM ' . prefixTable($object_name) . '
-                WHERE object_id = %i',
+            DB::delete(
+                prefixTable($object_name),
+                'object_id = %i',
                 $post_object_id
             );
         }
@@ -4143,9 +4143,14 @@ function deleteUserObjetsKeys(int $userId, array $SETTINGS = []): bool
         $userId
     );
     // Remove all item sharekeys files except personal items
+    // object_id references files.id, so we join through the files table to get item IDs
     DB::query(
         'DELETE FROM ' . prefixTable('sharekeys_files') . '
-        WHERE user_id = %i AND object_id NOT IN (SELECT i.id FROM ' . prefixTable('items') . ' AS i WHERE i.perso = 1)',
+        WHERE user_id = %i AND object_id NOT IN (
+            SELECT f.id FROM ' . prefixTable('files') . ' AS f
+            INNER JOIN ' . prefixTable('items') . ' AS i ON f.id_item = i.id
+            WHERE i.perso = 1
+        )',
         $userId
     );
     // Remove all item sharekeys fields except personal items
@@ -5613,32 +5618,32 @@ function purgeUnnecessaryKeysForUser(int $user_id=0)
     );
     if (count($personalItems) > 0) {
         // Item keys
-        DB::query(
-            'DELETE FROM ' . prefixTable('sharekeys_items') . '
-            WHERE object_id IN %li AND user_id NOT IN %ls',
+        DB::delete(
+            prefixTable('sharekeys_items'),
+            'object_id IN %li AND user_id NOT IN %ls',
             $personalItems,
-            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
         );
         // Files keys
-        DB::query(
-            'DELETE FROM ' . prefixTable('sharekeys_files') . '
-            WHERE object_id IN %li AND user_id NOT IN %ls',
+        DB::delete(
+            prefixTable('sharekeys_files'),
+            'object_id IN %li AND user_id NOT IN %ls',
             $personalItems,
-            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
         );
         // Fields keys
-        DB::query(
-            'DELETE FROM ' . prefixTable('sharekeys_fields') . '
-            WHERE object_id IN %li AND user_id NOT IN %ls',
+        DB::delete(
+            prefixTable('sharekeys_fields'),
+            'object_id IN %li AND user_id NOT IN %ls',
             $personalItems,
-            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
         );
         // Logs keys
-        DB::query(
-            'DELETE FROM ' . prefixTable('sharekeys_logs') . '
-            WHERE object_id IN %li AND user_id NOT IN %ls',
+        DB::delete(
+            prefixTable('sharekeys_logs'),
+            'object_id IN %li AND user_id NOT IN %ls',
             $personalItems,
-            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+            [$user_id, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
         );
     }
 }
@@ -6133,32 +6138,25 @@ function EnsurePersonalItemHasOnlyKeysForOwner(int $userId, int $itemId): bool
     // Some TeamPass tables use `id`, others use `increment_id` as object identifier.
     // Detect the real PK column at runtime for dependent tables to avoid SQL errors on upgraded instances.
     $resolveObjectIdColumn = static function (string $tableName): string {
+        static $cache = [];
+        if (isset($cache[$tableName])) {
+            return $cache[$tableName];
+        }
         DB::query(
             'SHOW COLUMNS FROM ' . prefixTable($tableName) . ' LIKE %s',
             'increment_id'
         );
-        if (DB::count() > 0) {
-            return 'increment_id';
-        }
-
-        DB::query(
-            'SHOW COLUMNS FROM ' . prefixTable($tableName) . ' LIKE %s',
-            'id'
-        );
-        if (DB::count() > 0) {
-            return 'id';
-        }
-
-        return 'id';
+        $cache[$tableName] = DB::count() > 0 ? 'increment_id' : 'id';
+        return $cache[$tableName];
     };
 
     $filesObjectIdColumn = $resolveObjectIdColumn('files');
     $categoriesItemsObjectIdColumn = $resolveObjectIdColumn('categories_items');
     $logItemsObjectIdColumn = $resolveObjectIdColumn('log_items');
 
-    DB::query(
-        'DELETE FROM ' . prefixTable('sharekeys_items') . '
-        WHERE object_id = %i AND user_id NOT IN %ls',
+    DB::delete(
+        prefixTable('sharekeys_items'),
+        'object_id = %i AND user_id NOT IN %ls',
         $itemId,
         [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
     );

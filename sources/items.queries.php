@@ -1543,9 +1543,9 @@ switch ($inputData['type']) {
                         );
                         if (DB::count() > 0) {
                             // Delete associated sharekeys first
-                            DB::delete(
-                                prefixTable('sharekeys_fields'),
-                                'object_id = %i',
+                            DB::query(
+                                'DELETE FROM ' . prefixTable('sharekeys_fields') . '
+                                WHERE object_id = %i',
                                 $existingField['id']
                             );
                             // Then delete the field entry
@@ -3887,17 +3887,39 @@ switch ($inputData['type']) {
                 'id=%s',
                 $inputData['folderId']
             );
-            // update complixity value
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => $dataReceived['complexity'],
-                    'updated_at' => time(),
-                ),
-                'intitule = %s AND type = %s',
+            // Add or update complexity value.
+            // Some personal root folders may miss the misc/complex row,
+            // therefore a plain UPDATE is not sufficient here.
+            $existingFolderComplexity = DB::queryFirstRow(
+                'SELECT increment_id
+                FROM ' . prefixTable('misc') . '
+                WHERE intitule = %i AND type = %s',
                 $inputData['folderId'],
                 'complex'
             );
+            if ($existingFolderComplexity !== null) {
+                DB::update(
+                    prefixTable('misc'),
+                    array(
+                        'valeur' => $dataReceived['complexity'],
+                        'updated_at' => time(),
+                    ),
+                    'intitule = %s AND type = %s',
+                    $inputData['folderId'],
+                    'complex'
+                );
+            } else {
+                DB::insert(
+                    prefixTable('misc'),
+                    array(
+                        'type' => 'complex',
+                        'intitule' => $inputData['folderId'],
+                        'valeur' => $dataReceived['complexity'],
+                        'created_at' => time(),
+                        'updated_at' => time(),
+                    )
+                );
+            }
             // rebuild fuild tree folder
             $tree->rebuild();
         }
@@ -4674,6 +4696,16 @@ switch ($inputData['type']) {
             }
         }
 
+        if (
+            $inputData['context'] === 'item_edit_current_folder'
+            && (int) $inputData['itemId'] > 0
+        ) {
+            $currentItemFolderId = getItemFolderIdFromDb((int) $inputData['itemId']);
+            if ($currentItemFolderId !== null) {
+                $inputData['folderId'] = $currentItemFolderId;
+            }
+        }
+
         // do query on this folder
         $data_this_folder = DB::queryFirstRow(
             'SELECT id, personal_folder, title
@@ -5019,9 +5051,9 @@ switch ($inputData['type']) {
             );
 
             // DElete sharekeys
-            DB::delete(
-                prefixTable('sharekeys_files'),
-                'object_id = %i',
+            DB::query(
+                'DELETE FROM ' . prefixTable('sharekeys_files') . '
+                WHERE object_id = %i',
                 $fileId
             );
 
@@ -5239,9 +5271,9 @@ switch ($inputData['type']) {
             // Encrypt only for the user
 
             // Remove all item sharekeys items
-            DB::delete(
-                prefixTable('sharekeys_items'),
-                'object_id = %i AND user_id NOT IN %ls',
+            DB::query(
+                'DELETE FROM ' . prefixTable('sharekeys_items') . '
+                WHERE object_id = %i AND user_id NOT IN %ls',
                 $inputData['itemId'],
                 [$session->get('user-id'), TP_USER_ID]
             );
@@ -5255,9 +5287,9 @@ switch ($inputData['type']) {
                 $inputData['itemId']
             );
             foreach ($rows as $field) {
-                DB::delete(
-                    prefixTable('sharekeys_fields'),
-                    'object_id = %i AND user_id NOT IN %ls',
+                DB::query(
+                    'DELETE FROM ' . prefixTable('sharekeys_fields') . '
+                    WHERE object_id = %i AND user_id NOT IN %ls',
                     $field['id'],
                     [$session->get('user-id'), TP_USER_ID]
                 );
@@ -5272,9 +5304,9 @@ switch ($inputData['type']) {
                 $inputData['itemId']
             );
             foreach ($rows as $attachment) {
-                DB::delete(
-                    prefixTable('sharekeys_files'),
-                    'object_id = %i AND user_id NOT IN %ls',
+                DB::query(
+                    'DELETE FROM ' . prefixTable('sharekeys_files') . '
+                    WHERE object_id = %i AND user_id NOT IN %ls',
                     $attachment['id'],
                     [$session->get('user-id'), TP_USER_ID]
                 );
@@ -5566,9 +5598,9 @@ switch ($inputData['type']) {
                     // Encrypt only for the user
 
                     // Remove all item sharekeys items
-                    DB::delete(
-                        prefixTable('sharekeys_items'),
-                        'object_id = %i AND user_id NOT IN %ls',
+                    DB::query(
+                        'DELETE FROM ' . prefixTable('sharekeys_items') . '
+                        WHERE object_id = %i AND user_id NOT IN %ls',
                         $item_id,
                         [$session->get('user-id'), TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
                     );
@@ -5582,9 +5614,9 @@ switch ($inputData['type']) {
                         $item_id
                     );
                     foreach ($rows as $field) {
-                        DB::delete(
-                            prefixTable('sharekeys_fields'),
-                            'object_id = %i AND user_id != %i',
+                        DB::query(
+                            'DELETE FROM ' . prefixTable('sharekeys_fields') . '
+                            WHERE object_id = %i AND user_id != %i',
                             $field['id'],
                             $session->get('user-id')
                         );
@@ -5599,9 +5631,9 @@ switch ($inputData['type']) {
                         $item_id
                     );
                     foreach ($rows as $attachment) {
-                        DB::delete(
-                            prefixTable('sharekeys_files'),
-                            'object_id = %i AND user_id != %i',
+                        DB::query(
+                            'DELETE FROM ' . prefixTable('sharekeys_files') . '
+                            WHERE object_id = %i AND user_id != %i',
                             $attachment['id'],
                             $session->get('user-id')
                         );
@@ -7452,6 +7484,13 @@ function fileFormatImage($ext)
 function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $action = ''): array
 {
     $session = SessionManager::getSession();
+
+    if ($itemId > 0) {
+        $currentTreeId = getItemFolderIdFromDb($itemId);
+        if ($currentTreeId !== null) {
+            $treeId = $currentTreeId;
+        }
+    }
     
     // Check if the item is locked and whether the current user can edit it
     $editionLock = isItemLocked($itemId, $session, $userId, $action);

@@ -401,7 +401,11 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                         for (let x = 1; x < max_folder_depth; x++) {
                             $('#folders-depth').append('<option value="' + x + '">' + x + '</option>')
                         }
-                        $('#folders-depth').val('all').change()
+                        const storedDepth = store.get('teampassUser') && store.get('teampassUser').foldersDepthFilter !== undefined
+                            ? store.get('teampassUser').foldersDepthFilter
+                            : 'all'
+                        const depthToApply = $('#folders-depth option[value="' + storedDepth + '"]').length > 0 ? storedDepth : 'all'
+                        $('#folders-depth').val(depthToApply).trigger('change')
 
                         // Populate complexity filter (keep current selection if possible)
                         const prevComplexity = $('#folders-complexity').val()
@@ -658,7 +662,15 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         })
     }
 
-    $(document).on('change', '#folders-depth', applyFilters)
+    $(document).on('change', '#folders-depth', function() {
+        const depth = $(this).val()
+        if (depth !== null && depth !== '') {
+            store.update('teampassUser', function(teampassUser) {
+                teampassUser.foldersDepthFilter = depth
+            })
+        }
+        applyFilters()
+    })
     $(document).on('change', '#folders-complexity', applyFilters)
     $('#folders-search').on('keyup', applyFilters)
 
@@ -781,16 +793,32 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         $('#folder-edit-icon').val(folderIcon)
         $('#folder-edit-icon-selected').val(folderIconSel)
 
+        // Slide in first so Select2 initializes inside a visible container
+        $('#folder-edit-overlay').fadeIn(150)
+        $('#folder-edit-sidebar').addClass('open')
+
         // Populate selects from stored options then set values
         $('#folder-edit-parent').html(store.get('teampassApplication').foldersSelect)
         $('#folder-edit-complexity').html(store.get('teampassApplication').complexityOptions)
 
+        // Re-initialize Select2 cleanly each time the sidebar opens
+        if ($('#folder-edit-parent').hasClass('select2-hidden-accessible')) {
+            $('#folder-edit-parent').select2('destroy')
+        }
+        if ($('#folder-edit-complexity').hasClass('select2-hidden-accessible')) {
+            $('#folder-edit-complexity').select2('destroy')
+        }
+
         $('#folder-edit-parent').select2({
-            language: '<?php echo $session->get('user-language_code'); ?>'
+            language: '<?php echo $session->get('user-language_code'); ?>',
+            dropdownParent: $('#folder-edit-sidebar'),
+            width: '100%'
         }).val(String(folderParent)).trigger('change')
 
         $('#folder-edit-complexity').select2({
-            language: '<?php echo $session->get('user-language_code'); ?>'
+            language: '<?php echo $session->get('user-language_code'); ?>',
+            dropdownParent: $('#folder-edit-sidebar'),
+            width: '100%'
         }).val(String(folderComplexity)).trigger('change')
 
         // Checkboxes
@@ -809,9 +837,6 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         $('#table-folders tbody tr.editing-active').removeClass('editing-active')
         $row.addClass('editing-active')
 
-        // Slide in
-        $('#folder-edit-overlay').fadeIn(150)
-        $('#folder-edit-sidebar').addClass('open')
     }
 
     /**

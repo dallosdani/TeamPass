@@ -1528,7 +1528,7 @@ function logItems(
         if ($action === 'at_shown') {
             try {
                 $existing = DB::queryFirstField(
-                    'SELECT id FROM ' . prefixTable('log_items') . '
+                    'SELECT increment_id FROM ' . prefixTable('log_items') . '
                     WHERE id_item = %i AND id_user = %i AND action = %s AND date >= %i AND raison LIKE %ss
                     ORDER BY date DESC
                     LIMIT 1',
@@ -6150,7 +6150,7 @@ function EnsurePersonalItemHasOnlyKeysForOwner(int $userId, int $itemId): bool
     );
     DB::delete(
         prefixTable('sharekeys_logs'),
-        'object_id IN (SELECT id FROM '.prefixTable('log_items').' WHERE id_item = %i) AND user_id NOT IN %ls',
+        'object_id IN (SELECT increment_id FROM '.prefixTable('log_items').' WHERE id_item = %i) AND user_id NOT IN %ls',
         $itemId,
         [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
     );

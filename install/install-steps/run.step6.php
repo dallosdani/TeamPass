@@ -329,6 +329,17 @@ class teampassInstaller
                 $data
             );
 
+            // Set the secure cookie flag based on the configured URL protocol.
+            // HTTP deployments (e.g. Docker without a reverse proxy) must use false,
+            // otherwise the browser will reject the CSRF cookie and logins will fail.
+            $teampassUrl = $this->installConfig['teampassUrl'] ?? '';
+            $secureCookie = str_starts_with((string) $teampassUrl, 'https://') ? 'true' : 'false';
+            $data = str_replace(
+                '"secure" => true',
+                '"secure" => ' . $secureCookie,
+                $data
+            );
+
             // Save the changes
             if (file_put_contents($csrfpFile, $data) === false) {
                 return [

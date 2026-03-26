@@ -5787,6 +5787,7 @@ function returnIfSet($value, $retFalse = '', $retTrue = null): mixed
  * @param array $post_replace
  * @param boolean $immediate_email
  * @param string $encryptedUserPassword
+ * @param string $receiverName
  * @return string
  */
 function sendMailToUser(
@@ -5795,7 +5796,8 @@ function sendMailToUser(
     string $post_subject,
     array $post_replace,
     bool $immediate_email = false,
-    $encryptedUserPassword = ''
+    $encryptedUserPassword = '',
+    string $receiverName = ''
 ): ?string {
     global $SETTINGS;
     $emailSettings = new EmailSettings($SETTINGS);
@@ -5844,7 +5846,7 @@ function sendMailToUser(
             $post_subject,
             $post_body,
             $post_receipt,
-            "",
+            $receiverName,
             $encryptedUserPassword,
         );
     }

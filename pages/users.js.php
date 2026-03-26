@@ -1144,6 +1144,19 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                                     timeOut: 4000
                                 }
                             );
+
+                            if (typeof data.user_password !== 'undefined' && data.user_password !== '') {
+                                showModalDialogBox(
+                                    '#warningModal',
+                                    '<i class="fas fa-user-shield fa-lg warning mr-2"></i><?php echo $lang->get('caution'); ?>',
+                                    '<?php echo $lang->get('user_password'); ?>&nbsp;<code class="ml-2">' + data.user_password + '</code>',
+                                    '',
+                                    '<?php echo $lang->get('close'); ?>',
+                                    false,
+                                    false,
+                                    false
+                                );
+                            }
                             // ---
                         } else {
                             // Inform user
@@ -1302,11 +1315,14 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                             $('#dialog-admin-change-user-password-info')
                                 .html('<i class="icon fas fa-info mr-2"></i><?php echo $lang->get('admin_change_user_password_info'); ?>');
                             $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
+                            $('#dialog-admin-change-user-password-show-password-div').removeClass('hidden');
+                            $('#dialog-admin-change-user-password-do-show-password').prop('checked', true);
 
                             // SHow form
                             $('#dialog-admin-change-user-password').removeClass('hidden');
 
                             $('#admin_change_user_password_target_user').val(userId);
+                            $('#admin_change_user_encryption_code_target_user').val('');
                         }
                     }
                 }
@@ -1349,10 +1365,13 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             $('#dialog-admin-change-user-password-info')
                 .html('<i class="icon fas fa-info mr-2"></i><?php echo $lang->get('admin_change_user_encryption_code_info'); ?>');
             $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
+            $('#dialog-admin-change-user-password-show-password-div').addClass('hidden');
+            $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
 
             // SHow form
             $('#dialog-admin-change-user-password').removeClass('hidden');
 
+            $('#admin_change_user_password_target_user').val('');
             $('#admin_change_user_encryption_code_target_user').val($(this).data('id'));
             // ---
 

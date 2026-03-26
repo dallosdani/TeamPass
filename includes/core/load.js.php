@@ -1174,6 +1174,15 @@ if (
     /**
     * ADMIN HAS DECIDED TO CHANGE THE USER'S AUTH PASSWORD
      */
+    function resetAdminChangeUserPasswordDialogContext() {
+        $('#admin_change_user_password_target_user').val('');
+        $('#admin_change_user_encryption_code_target_user').val('');
+        $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+        $('#dialog-admin-change-user-password-show-password-div').addClass('hidden');
+        $('#dialog-admin-change-user-password-info').html('');
+        $('#dialog-admin-change-user-password-progress').html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
+    }
+
     $(document).on('click', '#dialog-admin-change-user-password-do', function() {
         // When an admin changes the user auth password
         if (debugJavascript === true) console.log('Reencryption based upon admin decision to change user auth password');
@@ -1264,8 +1273,8 @@ if (
                             );
                         }
 
-                        $('#dialog-admin-change-user-password-do-show-password').iCheck('uncheck');                        
                         $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('generate_new_keys_end'); ?>');
+                        resetAdminChangeUserPasswordDialogContext();
                         // Show warning
                         toastr.remove();
                     }
@@ -1278,6 +1287,8 @@ if (
     $(document).on('click', '#dialog-admin-change-user-password-close', function() {
         // HIde
         $('.content-header, .content').removeClass('hidden');
+
+        resetAdminChangeUserPasswordDialogContext();
 
         // SHow form
         $('#dialog-admin-change-user-password').addClass('hidden');
@@ -1346,6 +1357,8 @@ if (
 
                         // HIde
                         $('.content-header, .content').removeClass('hidden');
+
+                        resetAdminChangeUserPasswordDialogContext();
 
                         // SHow form
                         $('#dialog-admin-change-user-password').addClass('hidden');

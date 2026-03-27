@@ -4298,6 +4298,178 @@ case 'get_extension_licence_info':
     break;
 
 // ========================================
+// TEAMPASS LATEST RELEASE BADGE
+// ========================================
+
+case 'get_teampass_latest_release':
+    if ($post_key !== $session->get('key')) {
+        echo prepareExchangedData(
+            [
+                'error' => true,
+                'message' => $lang->get('key_is_not_correct'),
+            ],
+            'encode'
+        );
+        break;
+    }
+
+    if ((int) $session->get('user-admin') !== 1) {
+        echo prepareExchangedData(
+            [
+                'error' => true,
+                'message' => $lang->get('error_not_allowed_to'),
+            ],
+            'encode'
+        );
+        break;
+    }
+
+    $currentVersion = TP_VERSION . '.' . TP_VERSION_MINOR;
+
+    $cacheRaw = DB::queryFirstField(
+        'SELECT valeur
+        FROM ' . prefixTable('misc') . '
+        WHERE type = %s
+        AND intitule = %s',
+        'admin',
+        'teampass_latest_release_cache'
+    );
+
+    $cacheAt = (int) DB::queryFirstField(
+        'SELECT valeur
+        FROM ' . prefixTable('misc') . '
+        WHERE type = %s
+        AND intitule = %s',
+        'admin',
+        'teampass_latest_release_cache_at'
+    );
+
+    $cachedResult = is_string($cacheRaw) && $cacheRaw !== '' ? json_decode($cacheRaw, true) : null;
+    $cacheIsValid = is_array($cachedResult);
+    $cacheTtl = $cacheIsValid === true && ($cachedResult['error'] ?? false) === false ? 43200 : 3600;
+
+    if ($cacheIsValid === true && (time() - $cacheAt) < $cacheTtl) {
+        echo prepareExchangedData($cachedResult, 'encode');
+        break;
+    }
+
+    $storeLatestReleaseCache = static function (array $result): void {
+        DB::query(
+            'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+             ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+            'admin',
+            'teampass_latest_release_cache',
+            (string) json_encode($result, JSON_UNESCAPED_SLASHES)
+        );
+
+        DB::query(
+            'INSERT INTO ' . prefixTable('misc') . ' (type, intitule, valeur) VALUES (%s, %s, %s)
+             ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)',
+            'admin',
+            'teampass_latest_release_cache_at',
+            (string) time()
+        );
+    };
+
+    $fallbackResult = [
+        'error' => false,
+        'has_update' => false,
+        'current_version' => $currentVersion,
+        'latest_version' => '',
+        'release_url' => '',
+    ];
+
+    if (function_exists('curl_init') === false) {
+        if ($cacheIsValid === true) {
+            echo prepareExchangedData($cachedResult, 'encode');
+            break;
+        }
+
+        $storeLatestReleaseCache($fallbackResult);
+        echo prepareExchangedData($fallbackResult, 'encode');
+        break;
+    }
+
+    $curlHandle = curl_init('https://api.github.com/repos/nilsteampassnet/TeamPass/releases/latest');
+    if ($curlHandle === false) {
+        if ($cacheIsValid === true) {
+            echo prepareExchangedData($cachedResult, 'encode');
+            break;
+        }
+
+        $storeLatestReleaseCache($fallbackResult);
+        echo prepareExchangedData($fallbackResult, 'encode');
+        break;
+    }
+
+    curl_setopt_array($curlHandle, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT => 6,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/vnd.github+json',
+            'X-GitHub-Api-Version: 2022-11-28',
+            'User-Agent: TeamPass/' . $currentVersion,
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_FAILONERROR => false,
+    ]);
+
+    $responseBody = curl_exec($curlHandle);
+    $httpCode = (int) curl_getinfo($curlHandle, CURLINFO_RESPONSE_CODE);
+    curl_close($curlHandle);
+
+    if ($responseBody === false || $httpCode !== 200) {
+        if ($cacheIsValid === true) {
+            echo prepareExchangedData($cachedResult, 'encode');
+            break;
+        }
+
+        $storeLatestReleaseCache($fallbackResult);
+        echo prepareExchangedData($fallbackResult, 'encode');
+        break;
+    }
+
+    $releaseData = json_decode($responseBody, true);
+    if (is_array($releaseData) === false) {
+        if ($cacheIsValid === true) {
+            echo prepareExchangedData($cachedResult, 'encode');
+            break;
+        }
+
+        $storeLatestReleaseCache($fallbackResult);
+        echo prepareExchangedData($fallbackResult, 'encode');
+        break;
+    }
+
+    $tagName = isset($releaseData['tag_name']) && is_string($releaseData['tag_name']) === true
+        ? trim($releaseData['tag_name'])
+        : '';
+    $latestVersion = $tagName !== '' ? preg_replace('/^v/i', '', $tagName) : '';
+    $latestVersion = is_string($latestVersion) === true ? trim($latestVersion) : '';
+
+    $releaseUrl = isset($releaseData['html_url']) && is_string($releaseData['html_url']) === true
+        ? trim($releaseData['html_url'])
+        : '';
+
+    if ($releaseUrl === '' && $tagName !== '') {
+        $releaseUrl = 'https://github.com/nilsteampassnet/TeamPass/releases/tag/' . rawurlencode($tagName);
+    }
+
+    $result = [
+        'error' => false,
+        'has_update' => $latestVersion !== '' && version_compare($currentVersion, $latestVersion, '<'),
+        'current_version' => $currentVersion,
+        'latest_version' => $latestVersion,
+        'release_url' => $releaseUrl,
+    ];
+
+    $storeLatestReleaseCache($result);
+    echo prepareExchangedData($result, 'encode');
+    break;
+
+// ========================================
 // WEBSOCKET STATUS & CONTROL
 // ========================================
 

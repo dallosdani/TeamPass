@@ -111,6 +111,59 @@ if (
         'userOauth2Info', ''
     );
 
+    /**
+     * Load the TeamPass latest release badge in the sidebar for administrators.
+     *
+     * @returns {void}
+     */
+    function loadTeampassSidebarVersionBadge() {
+        const $badge = $('#tp-sidebar-version-badge');
+
+        if ($badge.length === 0) {
+            return;
+        }
+
+        $.post(
+            'sources/admin.queries.php',
+            {
+                type: 'get_teampass_latest_release',
+                key: '<?php echo $session->get('key'); ?>'
+            },
+            function(data) {
+                try {
+                    data = prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
+                } catch (error) {
+                    $badge.addClass('d-none').tooltip('dispose');
+                    return;
+                }
+
+                if (
+                    data.error === true
+                    || data.has_update !== true
+                    || typeof data.latest_version !== 'string'
+                    || data.latest_version.length === 0
+                    || typeof data.release_url !== 'string'
+                    || data.release_url.length === 0
+                ) {
+                    $badge.addClass('d-none').tooltip('dispose');
+                    return;
+                }
+
+                let tooltipText = <?php echo json_encode($lang->get('admin_new_version_available')); ?>;
+                tooltipText = tooltipText.replace('%s', data.latest_version);
+
+                $badge
+                    .text(<?php echo json_encode($lang->get('admin_update_badge')); ?>)
+                    .attr('href', data.release_url)
+                    .attr('title', tooltipText)
+                    .attr('aria-label', tooltipText)
+                    .removeClass('d-none')
+                    .tooltip('dispose')
+                    .tooltip({container: 'body'});
+            }
+        );
+    }
+
 
     $(document).ready(function() {
         // Don't redirect in some conditions
@@ -623,6 +676,8 @@ if (
 
     // Show tooltips
     $('.infotip').tooltip();
+
+    loadTeampassSidebarVersionBadge();
 
     // Sidebar redirection
     $('.nav-link').click(function() {

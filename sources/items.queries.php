@@ -2953,6 +2953,12 @@ switch ($inputData['type']) {
 
             $arrData['label'] = $dataItem['label'] === '' ? '' : $dataItem['label'];
             $arrData['pw_length'] = strlen($pw);
+            // Password security badge: OWASP ASVS aligned policy (min length 12, min complexity score 70)
+            if (strlen($pw) === 0) {
+                $arrData['pw_is_secure'] = null; // empty password → no badge
+            } else {
+                $arrData['pw_is_secure'] = strlen($pw) >= 12 && intval($dataItem['complexity_level']) >= 70;
+            }
             $arrData['pw_decrypt_info'] = empty($pw) === true && $pwIsEmptyNormal === false ? 'error_no_sharekey_yet' : '';
             $arrData['email'] = empty($dataItem['email']) === true ? '' : $dataItem['email'];
             $arrData['url'] = empty($dataItem['url']) === true ? '' : $dataItem['url'];

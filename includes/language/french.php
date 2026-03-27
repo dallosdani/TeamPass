@@ -2097,5 +2097,6 @@ return array(
     'network_security_remote_addr' => 'Adresse distante du client',
     'email_subject_on_user_lock' => '[TeamPass] Un compte utilisateur a été bloqué',
     'email_body_on_user_lock' => 'Bonjour,<br><br>Ceci est un email généré par TeamPass.<br><br>Le compte utilisateur <b>#tp_user#</b> a été bloqué par la protection anti brute force le #tp_date# à #tp_time#.<br><br>Détails :<ul><li>Nom : #tp_name#</li><li>Email : #tp_email#</li><li>Adresse IP source : #tp_ip#</li><li>Déblocage automatique prévu : #tp_unlock_at#</li></ul><br>Cordialement.',
+    'not_secure' => 'Non sécurisé',
 
 );

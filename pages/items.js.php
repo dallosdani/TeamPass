@@ -548,6 +548,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         $pwdField
             .html('<?php echo $var['hidden_asterisk']; ?>')
             .removeClass('pointer_none');
+
+        $('#card-item-pwd-security-badge').addClass('hidden').removeClass('badge-success badge-danger');
     }
 
 
@@ -5868,6 +5870,23 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                         $('#card-item-description').removeClass('hidden');
                     }
                     $('#card-item-pwd').html('<?php echo $var['hidden_asterisk']; ?>');
+
+                    // Password security badge
+                    const $pwBadge = $('#card-item-pwd-security-badge')
+                    if (data.pw_is_secure === true) {
+                        $pwBadge
+                            .removeClass('hidden badge-danger')
+                            .addClass('badge-success')
+                            .html('<i class="fa-solid fa-shield-halved mr-1"></i><?php echo $lang->get('secure'); ?>')
+                    } else if (data.pw_is_secure === false) {
+                        $pwBadge
+                            .removeClass('hidden badge-success')
+                            .addClass('badge-danger')
+                            .html('<i class="fa-solid fa-triangle-exclamation mr-1"></i><?php echo $lang->get('not_secure'); ?>')
+                    } else {
+                        $pwBadge.addClass('hidden').removeClass('badge-success badge-danger')
+                    }
+
                     $('#card-item-login').html(data.login);
                     $('#form-item-login, #form-item-suggestion-login, #form-item-server-login').val(data.login);
 

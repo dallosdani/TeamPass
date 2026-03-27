@@ -1152,6 +1152,7 @@ if ((int) $session_user_admin === 1) {
                             <ul class="list-group list-group-unbordered mb-3">
                                 <li class="list-group-item">
                                     <b><?php echo $lang->get('pw'); ?></b>
+                                    <span id="card-item-pwd-security-badge" class="badge ml-2 hidden"></span>
                                     <button type="button" class="float-right btn btn-secondary btn-sm btn-copy-clipboard" id="card-item-pwd-button">
                                         <i class="fa-regular fa-copy"></i>
                                     </button>

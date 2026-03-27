@@ -536,7 +536,21 @@ trait UserHandlerTrait {
         $lang = new Language('english');
         
         // IF USER IS NOT THE SAME
+        // When the creator and the target user are identical (admin regenerating their own keys),
+        // skip the notification email but still mark the user as ready so the UI polling resolves.
         if (isset($arguments['owner_id']) && (int) $arguments['new_user_id'] === (int) $arguments['owner_id']) {
+            DB::update(
+                prefixTable('users'),
+                [
+                    'is_ready_for_usage' => 1,
+                    'otp_provided' => isset($arguments['otp_provided_new_value']) && (int) $arguments['otp_provided_new_value'] === 1 ? 1 : 0,
+                    'ongoing_process_id' => null,
+                    'special' => 'none',
+                    'updated_at' => time(),
+                ],
+                'id = %i',
+                (int) $arguments['new_user_id']
+            );
             return;
         }
         

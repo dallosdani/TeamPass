@@ -1221,6 +1221,7 @@ return array(
     'restricted_to_roles' => 'Allow restricting items to users and roles',
     'root' => 'Root',
     'secure' => 'Secure',
+    'not_secure' => 'Not secure',
     'see_logs' => 'See Logs',
     'settings_anyone_can_modify' => '<i>Anyone can modify</i> feature enabled',
     'settings_anyone_can_modify_tip' => 'This adds a checkbox during new password item creation that can set the item to be modifiable by anyone.',

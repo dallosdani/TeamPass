@@ -391,11 +391,22 @@ if (null !== $post_type) {
                 }
             }
 
+            $isPersonalRootFolder =
+                (int) $dataFolder['parent_id'] === 0
+                && (string) $dataFolder['title'] === (string) $session->get('user-id')
+                && (int) $dataFolder['personal_folder'] === 1;
+
             // Is the parent folder changed?
             if ((int) $dataFolder['parent_id'] === (int) $inputData['parentId']) {
                 $parentChanged = false;
             } else {
                 $parentChanged = true;
+            }
+
+            if ($isPersonalRootFolder === true) {
+                $inputData['parentId'] = (int) $dataFolder['parent_id'];
+                $inputData['title'] = (string) $dataFolder['title'];
+                $parentChanged = false;
             }
 
             //check if parent folder is personal
@@ -415,7 +426,9 @@ if (null !== $post_type) {
                 $parentBloquerModification = 0;
             }
 
-            if (isset($dataParent['personal_folder']) === true && (int) $dataParent['personal_folder'] === 1) {
+            if ($isPersonalRootFolder === true) {
+                $isPersonal = 1;
+            } elseif (isset($dataParent['personal_folder']) === true && (int) $dataParent['personal_folder'] === 1) {
                 $isPersonal = 1;
             } else {
                 $isPersonal = 0;
@@ -502,17 +515,39 @@ if (null !== $post_type) {
             // Invalidate cache for users with access to this folder
             invalidateCacheForFolderUsers((int) $dataFolder['id']);
 
-            //Add complexity
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => $inputData['complexity'],
-                    'updated_at' => time(),
-                ),
-                'intitule = %s AND type = %s',
+            // Add or update complexity row for this folder.
+            // Personal root folders can exist without a misc/complex row,
+            // so a plain UPDATE may silently affect 0 rows and leave the UI
+            // and item edition logic with a fallback complexity of 0.
+            DB::query(
+                'SELECT valeur
+                FROM ' . prefixTable('misc') . '
+                WHERE intitule = %i AND type = %s',
                 $dataFolder['id'],
                 'complex'
             );
+            if (DB::count() > 0) {
+                DB::update(
+                    prefixTable('misc'),
+                    array(
+                        'valeur' => $inputData['complexity'],
+                        'updated_at' => time(),
+                    ),
+                    'intitule = %s AND type = %s',
+                    $dataFolder['id'],
+                    'complex'
+                );
+            } else {
+                DB::insert(
+                    prefixTable('misc'),
+                    array(
+                        'type' => 'complex',
+                        'intitule' => $dataFolder['id'],
+                        'valeur' => $inputData['complexity'],
+                        'created_at' => time(),
+                    )
+                );
+            }
 
             // ensure categories are set
             handleFoldersCategories(

@@ -23,21 +23,17 @@ $scheduler = new Scheduler();
 $configManager = new ConfigManager();
 $SETTINGS = $configManager->getAllSettings();
 
-// Update or insert last cron execution timestamp
-$updated = DB::update(
+// Update last cron execution timestamp (upsert)
+DB::query(
+    'INSERT INTO %l (type, intitule, valeur, updated_at)
+     VALUES (%s, %s, %i, %i)
+     ON DUPLICATE KEY UPDATE valeur = VALUES(valeur), updated_at = VALUES(updated_at)',
     prefixTable('misc'),
-    ['valeur' => time()],
-    'type = "admin" AND intitule = "last_cron_exec"'
+    'admin',
+    'last_cron_exec',
+    time(),
+    time()
 );
-
-if ($updated === 0) {
-    DB::insert(
-        prefixTable('misc'), [
-            'type' => 'admin',
-            'intitule' => 'last_cron_exec',
-            'valeur' => time()
-    ]);
-}
 
 // Configuration des tâches de fond avec des fréquences dynamiques
 $backgroundTasks = [

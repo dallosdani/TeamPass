@@ -63,6 +63,7 @@ $scripts_list = array(
     array('upgrade_operations.php', 'Transparent_recovery_migration'),
     array('upgrade_run_3.1.6.php', 'user_id'),
     array('upgrade_run_3.1.7.php', 'user_id'),
+    array('upgrade_operations.php', 'deduplicate_misc'),
 );
 $param = '';
 

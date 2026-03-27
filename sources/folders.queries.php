@@ -903,14 +903,16 @@ if (null !== $post_type) {
                                 $folderDeletedData['is_template'] = (int) $thisSubFolders->is_template;
                             }
 
-                            DB::insert(
+                            DB::query(
+                                'INSERT INTO %l (type, intitule, valeur, created_at)
+                                 VALUES (%s, %s, %s, %i)
+                                 ON DUPLICATE KEY UPDATE valeur = VALUES(valeur), updated_at = %i',
                                 prefixTable('misc'),
-                                array(
-                                    'type' => 'folder_deleted',
-                                    'intitule' => 'f' . (int) $thisSubFolders->id,
-                                    'valeur' => json_encode($folderDeletedData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                                    'created_at' => time(),
-                                )
+                                'folder_deleted',
+                                'f' . (int) $thisSubFolders->id,
+                                json_encode($folderDeletedData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                                time(),
+                                time()
                             );
                             //array for delete folder
                             $folderForDel[] = $thisSubFolders->id;

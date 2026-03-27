@@ -231,19 +231,11 @@ if (mysqli_error($db_link)) {
 // STEP 5: Add migration setting
 // ============================================
 
-$result = mysqli_query(
+mysqli_query(
     $db_link,
-    "SELECT * FROM `" . $pre . "misc`
-     WHERE type = 'admin' AND intitule = 'phpseclib_migration_mode'"
+    "INSERT IGNORE INTO `" . $pre . "misc` (type, intitule, valeur)
+     VALUES ('admin', 'phpseclib_migration_mode', 'progressive')"
 );
-
-if (mysqli_num_rows($result) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (type, intitule, valeur)
-         VALUES ('admin', 'phpseclib_migration_mode', 'progressive')"
-    );
-}
 
 // ============================================
 // STEP 6: Add forced migration tracking columns
@@ -338,18 +330,11 @@ $iumSettings = [
 ];
 
 foreach ($iumSettings as $setting) {
-    $tmp = mysqli_num_rows(mysqli_query(
+    mysqli_query(
         $db_link,
-        "SELECT * FROM `" . $pre . "misc`
-         WHERE type = 'settings' AND intitule = '" . $setting[0] . "'"
-    ));
-    if ((int)$tmp === 0) {
-        mysqli_query(
-            $db_link,
-            "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`)
-             VALUES ('settings', '" . $setting[0] . "', '" . $setting[1] . "')"
-        );
-    }
+        "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`)
+         VALUES ('settings', '" . $setting[0] . "', '" . $setting[1] . "')"
+    );
 }
 
 // @phpstan-ignore identical.alwaysFalse (mysqli_query may return false on error despite PHPDoc)
@@ -369,13 +354,10 @@ $settings = [
 ];
 
 foreach ($settings as $setting) {
-    $tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = '" . $setting[0] . "'"));
-    if (intval($tmp) === 0) {
-        mysqli_query(
-            $db_link,
-            "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', '" . $setting[0] . "', '" . $setting[1] . "')"
-        );
-    }
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', '" . $setting[0] . "', '" . $setting[1] . "')"
+    );
 }
 // ---<
 

@@ -79,8 +79,6 @@ if ($db_link) {
 $superGlobal = new SuperGlobal();
 $lang = new Language(); 
 
-$error = [];
-
 //---------------------------------------------------------------------
 
 //--->BEGIN 3.1.7
@@ -304,6 +302,7 @@ modifyColumn($pre . 'users', 'agses-usercardid', "agses_usercardid", "VARCHAR(50
 
 // --->
 
+
 // <---
 // ==========================================
 
@@ -320,6 +319,11 @@ addColumnIfNotExist(
     'invalidated_at',
     "INT UNSIGNED DEFAULT 0"
 );
+// --->
+
+
+// misc deduplication and UNIQUE constraint are handled in upgrade_operations.php
+// operation: deduplicate_misc (batched, loop-safe)
 
 //---<END 3.1.7
 
@@ -348,8 +352,7 @@ foreach ($redisDefaults as $key => $value) {
 mysqli_close($db_link);
 
 // Finished
-// @phpstan-ignore greater.alwaysFalse (error array reserved for future use)
-echo '[{"finish":"1" , "next":"", "error":"'.(count($error) > 0 ? json_encode($error) : '').'"}]';
+echo '[{"finish":"1" , "next":"", "error":""}]';
 
 
 //---< FUNCTIONS

@@ -310,12 +310,17 @@ class FolderManager
      */
     private function addComplexity($folderId, $complexity)
     {
-        DB::insert(prefixTable('misc'), [
-            'type' => 'complex',
-            'intitule' => $folderId,
-            'valeur' => $complexity,
-            'created_at' => time(),
-        ]);
+        DB::query(
+            'INSERT INTO %l (type, intitule, valeur, created_at)
+             VALUES (%s, %s, %s, %i)
+             ON DUPLICATE KEY UPDATE valeur = VALUES(valeur), updated_at = %i',
+            prefixTable('misc'),
+            'complex',
+            (string) $folderId,
+            (string) $complexity,
+            time(),
+            time()
+        );
     }
 
     /**

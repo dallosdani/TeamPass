@@ -86,13 +86,10 @@ $lang = new Language();
 
 // 
 // Add new setting 'enable_refresh_task_last_execution'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'enable_refresh_task_last_execution'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_refresh_task_last_execution', '1')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_refresh_task_last_execution', '1')"
+);
 
 //---<END 3.1.0
 
@@ -140,13 +137,10 @@ modifyColumn(
 
 
 // Add new setting 'ldap_group_objectclasses_attibute'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_group_objectclasses_attibute'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_group_objectclasses_attibute', 'top,groupofuniquenames')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_group_objectclasses_attibute', 'top,groupofuniquenames')"
+);
 
 
 // Alter table users to ensure a start at 1000000
@@ -156,13 +150,10 @@ mysqli_query(
 );
 
 // Add new setting 'pwd_default_length'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'pwd_default_length'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'pwd_default_length', '14')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'pwd_default_length', '14')"
+);
 
 // Rename table 'processes' to 'background_tasks'
 $tmp = mysqli_num_rows(mysqli_query($db_link, "SHOW TABLES LIKE '" . $pre . "background_tasks'"));
@@ -238,13 +229,10 @@ if (intval($tmp) === 0) {
 }
 
 // Add new setting 'tasks_log_retention_delay'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'tasks_log_retention_delay'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_log_retention_delay', '3650')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_log_retention_delay', '3650')"
+);
 
 //---<END 3.1.1
 
@@ -388,30 +376,21 @@ modifyColumn(
 );
 
 // Add new setting 'oauth2_enabled'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth2_enabled'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_enabled', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_enabled', '0')"
+);
 
 // Add new setting 'oauth2_client_appname'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth2_client_appname'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_client_appname', 'Login with Azure')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_client_appname', 'Login with Azure')"
+);
 // Add new setting 'oauth2_client_scopes'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth2_client_scopes'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_client_scopes', 'openid,profile,email')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth2_client_scopes', 'openid,profile,email')"
+);
 
 // Add index and change created/updated/finished_at type.
 try {
@@ -473,13 +452,10 @@ try {
 }
 
 // Add new setting 'show_item_data'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'show_item_data'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'show_item_data', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'show_item_data', '0')"
+);
 
 // Add field split_view_mode to users table
 $res = addColumnIfNotExist(
@@ -494,40 +470,28 @@ if ($res === false) {
 }
 
 // Add new setting 'limited_search_default'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'limited_search_default'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'limited_search_default', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'limited_search_default', '0')"
+);
 
 // Add new setting 'highlight_selected'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'highlight_selected'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'highlight_selected', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'highlight_selected', '0')"
+);
 
 // Add new setting 'highlight_favorites'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'highlight_favorites'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'highlight_favorites', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'highlight_favorites', '0')"
+);
 
 // Add new setting 'number_users_build_cache_tree'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'number_users_build_cache_tree'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'number_users_build_cache_tree', '10')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'number_users_build_cache_tree', '10')"
+);
 
 // Add field is_encrypted to misc table
 $res = addColumnIfNotExist(
@@ -559,19 +523,10 @@ if (file_exists($configFilePath)) {
         $escapedKey = mysqli_real_escape_string($db_link, $key);
         $escapedValue = mysqli_real_escape_string($db_link, $value);
 
-        $query = "SELECT `valeur` FROM `" . $pre . "misc` WHERE `type` = 'admin' AND `intitule` = '$escapedKey'";
-        $result = mysqli_query($db_link, $query);
-
-        if ($result && mysqli_num_rows($result) > 0) {
-            $row = mysqli_fetch_assoc($result);
-            if ($row['valeur'] !== $escapedValue) {
-                $updateQuery = "UPDATE `" . $pre . "misc` SET `valeur` = '$escapedValue', `updated_at` = '" . time() . "' WHERE `type` = 'admin' AND `intitule` = '$escapedKey'";
-                mysqli_query($db_link, $updateQuery);
-            }
-        } else {
-            $insertQuery = "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`, `updated_at`) VALUES ('admin', '$escapedKey', '$escapedValue', '" . time() . "')";
-            mysqli_query($db_link, $insertQuery);
-        }
+        $upsertQuery = "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`, `updated_at`)
+            VALUES ('admin', '$escapedKey', '$escapedValue', '" . time() . "')
+            ON DUPLICATE KEY UPDATE `valeur` = VALUES(`valeur`), `updated_at` = VALUES(`updated_at`)";
+        mysqli_query($db_link, $upsertQuery);
     }
 
     // Rename the file
@@ -840,40 +795,28 @@ try {
 }
 
 // Add new setting 'tasks_history_delay'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'tasks_history_delay'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_history_delay', '604800')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_history_delay', '604800')"
+);
 
 // Add new setting 'oauth_new_user_is_administrated_by'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth_new_user_is_administrated_by'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_new_user_is_administrated_by', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_new_user_is_administrated_by', '0')"
+);
 
 // Add new setting 'oauth_selfregistered_user_belongs_to_role'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth_selfregistered_user_belongs_to_role'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_selfregistered_user_belongs_to_role', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_selfregistered_user_belongs_to_role', '0')"
+);
 
 // Add new setting 'oauth_self_register_groups'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'oauth_self_register_groups'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_self_register_groups', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'oauth_self_register_groups', '')"
+);
 
 
 // Releated to #4701
@@ -913,29 +856,22 @@ try {
     mysqli_rollback($db_link);
 }
 
-// Update setting from 'ldap_tls_certifacte_check' to 'ldap_tls_certificate_check'
-$result = mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_tls_certifacte_check'");
-$tmp = mysqli_num_rows($result);
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_tls_certificate_check', 'LDAP_OPT_X_TLS_NEVER')"
-    );
-} else {
-    mysqli_query(
-        $db_link,
-        "UPDATE `" . $pre . "misc` SET intitule = 'ldap_tls_certificate_check' WHERE type = 'admin' AND intitule = 'ldap_tls_certifacte_check'"
-    );
-}
+// Rename typo 'ldap_tls_certifacte_check' → 'ldap_tls_certificate_check' if old key exists
+mysqli_query(
+    $db_link,
+    "UPDATE `" . $pre . "misc` SET intitule = 'ldap_tls_certificate_check' WHERE type = 'admin' AND intitule = 'ldap_tls_certifacte_check'"
+);
+// Ensure correct key exists (no-op if already present due to rename above or prior upgrade)
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_tls_certificate_check', 'LDAP_OPT_X_TLS_NEVER')"
+);
 
 // Add new setting 'task_duration_estimation'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'task_duration_estimation'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'task_duration_estimation', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'task_duration_estimation', '0')"
+);
 
 // Add is_template field on nested_tree.
 try {
@@ -1093,19 +1029,12 @@ try {
     mysqli_rollback($db_link);
 }
 
-// Save timestamp
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'upgrade_timestamp'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'upgrade_timestamp', ".time().")"
-    );
-} else {
-    mysqli_query(
-        $db_link,
-        "UPDATE `" . $pre . "misc` SET valeur = ".time()." WHERE type = 'admin' AND intitule = 'upgrade_timestamp'"
-    );
-}
+// Save upgrade timestamp (upsert: always update if exists)
+mysqli_query(
+    $db_link,
+    "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'upgrade_timestamp', " . time() . ")
+     ON DUPLICATE KEY UPDATE `valeur` = VALUES(`valeur`)"
+);
 
 // Close connection
 mysqli_close($db_link);

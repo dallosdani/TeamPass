@@ -921,6 +921,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 $('#form-item-button-save').data('action', 'new_item');
                 // Does this folder contain Custom Fields
                 if (store.get('teampassItem').hasCustomCategories.length > 0) {
+                    // Reset all categories first to avoid stale fields from previous folders
+                    $('.form-item-category').addClass('hidden');
                     $('#form-item-field').removeClass('hidden');
                     $.each(store.get('teampassItem').hasCustomCategories, function(i, category) {
                         $('#form-item-category-' + category).removeClass('hidden');
@@ -4200,6 +4202,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             // Does this folder contain Custom Fields
             if (store.get('teampassItem').hasCustomCategories.length > 0) {
+                // Reset all categories first to avoid stale fields from previous folders
+                $('.form-item-category').addClass('hidden');
                 $('#form-item-field').removeClass('hidden');
                 $.each(store.get('teampassItem').hasCustomCategories, function(i, category) {
                     $('#form-item-category-' + category).removeClass('hidden');

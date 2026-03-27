@@ -112,15 +112,72 @@ if (
     );
 
     /**
+     * Apply version badge data to the DOM element.
+     * Hides the badge when no update is available or data is invalid.
+     *
+     * @param {jQuery} $badge
+     * @param {object} data  - decoded server response
+     * @returns {void}
+     */
+    function applyVersionBadge($badge, data) {
+        if (
+            data.error === true
+            || data.has_update !== true
+            || typeof data.latest_version !== 'string'
+            || data.latest_version.length === 0
+            || typeof data.release_url !== 'string'
+            || data.release_url.length === 0
+        ) {
+            $badge.addClass('d-none').tooltip('dispose');
+            return;
+        }
+
+        let tooltipText = <?php echo json_encode($lang->get('admin_new_version_available')); ?>;
+        tooltipText = tooltipText.replace('%s', data.latest_version);
+
+        $badge
+            .text(<?php echo json_encode($lang->get('admin_update_badge')); ?>)
+            .attr('href', data.release_url)
+            .attr('title', tooltipText)
+            .attr('aria-label', tooltipText)
+            .removeClass('d-none')
+            .tooltip('dispose')
+            .tooltip({container: 'body'});
+    }
+
+    /**
      * Load the TeamPass latest release badge in the sidebar for administrators.
+     * Uses sessionStorage (4h TTL) to avoid an AJAX call on every page load.
      *
      * @returns {void}
      */
     function loadTeampassSidebarVersionBadge() {
         const $badge = $('#tp-sidebar-version-badge');
 
+        // Badge element only exists for admin users — exit early for everyone else
         if ($badge.length === 0) {
             return;
+        }
+
+        const CACHE_KEY = 'tp_version_badge_v1';
+        const CACHE_TTL = 4 * 3600 * 1000; // 4 hours in ms
+
+        // Serve from sessionStorage when available and still fresh
+        try {
+            const raw = sessionStorage.getItem(CACHE_KEY);
+            if (raw !== null) {
+                const cached = JSON.parse(raw);
+                if (
+                    cached !== null
+                    && typeof cached === 'object'
+                    && (Date.now() - cached.ts) < CACHE_TTL
+                ) {
+                    applyVersionBadge($badge, cached.data);
+                    return;
+                }
+            }
+        } catch (e) {
+            // sessionStorage unavailable (private browsing quota, etc.) — fall through to AJAX
         }
 
         $.post(
@@ -137,29 +194,14 @@ if (
                     return;
                 }
 
-                if (
-                    data.error === true
-                    || data.has_update !== true
-                    || typeof data.latest_version !== 'string'
-                    || data.latest_version.length === 0
-                    || typeof data.release_url !== 'string'
-                    || data.release_url.length === 0
-                ) {
-                    $badge.addClass('d-none').tooltip('dispose');
-                    return;
+                // Persist in sessionStorage so subsequent page loads skip the AJAX call
+                try {
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify({data: data, ts: Date.now()}));
+                } catch (e) {
+                    // Quota exceeded or unavailable — ignore
                 }
 
-                let tooltipText = <?php echo json_encode($lang->get('admin_new_version_available')); ?>;
-                tooltipText = tooltipText.replace('%s', data.latest_version);
-
-                $badge
-                    .text(<?php echo json_encode($lang->get('admin_update_badge')); ?>)
-                    .attr('href', data.release_url)
-                    .attr('title', tooltipText)
-                    .attr('aria-label', tooltipText)
-                    .removeClass('d-none')
-                    .tooltip('dispose')
-                    .tooltip({container: 'body'});
+                applyVersionBadge($badge, data);
             }
         );
     }

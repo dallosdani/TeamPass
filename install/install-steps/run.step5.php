@@ -477,7 +477,8 @@ class DatabaseInstaller
             `created_at` varchar(255) NULL DEFAULT NULL,
             `updated_at` varchar(255) NULL DEFAULT NULL,
             `is_encrypted` tinyint(1) NOT NULL DEFAULT '0',
-            PRIMARY KEY (`increment_id`)
+            PRIMARY KEY (`increment_id`),
+            UNIQUE KEY `uk_type_intitule` (`type`, `intitule`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
 
@@ -705,26 +706,19 @@ class DatabaseInstaller
             array('admin', 'network_trusted_proxies', '')
         );
         foreach ($aMiscVal as $elem) {
-            //Check if exists before inserting
-            $tmp = DB::queryFirstField(
-                "SELECT COUNT(*) FROM " . $this->inputData['tablePrefix'] . "misc 
-                WHERE type = %s AND intitule = %s",
-                $elem[0],                  // Type
-                $elem[1]                   // Intitule
+            $value = isset($elem[3]) ? $elem[3] : 0;
+
+            // INSERT IGNORE: skip silently if (type, intitule) already exists (UNIQUE constraint)
+            DB::query(
+                'INSERT IGNORE INTO ' . $this->inputData['tablePrefix'] . 'misc
+                 (type, intitule, valeur, created_at, is_encrypted)
+                 VALUES (%s, %s, %s, %i, %i)',
+                $elem[0],
+                $elem[1],
+                str_replace("'", '', $elem[2]),
+                time(),
+                $value
             );
-            
-            if (intval($tmp) === 0) {
-                $value = isset($elem[3]) ? $elem[3] : 0;
-            
-                // Insert data using MeekroDB
-                DB::insert($this->inputData['tablePrefix'] . 'misc', [
-                    'type'         => $elem[0],
-                    'intitule'     => $elem[1],
-                    'valeur'       => str_replace("'", '', $elem[2]),
-                    'created_at'   => time(),
-                    'is_encrypted' => $value
-                ]);
-            }
         }
     }
 

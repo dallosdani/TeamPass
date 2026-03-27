@@ -4326,23 +4326,9 @@ case 'get_teampass_latest_release':
 
     $currentVersion = TP_VERSION . '.' . TP_VERSION_MINOR;
 
-    $cacheRaw = DB::queryFirstField(
-        'SELECT valeur
-        FROM ' . prefixTable('misc') . '
-        WHERE type = %s
-        AND intitule = %s',
-        'admin',
-        'teampass_latest_release_cache'
-    );
-
-    $cacheAt = (int) DB::queryFirstField(
-        'SELECT valeur
-        FROM ' . prefixTable('misc') . '
-        WHERE type = %s
-        AND intitule = %s',
-        'admin',
-        'teampass_latest_release_cache_at'
-    );
+    // Read cache from $SETTINGS (already loaded in memory by ConfigManager — no extra DB query)
+    $cacheRaw = $SETTINGS['teampass_latest_release_cache'] ?? '';
+    $cacheAt  = (int) ($SETTINGS['teampass_latest_release_cache_at'] ?? 0);
 
     $cachedResult = is_string($cacheRaw) && $cacheRaw !== '' ? json_decode($cacheRaw, true) : null;
     $cacheIsValid = is_array($cachedResult);
@@ -4369,6 +4355,9 @@ case 'get_teampass_latest_release':
             'teampass_latest_release_cache_at',
             (string) time()
         );
+
+        // Invalidate APCu so the next ConfigManager read picks up the new cache values
+        ConfigManager::invalidateCache();
     };
 
     $fallbackResult = [
@@ -4379,7 +4368,20 @@ case 'get_teampass_latest_release':
         'release_url' => '',
     ];
 
+    // Skip entirely if cURL is unavailable
     if (function_exists('curl_init') === false) {
+        if ($cacheIsValid === true) {
+            echo prepareExchangedData($cachedResult, 'encode');
+            break;
+        }
+
+        $storeLatestReleaseCache($fallbackResult);
+        echo prepareExchangedData($fallbackResult, 'encode');
+        break;
+    }
+
+    // Skip entirely if the server has no outbound internet access (fast DNS pre-flight check)
+    if (checkdnsrr('api.github.com', 'A') === false) {
         if ($cacheIsValid === true) {
             echo prepareExchangedData($cachedResult, 'encode');
             break;

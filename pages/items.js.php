@@ -4732,13 +4732,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         
         // Show list of sub directories - Load only once
         if (store.get('teampassUser').show_subfolders === 1 && start === 0) {
+            // Normalize to integer: groupe_id may be a string (from .val()) or integer (from jstree).
+            // folder.parent_id in the store is encoded as integer by PHP JSON, so strict === would
+            // fail on a string, causing an empty subfolder list after item save.
+            const groupeIdInt = parseInt(groupe_id);
             // if undefined wait 1.5s until queries are done
             if(store.get('teampassApplication').foldersList === undefined) {
                 setTimeout(() => {
-                displaySubfolders(store.get('teampassApplication').foldersList, groupe_id);
+                displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
                 }, 1500);
             } else {
-                displaySubfolders(store.get('teampassApplication').foldersList, groupe_id);
+                displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
             }
         }
 

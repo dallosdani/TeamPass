@@ -974,9 +974,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 return false;
             }
 
+            // Launch both requests in parallel: privileges check and password fetch
+            const _pwdPromise = getItemPassword(
+                'at_password_shown_edit_form',
+                'item_id',
+                store.get('teampassItem').id
+            );
             $.when(
-                getPrivilegesOnItem(item_tree_id, 1, 'item_edit_current_folder')
-            ).then(function(retData) {
+                getPrivilegesOnItem(item_tree_id, 1, 'item_edit_current_folder'),
+                _pwdPromise
+            ).then(function(retData, _pwdResult) {
+                const _prefetchedPassword = Array.isArray(_pwdResult) ? _pwdResult[0] : _pwdResult;
                 if (retData.error === true) {
                     toastr.remove();
                     toastr.error(
@@ -1024,7 +1032,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 showItemEditForm(
                     retData.folderId !== undefined && retData.folderId !== ''
                         ? parseInt(retData.folderId, 10)
-                        : item_tree_id
+                        : item_tree_id,
+                    _prefetchedPassword
                 );
             });
 
@@ -1622,16 +1631,16 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         context = context || '';
 
         if (folderId === null || folderId === '' || typeof folderId === 'undefined') {
-            $('#card-item-visibility').html('');
-            $('#card-item-minimum-complexity').html('');
+            $('#card-item-visibility').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
+            $('#card-item-minimum-complexity').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
             return $.Deferred().resolve({ error: true }).promise();
         }
 
         itemFolderRulesRefreshRequestId += 1;
         const currentRequestId = itemFolderRulesRefreshRequestId;
 
-        $('#card-item-visibility').html('');
-        $('#card-item-minimum-complexity').html('');
+        $('#card-item-visibility').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
+        $('#card-item-minimum-complexity').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
 
         return $.post(
             'sources/items.queries.php', {
@@ -4107,7 +4116,42 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
     });
 
 
-    function showItemEditForm(selectedFolderId) {
+    /**
+     * Reset the password field to a loading state and asynchronously apply the real password.
+     * Used by both showItemEditForm() (edit button) and Details() (pencil from list).
+     *
+     * @param {Promise|null} prefetchedPasswordPromise  Already-in-flight promise, or null to start a new request.
+     * @param {number}       itemId                     The item whose password to load.
+     */
+    function loadPasswordIntoEditForm(prefetchedPasswordPromise, itemId) {
+        // Clear the field and show the spinner (between input and buttons)
+        $('#form-item-password')
+            .val('')
+            .attr('placeholder', '<?php echo $lang->get('loading_data'); ?>...');
+        $('#form-item-password-loader').removeClass('hidden');
+
+        // Reset the strength bar to "weak" without destroying pwstrength's internal DOM
+        $('#form-item-password-complex').val(0);
+        $('#form-item-password').pwstrength('forceUpdate');
+
+        const _pwdPromise = prefetchedPasswordPromise !== null
+            ? prefetchedPasswordPromise
+            : getItemPassword('at_password_shown_edit_form', 'item_id', itemId);
+
+        // setTimeout(0) ensures the browser repaints the loading state before the
+        // strength bar is updated (microtasks from Promise.resolve run before repaint).
+        _pwdPromise.then(item_pwd => {
+            setTimeout(() => {
+                $('#form-item-password-loader').addClass('hidden');
+                $('#form-item-password').attr('placeholder', '<?php echo $lang->get('password'); ?>');
+                if (item_pwd || item_pwd === '') {
+                    syncItemPasswordComplexity(item_pwd);
+                }
+            }, 0);
+        });
+    }
+
+    function showItemEditForm(selectedFolderId, prefetchedPassword) {
         if (debugJavascript === true) console.info('SHOW EDIT ITEM ' + selectedFolderId);
         // Reset item
         store.update(
@@ -4116,7 +4160,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 teampassItem.otp_code_generate = false;
             }
         );
-        
+
         if (store.get('teampassItem').error === true) {
             toastr.remove();
             toastr.error(
@@ -4127,63 +4171,58 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 }
             );
         } else {
-            // Get password and fill the field.
-            getItemPassword(
-                'at_password_shown_edit_form',
-                'item_id',
-                store.get('teampassItem').id
-            ).then(item_pwd => {
-                if (item_pwd || item_pwd === '') {
-                    syncItemPasswordComplexity(item_pwd);
+            // Set selected folder id.
+            // getPrivilegesOnItem already called get_complixity_level and populated
+            // the store with fresh visibility/complexity — read from it directly.
+            $('#form-item-folder').val(selectedFolderId);
+            const _editItem = store.get('teampassItem');
+            $('#card-item-visibility').html(_editItem.itemVisibility || '<?php echo $lang->get('none'); ?>');
+            $('#card-item-minimum-complexity').html(_editItem.itemMinimumComplexity || '');
 
-                    // Set selected folder id.
-                    // getPrivilegesOnItem already called get_complixity_level and populated
-                    // the store with fresh visibility/complexity — read from it directly.
-                    $('#form-item-folder').val(selectedFolderId);
-                    const _editItem = store.get('teampassItem');
-                    $('#card-item-visibility').html(_editItem.itemVisibility || '<?php echo $lang->get('none'); ?>');
-                    $('#card-item-minimum-complexity').html(_editItem.itemMinimumComplexity || '');
+            // show top back buttons
+            $('#but_back_top_left, #but_back_top_right').addClass('hidden');
 
-                    // show top back buttons
-                    $('#but_back_top_left, #but_back_top_right').addClass('hidden');
+            // Show edition form
+            $('.form-item, #form-item-attachments-zone')
+                .removeClass('hidden');
+            $('.form-item-copy, #form-item-password-options, .form-item-action, #folders-tree-card, .columns-position')
+                .addClass('hidden');
 
-                    // Show edition form
-                    $('.form-item, #form-item-attachments-zone')
-                        .removeClass('hidden');
-                    $('.form-item-copy, #form-item-password-options, .form-item-action, #folders-tree-card, .columns-position')
-                        .addClass('hidden');
+            // Initial 'user did a change'
+            userDidAChange = false;
 
-                    // Initial 'user did a change'
-                    userDidAChange = false;
+            $('#form-item-label').focus();
 
-                    $('#form-item-label').focus();
+            // Set type of action
+            $('#form-item-button-save').data('action', 'update_item');
 
-                    // Set type of action
-                    $('#form-item-button-save').data('action', 'update_item');
+            // Does this folder contain Custom Fields
+            if (store.get('teampassItem').hasCustomCategories.length > 0) {
+                $('#form-item-field').removeClass('hidden');
+                $.each(store.get('teampassItem').hasCustomCategories, function(i, category) {
+                    $('#form-item-category-' + category).removeClass('hidden');
+                })
+            } else {
+                $('#form-item-field, .form-item-category').addClass('hidden');
+            }
 
-                    // Does this folder contain Custom Fields
-                    if (store.get('teampassItem').hasCustomCategories.length > 0) {
-                        $('#form-item-field').removeClass('hidden');
-                        $.each(store.get('teampassItem').hasCustomCategories, function(i, category) {
-                            $('#form-item-category-' + category).removeClass('hidden');
-                        })
-                    } else {
-                        $('#form-item-field, .form-item-category').addClass('hidden');
-                    }            
-
-                    // is user allowed to edit this item - overpass readonly folder
-                    if (typeof store.get('teampassApplication').itemsList !== 'undefined') {
-                        var itemsList = JSON.parse(store.get('teampassApplication').itemsList);
-                        userItemRight = itemsList[store.get('teampassItem').id]?.rights;
-                        if (userItemRight && userItemRight > 40 && $('#form-item-folder option:selected').attr('disabled') === 'disabled') {
-                            $('#form-item-folder option:selected').removeAttr('disabled');
-                        }
-                    }
-
-                    toastr.remove();
+            // is user allowed to edit this item - overpass readonly folder
+            if (typeof store.get('teampassApplication').itemsList !== 'undefined') {
+                var itemsList = JSON.parse(store.get('teampassApplication').itemsList);
+                userItemRight = itemsList[store.get('teampassItem').id]?.rights;
+                if (userItemRight && userItemRight > 40 && $('#form-item-folder option:selected').attr('disabled') === 'disabled') {
+                    $('#form-item-folder option:selected').removeAttr('disabled');
                 }
-            });
-            // ---
+            }
+
+            toastr.remove();
+
+            // Show loading state in password field and apply password asynchronously.
+            // Pass the pre-fetched promise when available (parallel fetch), or null to start fresh.
+            const _prefetchedPromise = (prefetchedPassword !== undefined && prefetchedPassword !== null)
+                ? Promise.resolve(prefetchedPassword)
+                : null;
+            loadPasswordIntoEditForm(_prefetchedPromise, store.get('teampassItem').id);
         }
         //});
     }
@@ -5710,8 +5749,8 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     // effective folder rules to avoid displaying stale values coming from
                     // a previously selected folder.
                     if (actionType === 'edit') {
-                        $('#card-item-visibility').html('');
-                        $('#card-item-minimum-complexity').html('');
+                        $('#card-item-visibility').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
+                        $('#card-item-minimum-complexity').html('<i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>');
                     } else {
                         $('#card-item-visibility').html(store.get('teampassItem').itemVisibility);
                         $('#card-item-minimum-complexity').html(store.get('teampassItem').itemMinimumComplexity);
@@ -5845,6 +5884,13 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     $('#form-item-icon-show').html(itemIcon);
 
                     syncItemPasswordComplexity('');
+
+                    // For the direct-edit path (pencil from list), load the actual item
+                    // password asynchronously — same loading state as showItemEditForm().
+                    if (actionType === 'edit') {
+                        loadPasswordIntoEditForm(null, itemId);
+                    }
+
                     $('#form-item-label').focus();
 
                     // Editor for description field

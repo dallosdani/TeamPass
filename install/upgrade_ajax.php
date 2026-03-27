@@ -423,9 +423,11 @@ if (isset($post_type)) {
                     '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
             }
             // pcntl and posix are CLI-only extensions, only required for WebSocket (optional)
-            // Use shell check to verify they are installed for CLI
+            // Use shell check to verify they are installed for CLI (only when exec() is available)
             $cliModules = [];
-            exec('php -m 2>/dev/null', $cliModules);
+            if (function_exists('exec')) {
+                exec('php -m 2>/dev/null', $cliModules);
+            }
             foreach (['posix', 'pcntl'] as $cliExt) {
                 if (!in_array($cliExt, $cliModules, true)) {
                     $txt .= '<span>PHP extension \"' . $cliExt . '\" not found' .

@@ -57,11 +57,12 @@ Paste the configuration variables here
 
 </details>
 
-## Updated from an older Teampass or fresh install
+## Important informations
 
-```
-Fresh install / Updated from what release
-```
+| | |
+|---|---|
+| **Updated from an older Teampass or fresh install** | Fresh install / Updated from what release |
+| **Using Docker** | Yes / No |
 
 ## Client configuration
 

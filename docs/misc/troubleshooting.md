@@ -136,3 +136,104 @@ The account creation background task (key generation) may not have completed bef
 1. Go to **Admin → Tasks** and verify the key generation task for that user completed successfully.
 2. If the task failed, check the task error message. Common causes: missing email address in the Azure profile, or the background task cron job is not running.
 3. Once the task completes, the user can log in normally.
+
+---
+
+## Migrating TeamPass to another environment
+
+This section covers moving an existing TeamPass installation to a new server or from a test environment to production. **Never run the installer on an existing installation** — doing so regenerates the encryption key (SECUREFILE) and permanently invalidates all encrypted data.
+
+### Prerequisites
+
+Before starting, gather the following from the **source** server:
+- `includes/config/settings.php` (contains DB credentials, paths, and the SECUREFILE name)
+- The SECUREFILE itself (path and filename come from `settings.php` — the file is stored outside the web root at `SECUREPATH/SECUREFILE`)
+- A full database dump: `mysqldump -u <user> -p <dbname> > teampass_backup.sql`
+- The full TeamPass application folder
+
+### Step-by-step migration
+
+**1. Copy the application**
+
+Transfer the entire TeamPass folder to the destination server. Preserve file permissions (`www-data` or equivalent must own the files).
+
+**2. Copy the SECUREFILE**
+
+The encryption master key is stored outside the web root. Find its location in `includes/config/settings.php`:
+
+```php
+define('SECUREPATH', '/var/teampass/');   // example
+define('SECUREFILE', 'sk_xxxxxxxx');      // example
+```
+
+Copy that file to the **exact same path** on the destination server. If the path changes, update the constants in `settings.php`.
+
+> ⚠️ If the SECUREFILE is lost or regenerated, all encrypted data (passwords, sessions, settings) becomes unrecoverable.
+
+**3. Import the database**
+
+```bash
+mysql -u <dest_user> -p <dest_dbname> < teampass_backup.sql
+```
+
+**4. Update `includes/config/settings.php`**
+
+Edit the file on the destination server and update:
+- `DB_HOST`, `DB_USER`, `DB_PASSWD`, `DB_BDDNAME` — destination DB credentials
+- `SECUREPATH` / `SECUREFILE` — only if the path changed in step 2
+
+**5. Update paths in the database**
+
+If the server URL or absolute path changed, update the `teampass_misc` settings table:
+
+```sql
+UPDATE teampass_misc SET valeur = '/var/www/html/teampass/' WHERE intitule = '_absolute_path';
+UPDATE teampass_misc SET valeur = 'https://teampass.example.com/' WHERE intitule = '_url_path';
+```
+
+**6. Delete stale PHP sessions**
+
+Old session files from the source server will fail to decrypt with the destination server's environment. Remove them:
+
+```bash
+rm /var/lib/php/sessions/sess_*
+# or wherever your session.save_path points
+```
+
+**7. Fix file permissions**
+
+```bash
+chown -R www-data:www-data /var/www/html/teampass/
+chmod -R 755 /var/www/html/teampass/
+```
+
+**8. Restart PHP-FPM**
+
+Clears the APCu settings cache and reloads environment:
+
+```bash
+systemctl restart php8.x-fpm
+```
+
+**9. Verify**
+
+- Log in as administrator.
+- Go to **Admin → Tools** and run a diagnostic check.
+- Verify that items and passwords are accessible for regular users.
+- Check **Admin → Tasks** — background tasks should be running normally.
+
+### Common errors during migration
+
+| Error | Likely cause | Fix |
+|---|---|---|
+| `Ciphertext is too short` or `Integrity check failed` | SECUREFILE mismatch or stale PHP sessions | Verify SECUREFILE path/content matches source; delete old session files (step 6) |
+| `Access denied for user '...'@'...'` | DB credentials mismatch between `settings.php` and destination DB | Update `settings.php` or recreate the DB user with the source credentials |
+| `Cannot redeclare isHex()` | PHP file included twice — symptom of a botched installer re-run | Restore `settings.php` from the source server and do not re-run the installer |
+| Domain users see empty passwords | Session decryption failure upstream of sharekey decryption | Fix SECUREFILE issue first; passwords will reappear once sessions work |
+| Items appear empty after migration | Background key-generation task pending | Wait for the task to complete (Admin → Tasks), or run the background handler manually |
+
+### What NOT to do
+
+- ❌ **Do not run `install/install.php`** on an existing installation — it regenerates the SECUREFILE.
+- ❌ **Do not run `install/upgrade.php`** unless you are intentionally upgrading the TeamPass version.
+- ❌ **Do not regenerate user keys** unless explicitly needed — it triggers a full re-encryption of all items.

@@ -2099,5 +2099,7 @@ Path: %s',
     'email_subject_on_user_lock' => '[TeamPass] A user account has been locked',
     'email_body_on_user_lock' => 'Hello,<br><br>This is a generated email from TeamPass.<br><br>User account <b>#tp_user#</b> has been locked by the anti brute force protection on #tp_date# at #tp_time#.<br><br>Details:<ul><li>Name: #tp_name#</li><li>Email: #tp_email#</li><li>Source IP: #tp_ip#</li><li>Automatic unlock at: #tp_unlock_at#</li></ul><br>Regards.',
     'not_secure' => 'Not secure',
+    'admin_update_badge' => 'Update',
+    'admin_new_version_available' => 'version %s available',
 
 );

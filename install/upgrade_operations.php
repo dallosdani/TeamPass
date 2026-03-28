@@ -171,11 +171,87 @@ if (isset($post_operation) === true && empty($post_operation) === false && strpo
         foreach ($tables as $table) {
             cleanDuplicateSharekeys($pre.$table);
         }
+    } elseif ($post_operation === 'deduplicate_misc') {
+        $finish = deduplicateMisc($pre);
     }
     // Return back
     echo '[{"finish":"'.$finish.'" , "next":"", "error":"", "total":"'.$total.'"}]';
     // Commit transaction.
     mysqli_commit($db_link);
+}
+
+/**
+ * 3.1.7 - Deduplicate teampass_misc and add UNIQUE KEY on (type, intitule)
+ *
+ * Processes in batches of 500 to avoid server timeouts on large datasets.
+ * On each call:
+ *   - If the UNIQUE KEY already exists → returns 1 (already done).
+ *   - Selects up to 500 duplicate row IDs (rows that are not the "winner"
+ *     of their (type, intitule) group) and deletes them.
+ *     Winner = highest COALESCE(updated_at, created_at); ties broken by
+ *     highest increment_id.
+ *   - If the deleted batch was smaller than the batch size (no more
+ *     duplicates remain) → adds the UNIQUE KEY and returns 1 (finished).
+ *   - Otherwise → returns 0 (caller must loop again).
+ *
+ * @param string $pre Table prefix
+ * @return int 1 = finished, 0 = call again
+ */
+function deduplicateMisc(string $pre): int
+{
+    global $db_link;
+
+    // Already done if the UNIQUE KEY exists
+    $check = mysqli_query($db_link, "SHOW INDEX FROM `{$pre}misc` WHERE Key_name = 'uk_type_intitule'");
+    if ($check !== false && mysqli_num_rows($check) > 0) {
+        return 1;
+    }
+
+    $batchSize = 500;
+
+    // Find IDs of rows to delete: every row that is NOT the winner of its
+    // (type, intitule) group.  Winner = latest timestamp; ties → highest id.
+    $rows = mysqli_query(
+        $db_link,
+        "SELECT t1.increment_id
+         FROM `{$pre}misc` t1
+         INNER JOIN `{$pre}misc` t2
+           ON  t1.type      = t2.type
+           AND t1.intitule  = t2.intitule
+           AND (
+             CAST(COALESCE(NULLIF(t1.updated_at, ''), t1.created_at, '0') AS UNSIGNED)
+               < CAST(COALESCE(NULLIF(t2.updated_at, ''), t2.created_at, '0') AS UNSIGNED)
+             OR (
+               CAST(COALESCE(NULLIF(t1.updated_at, ''), t1.created_at, '0') AS UNSIGNED)
+                 = CAST(COALESCE(NULLIF(t2.updated_at, ''), t2.created_at, '0') AS UNSIGNED)
+               AND t1.increment_id < t2.increment_id
+             )
+           )
+         LIMIT {$batchSize}"
+    );
+
+    if ($rows === false || mysqli_num_rows($rows) === 0) {
+        // No duplicates left — add the UNIQUE constraint
+        mysqli_query($db_link, "ALTER TABLE `{$pre}misc` ADD UNIQUE KEY `uk_type_intitule` (`type`, `intitule`)");
+        return 1;
+    }
+
+    $ids = [];
+    while ($row = mysqli_fetch_assoc($rows)) {
+        $ids[] = (int) $row['increment_id'];
+    }
+    $deleted = count($ids);
+
+    mysqli_query($db_link, "DELETE FROM `{$pre}misc` WHERE increment_id IN (" . implode(',', $ids) . ")");
+
+    // If the batch was not full, this was the last batch — add the constraint
+    if ($deleted < $batchSize) {
+        mysqli_query($db_link, "ALTER TABLE `{$pre}misc` ADD UNIQUE KEY `uk_type_intitule` (`type`, `intitule`)");
+        return 1;
+    }
+
+    // Full batch: there may be more duplicates — request another call
+    return 0;
 }
 
 /**

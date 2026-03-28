@@ -142,11 +142,15 @@ if ((int) $session_user_admin === 1) {
                 <div class="card-body">
                     <div>
                         <label><i class="fa-solid fa-users mr-2"></i><?php echo $lang->get('visible_by'); ?></label>
-                        <span id="card-item-visibility" class="text-info font-weight-bold ml-2"></span>
+                        <span id="card-item-visibility" class="text-info font-weight-bold ml-2">
+                            <i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>
+                        </span>
                     </div>
                     <div>
                         <label><i class="fa-solid fa-key mr-2"></i><?php echo $lang->get('complex_asked'); ?></label>
-                        <span id="card-item-minimum-complexity" class="text-info font-weight-bold ml-2"></span>
+                        <span id="card-item-minimum-complexity" class="text-info font-weight-bold ml-2">
+                            <i class="fa-solid fa-ellipsis mr-2 fa-fade"></i>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -192,6 +196,7 @@ if ((int) $session_user_admin === 1) {
                                     </div>
                                     <input id="form-item-password" type="password" class="form-control form-item-control" placeholder="<?php echo $lang->get('password'); ?>" data-field-name="pwd" data-change-ongoing="">
                                     <div class="input-group-append">
+                                        <span class="input-group-text hidden" id="form-item-password-loader"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
                                         <button class="btn btn-secondary btn-no-click infotip password-generate" id="item-button-password-generate" title="<?php echo $lang->get('pw_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-random"></i></button>
                                         <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-showOptions" title="<?php echo $lang->get('options'); ?>"><i class="fa-solid fa-sliders-h"></i></button>
                                         <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-show" title="<?php echo $lang->get('mask_pw'); ?>"><i class="fa-solid fa-low-vision"></i></button>
@@ -1147,6 +1152,7 @@ if ((int) $session_user_admin === 1) {
                             <ul class="list-group list-group-unbordered mb-3">
                                 <li class="list-group-item">
                                     <b><?php echo $lang->get('pw'); ?></b>
+                                    <span id="card-item-pwd-security-badge" class="badge ml-2 hidden"></span>
                                     <button type="button" class="float-right btn btn-secondary btn-sm btn-copy-clipboard" id="card-item-pwd-button">
                                         <i class="fa-regular fa-copy"></i>
                                     </button>

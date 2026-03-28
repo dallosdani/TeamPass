@@ -1696,6 +1696,11 @@ function generateBugReport(
         'oauth2_client_secret',
         'oauth2_client_token',
         'oauth2_client_endpoint',
+        'oauth2_endpoint',
+        'oauth2_token',
+        'restore_items_master_keys_id',
+        'statistics_auth_token',
+        'statistics_instance_id'
     );
 
     // Load user's language
@@ -1774,60 +1779,78 @@ function generateBugReport(
     }
 
     // Now prepare text
-    $txt = '### Page on which it happened
+    $txt = '## Page on which it happened
 ' . $data['current_page'] . '
 
-### Steps to reproduce
+## Steps to reproduce
+
 1.
 2.
 3.
 
-### Expected behaviour
+## Expected behaviour
+
 Tell us what should happen
 
+## Actual behaviour
 
-### Actual behaviour
 Tell us what happens instead
 
-### Server configuration
-**Operating system**: ' . php_uname() . '
+## Server configuration
 
-**Web server:** ' . $_SERVER['SERVER_SOFTWARE'] . '
+| | |
+|---|---|
+| **Operating system** | ' . php_uname() . ' |
+| **Web server** | ' . ($_SERVER['SERVER_SOFTWARE'] ?? 'unknown') . ' |
+| **Database** | ' . $dbVersion . ' |
+| **PHP version** | ' . PHP_VERSION . ' |
+| **TeamPass version** | ' . TP_VERSION . '.' . TP_VERSION_MINOR . ' |
+| **Install type** | Fresh install / Updated from x.x.x |
+| **Deployment** | Standard / Docker / other |
 
-**Database:** ' . $dbVersion . '
+## TeamPass configuration variables
 
-**PHP version:** ' . PHP_VERSION . '
+<details>
+<summary>Configuration variables (click to expand)</summary>
 
-**Teampass version:** ' . TP_VERSION . '.' . TP_VERSION_MINOR . '
-
-**Teampass configuration variables:**
 ```
 ' . $list_of_options . '
 ```
 
-**Updated from an older Teampass or fresh install:**
+</details>
 
-### Client configuration
+## Important informations
 
-**Browser:** ' . $data['browser_name'] . ' - ' . $data['browser_version'] . '
+| | |
+|---|---|
+| **Updated from an older Teampass or fresh install** | Fresh install / Updated from what release |
+| **Using Docker** | Yes / No |
 
-**Operating system:** ' . $data['os'] . ' - ' . $data['os_archi'] . 'bits
+## Client configuration
 
-### Logs
+| | |
+|---|---|
+| **Browser** | ' . $data['browser_name'] . ' - ' . $data['browser_version'] . ' |
+| **Operating system** | ' . $data['os'] . ' - ' . $data['os_archi'] . 'bits |
 
-#### Web server error log
+## Logs
+
+### Web server error log
+
 ```
 ' . $php_last_error . '
 ```
 
-#### Teampass 10 last system errors
+### TeamPass 10 last system errors
+
 ```
 ' . $teampass_errors . '
 ```
 
-#### Log from the web-browser developer console (CTRL + SHIFT + i)
+### Browser developer console (F12 > Console + Network)
+
 ```
-Insert the log here and especially the answer of the query that failed.
+Insert the relevant console/network errors here and especially the answer of the query that failed.
 ```
 ';
 

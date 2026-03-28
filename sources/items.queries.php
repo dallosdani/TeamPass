@@ -2953,6 +2953,12 @@ switch ($inputData['type']) {
 
             $arrData['label'] = $dataItem['label'] === '' ? '' : $dataItem['label'];
             $arrData['pw_length'] = strlen($pw);
+            // Password security badge: OWASP ASVS aligned policy (min length 12, min complexity score 70)
+            if (strlen($pw) === 0) {
+                $arrData['pw_is_secure'] = null; // empty password → no badge
+            } else {
+                $arrData['pw_is_secure'] = strlen($pw) >= 12 && intval($dataItem['complexity_level']) >= 70;
+            }
             $arrData['pw_decrypt_info'] = empty($pw) === true && $pwIsEmptyNormal === false ? 'error_no_sharekey_yet' : '';
             $arrData['email'] = empty($dataItem['email']) === true ? '' : $dataItem['email'];
             $arrData['url'] = empty($dataItem['url']) === true ? '' : $dataItem['url'];
@@ -3887,17 +3893,39 @@ switch ($inputData['type']) {
                 'id=%s',
                 $inputData['folderId']
             );
-            // update complixity value
-            DB::update(
-                prefixTable('misc'),
-                array(
-                    'valeur' => $dataReceived['complexity'],
-                    'updated_at' => time(),
-                ),
-                'intitule = %s AND type = %s',
+            // Add or update complexity value.
+            // Some personal root folders may miss the misc/complex row,
+            // therefore a plain UPDATE is not sufficient here.
+            $existingFolderComplexity = DB::queryFirstRow(
+                'SELECT increment_id
+                FROM ' . prefixTable('misc') . '
+                WHERE intitule = %i AND type = %s',
                 $inputData['folderId'],
                 'complex'
             );
+            if ($existingFolderComplexity !== null) {
+                DB::update(
+                    prefixTable('misc'),
+                    array(
+                        'valeur' => $dataReceived['complexity'],
+                        'updated_at' => time(),
+                    ),
+                    'intitule = %s AND type = %s',
+                    $inputData['folderId'],
+                    'complex'
+                );
+            } else {
+                DB::insert(
+                    prefixTable('misc'),
+                    array(
+                        'type' => 'complex',
+                        'intitule' => $inputData['folderId'],
+                        'valeur' => $dataReceived['complexity'],
+                        'created_at' => time(),
+                        'updated_at' => time(),
+                    )
+                );
+            }
             // rebuild fuild tree folder
             $tree->rebuild();
         }
@@ -4674,6 +4702,16 @@ switch ($inputData['type']) {
             }
         }
 
+        if (
+            $inputData['context'] === 'item_edit_current_folder'
+            && (int) $inputData['itemId'] > 0
+        ) {
+            $currentItemFolderId = getItemFolderIdFromDb((int) $inputData['itemId']);
+            if ($currentItemFolderId !== null) {
+                $inputData['folderId'] = $currentItemFolderId;
+            }
+        }
+
         // do query on this folder
         $data_this_folder = DB::queryFirstRow(
             'SELECT id, personal_folder, title
@@ -5018,7 +5056,7 @@ switch ($inputData['type']) {
                 'at_del_file : ' . strval($data['name'])
             );
 
-            // DElete sharekeys
+            // Delete sharekeys
             DB::delete(
                 prefixTable('sharekeys_files'),
                 'object_id = %i',
@@ -5570,7 +5608,7 @@ switch ($inputData['type']) {
                         prefixTable('sharekeys_items'),
                         'object_id = %i AND user_id NOT IN %ls',
                         $item_id,
-                        [$session->get('user-id'), TP_USER_ID, API_USER_ID, OTV_USER_ID,SSH_USER_ID]
+                        [$session->get('user-id'), TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
                     );
 
                     // Remove all item sharekeys fields
@@ -7218,11 +7256,23 @@ switch ($inputData['type']) {
             'decode'
         );
 
+        $checkItemId = (int) filter_var($dataReceived['itemId'], FILTER_SANITIZE_NUMBER_INT);
+        $checkTreeId = (int) filter_var($dataReceived['treeId'], FILTER_SANITIZE_NUMBER_INT);
+
+        // Client-side treeId may be stale if the item was moved since the page loaded.
+        // Resolve the item's actual current folder from the DB before checking rights.
+        if ($checkItemId > 0) {
+            $currentTreeId = getItemFolderIdFromDb($checkItemId);
+            if ($currentTreeId !== null) {
+                $checkTreeId = $currentTreeId;
+            }
+        }
+
         // Check rights
         $data = getCurrentAccessRights(
             (int) filter_var($dataReceived['userId'], FILTER_SANITIZE_NUMBER_INT),
-            (int) filter_var($dataReceived['itemId'], FILTER_SANITIZE_NUMBER_INT),
-            (int) filter_var($dataReceived['treeId'], FILTER_SANITIZE_NUMBER_INT),
+            $checkItemId,
+            $checkTreeId,
             (string) filter_var($dataReceived['action'], FILTER_SANITIZE_SPECIAL_CHARS),
         );
 
@@ -7452,7 +7502,7 @@ function fileFormatImage($ext)
 function getCurrentAccessRights(int $userId, int $itemId, int $treeId, string $action = ''): array
 {
     $session = SessionManager::getSession();
-    
+
     // Check if the item is locked and whether the current user can edit it
     $editionLock = isItemLocked($itemId, $session, $userId, $action);
 

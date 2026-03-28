@@ -907,3 +907,11 @@ Absolute priority: integrate with the current code rather than proposing an idea
 - Commit messages must always be in English.
 - Use simple and concise sentences.
 - Des phrases simples et concises
+
+## Conventions de review de PR
+
+- Les PR doivent cibler une branche `pr-XXXX` avec XXX l'ID de Github
+- Toute nouvelle fonction publique doit avoir un docblock
+- Les noms de variables en anglais uniquement
+- Pas de `var_dump()` ou `console.log()` en production
+- Veiller aux impacts sur `install` et `upgrade`

@@ -120,6 +120,23 @@ $csrf_token = $superGlobal->get('csrf_token', 'SESSION');
 				if (empty($post_step)) {
 					?>
 				<div class="row">
+					<?php if (file_exists(__DIR__ . '/../includes/config/settings.php')): ?>
+					<div class="col-12 mb-3">
+						<div class="alert alert-danger" role="alert">
+							<h5 class="alert-heading"><i class="fa-solid fa-triangle-exclamation"></i>&nbsp;Existing installation detected</h5>
+							<p>A <code>settings.php</code> configuration file already exists, which means TeamPass is already installed on this server.</p>
+							<hr>
+							<p class="mb-0">
+								<strong>Do not run the installer again.</strong>
+								Doing so will generate a new encryption key (SECUREFILE) and permanently invalidate all existing encrypted data (passwords, sessions, settings).<br><br>
+								If you want to <strong>upgrade</strong> TeamPass, use <code>install/upgrade.php</code> instead.<br>
+								If you are <strong>migrating</strong> TeamPass from another environment, follow the
+								<a href="../docs/#/misc/troubleshooting?id=migrating-teampass-to-another-environment" target="_blank" class="alert-link">Migration guide</a>
+								before proceeding.
+							</p>
+						</div>
+					</div>
+					<?php endif; ?>
 					<div class="col-12">
 						<div class="card bg-light">
 							<div class="card-body">

@@ -118,29 +118,20 @@ if (!$res) {
 
 //--->BEGIN 3.0.6
 // Add new setting 'sending_emails_job_frequency'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'sending_emails_job_frequency'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'sending_emails_job_frequency', '2')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'sending_emails_job_frequency', '2')"
+);
 // Add new setting 'user_keys_job_frequency'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'user_keys_job_frequency'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'user_keys_job_frequency', '1')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'user_keys_job_frequency', '1')"
+);
 // Add new setting 'items_statistics_job_frequency'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'enable_tasks_items_statistics_job_frequencymanager'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'items_statistics_job_frequency', '5')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'items_statistics_job_frequency', '5')"
+);
 
 // Add field ongoing_process_id to USERS table
 $res = addColumnIfNotExist(
@@ -197,44 +188,30 @@ if ($res === false) {
 
 //--->BEGIN 3.0.9
 // Add new setting 'reload_cache_table_task'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'reload_cache_table_task'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'reload_cache_table_task', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'reload_cache_table_task', '')"
+);
 // Add new setting 'rebuild_config_file'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'rebuild_config_file'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'rebuild_config_file', '')"
-    );
-}// Add new setting 'purge_temporary_files_task'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'purge_temporary_files_task'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'purge_temporary_files_task', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'rebuild_config_file', '')"
+);
+// Add new setting 'purge_temporary_files_task'
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'purge_temporary_files_task', '')"
+);
 // Add new setting 'clean_orphan_objects_task'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'clean_orphan_objects_task'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'clean_orphan_objects_task', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'clean_orphan_objects_task', '')"
+);
 // Add new setting 'users_personal_folder_task'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'users_personal_folder_task'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'users_personal_folder_task', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'users_personal_folder_task', '')"
+);
 
 // Remove unused settings
 mysqli_query(
@@ -414,13 +391,10 @@ try {
 }
 
 // Add new setting 'maximum_session_expiration_time'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'maximum_session_expiration_time'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'maximum_session_expiration_time', '60')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'maximum_session_expiration_time', '60')"
+);
 
 // Add field treated_objects to processes_logs table
 $res = addColumnIfNotExist(
@@ -557,13 +531,10 @@ try {
 }
 
 // Add new setting 'items_ops_job_frequency'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'items_ops_job_frequency'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'items_ops_job_frequency', '1')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'items_ops_job_frequency', '1')"
+);
 
 // Alter raison_iv field in log_items
 try {

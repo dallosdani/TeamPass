@@ -120,55 +120,23 @@ $tree = new NestedTree(
 );
 
 
-// Populate table MISC
+// Populate table MISC (upsert: always write version, only set ldap_mode when migrating from branch 2)
 $val = array(
-    array('admin', 'teampass_version', TP_VERSION, 1),
-    $TPIsBranch3 === true ? '' : array('admin', 'ldap_mode', 0, 1), // only disable if migrating from branch 2
+    array('admin', 'teampass_version', TP_VERSION),
+    $TPIsBranch3 === true ? '' : array('admin', 'ldap_mode', 0),
 );
 foreach ($val as $elem) {
     if ($elem === '') continue;
-    //Check if exists before inserting
     $queryRes = mysqli_query(
         $db_link,
-        "SELECT COUNT(*) FROM ".$pre."misc
-        WHERE type='".$elem[0]."' AND intitule='".$elem[1]."'"
+        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES
+        ('" . $elem[0] . "', '" . $elem[1] . "', '" . str_replace("'", "", $elem[2]) . "')
+        ON DUPLICATE KEY UPDATE `valeur` = VALUES(`valeur`)"
     );
     // @phpstan-ignore if.alwaysFalse (mysqli_error returns non-empty string on error despite type hint)
     if (mysqli_error($db_link)) {
-        echo '[{"finish":"1", "msg":"", "error":"MySQL Error! Last input is "'.$elem[1].'"}]';
+        echo '[{"finish":"1", "msg":"", "error":"MySQL Error! ' . addslashes(mysqli_error($db_link)) . '"}]';
         exit();
-    } else {
-        $resTmp = mysqli_fetch_row($queryRes);
-        if ($resTmp[0] === 0) {
-            $queryRes = mysqli_query(
-                $db_link,
-                "INSERT INTO `".$pre."misc`
-                (`type`, `intitule`, `valeur`) VALUES
-                ('".$elem[0]."', '".$elem[1]."', '".
-                str_replace("'", "", $elem[2])."');"
-            );
-            // @phpstan-ignore if.alwaysFalse (mysqli_error returns non-empty string on error despite type hint)
-            if (mysqli_error($db_link)) {
-                echo '[{"finish":"1", "msg":"", "error":"MySQL Error1! '.addslashes(mysqli_error($db_link)).'"}]';
-                exit();
-            }
-        } else {
-            // Force update for some settings
-            // @phpstan-ignore identical.alwaysTrue ($elem[3] type depends on caller context)
-            if ($elem[3] === 1) {
-                $queryRes = mysqli_query(
-                    $db_link,
-                    "UPDATE `".$pre."misc`
-                    SET `valeur` = '".$elem[2]."'
-                    WHERE `type` = '".$elem[0]."' AND `intitule` = '".$elem[1]."'"
-                );
-                // @phpstan-ignore if.alwaysFalse (mysqli_error returns non-empty string on error despite type hint)
-                if (mysqli_error($db_link)) {
-                    echo '[{"finish":"1", "msg":"", "error":"MySQL Error2! '.addslashes(mysqli_error($db_link)).'"}]';
-                    exit();
-                }
-            }
-        }
     }
 }
 
@@ -369,85 +337,58 @@ mysqli_query(
 );
 
 // Add new setting 'password_overview_delay'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'password_overview_delay'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'password_overview_delay', '4')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'password_overview_delay', '4')"
+);
 
 // Add new setting 'roles_allowed_to_print_select'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'roles_allowed_to_print_select'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'roles_allowed_to_print_select', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'roles_allowed_to_print_select', '')"
+);
 
 // Add new setting 'clipboard_life_duration'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'clipboard_life_duration'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'clipboard_life_duration', '30')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'clipboard_life_duration', '30')"
+);
 
 // Add new setting 'mfa_for_roles'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'mfa_for_roles'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'mfa_for_roles', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'mfa_for_roles', '')"
+);
 
 // Add new setting 'tree_counters'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'tree_counters'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tree_counters', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tree_counters', '0')"
+);
 
 // Add new setting 'settings_offline_mode'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'settings_offline_mode'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'settings_offline_mode', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'settings_offline_mode', '0')"
+);
 
 // Add new setting 'settings_tree_counters'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'settings_tree_counters'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'settings_tree_counters', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'settings_tree_counters', '0')"
+);
 
 // Add new setting 'copy_to_clipboard_small_icons'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'copy_to_clipboard_small_icons'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'copy_to_clipboard_small_icons', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'copy_to_clipboard_small_icons', '0')"
+);
 
 // Add new setting 'enable_massive_move_delete'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'enable_massive_move_delete'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_massive_move_delete', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_massive_move_delete', '0')"
+);
 
 // Convert the roles_allowed_to_print value to an array
 $roles_allowed_to_print = mysqli_fetch_row(mysqli_query(
@@ -651,13 +592,10 @@ if ($res === false) {
 }
 
 // Add new setting 'email_debug_level'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'email_debug_level'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'email_debug_level', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'email_debug_level', '0')"
+);
 //---<
 
 
@@ -770,106 +708,70 @@ while ($data = mysqli_fetch_array($rows)) {
 mysqli_query($db_link, "UPDATE `" . $pre . "misc` SET `valeur` = '0'  WHERE intitule = 'enable_server_password_change'");
 
 // Add new setting 'ga_reset_by_user'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ga_reset_by_user'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ga_reset_by_user', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ga_reset_by_user', '')"
+);
 // Add new setting 'onthefly-backup-key'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'onthefly-backup-key'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'onthefly-backup-key', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'onthefly-backup-key', '')"
+);
 // Add new setting 'onthefly-restore-key'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'onthefly-restore-key'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'onthefly-restore-key', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'onthefly-restore-key', '')"
+);
 // Add new setting 'ldap_user_dn_attribute'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_user_dn_attribute'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_user_dn_attribute', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_user_dn_attribute', '')"
+);
 // Add new setting 'ldap_dn_additional_user_dn'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_dn_additional_user_dn'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_dn_additional_user_dn', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_dn_additional_user_dn', '')"
+);
 // Add new setting 'ldap_user_object_filter'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_user_object_filter'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_user_object_filter', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_user_object_filter', '')"
+);
 // Add new setting 'ldap_bdn'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_bdn'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_bdn', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_bdn', '')"
+);
 // Add new setting 'ldap_hosts'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_hosts'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_hosts', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_hosts', '')"
+);
 // Add new setting 'ldap_password'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_password'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_password', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_password', '')"
+);
 // Add new setting 'ldap_username'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'ldap_username'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_username', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'ldap_username', '')"
+);
 // Add new setting 'api_token_duration'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'api_token_duration'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'api_token_duration', '60')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'api_token_duration', '60')"
+);
 
 //---< END 3.0.0.17
 
 
 //---> 3.0.0.18
 // Add new value 'last_folder_change' in table misc
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'timestamp' AND intitule = 'last_folder_change'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('timestamp', 'last_folder_change', '')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('timestamp', 'last_folder_change', '')"
+);
 
 // Add new table CACHE_TREE
 mysqli_query(
@@ -934,40 +836,28 @@ if ($res === false) {
 }
 
 // Add new setting 'enable_tasks_manager'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'enable_tasks_manager'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_tasks_manager', '0')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'enable_tasks_manager', '0')"
+);
 
 // Add new setting 'task_maximum_run_time'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'task_maximum_run_time'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'task_maximum_run_time', '300')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'task_maximum_run_time', '300')"
+);
 
 // Add new setting 'maximum_number_of_items_to_treat'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'maximum_number_of_items_to_treat'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'maximum_number_of_items_to_treat', '300')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'maximum_number_of_items_to_treat', '300')"
+);
 
 // Add new setting 'tasks_manager_refreshing_period'
-$tmp = mysqli_num_rows(mysqli_query($db_link, "SELECT * FROM `" . $pre . "misc` WHERE type = 'admin' AND intitule = 'tasks_manager_refreshing_period'"));
-if (intval($tmp) === 0) {
-    mysqli_query(
-        $db_link,
-        "INSERT INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_manager_refreshing_period', '".NUMBER_ITEMS_IN_BATCH."')"
-    );
-}
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `" . $pre . "misc` (`type`, `intitule`, `valeur`) VALUES ('admin', 'tasks_manager_refreshing_period', '".NUMBER_ITEMS_IN_BATCH."')"
+);
 
 // Add field is_ready_for_usage to USERS table
 $res = addColumnIfNotExist(

@@ -2098,5 +2098,7 @@ return array(
     'email_subject_on_user_lock' => '[TeamPass] 某个用户账户已被锁定',
     'email_body_on_user_lock' => '您好，<br><br>这是一封由Teampass密码管理器生成的电子邮件。<br><br>用户账户 <b>#tp_user#</b> 已于 #tp_date# #tp_time# 被反暴力破解保护机制锁定。<br><br>详情：<ul><li>姓名：#tp_name#</li><li>邮箱：#tp_email#</li><li>来源 IP：#tp_ip#</li><li>自动解锁时间：#tp_unlock_at#</li></ul><br><br><br>此致',
     'not_secure' => 'Not secure',
+    'admin_update_badge' => 'Update',
+    'admin_new_version_available' => 'version %s available',
 
 );

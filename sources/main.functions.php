@@ -7194,10 +7194,16 @@ function triggerBackgroundHandler(): void
     // pipes for stdout/stderr. When the parent request ends and pipes are closed,
     // the child receives SIGPIPE and dies silently on the first write (log, error, etc.).
     // Redirecting to /dev/null with & ensures true fire-and-forget detachment.
-    $cmd = escapeshellarg(getPHPBinary())
-        . ' ' . escapeshellarg(__DIR__ . '/../scripts/background_tasks___handler.php')
-        . ' > /dev/null 2>&1 &';
-    exec($cmd);
+    //
+    // Guard: exec() may be disabled via disable_functions in php.ini (e.g. Docker).
+    // In that case, skip the launch silently — the trigger file is already written
+    // above, and a cron job running background_tasks___handler.php will pick it up.
+    if (function_exists('exec')) {
+        $cmd = escapeshellarg(getPHPBinary())
+            . ' ' . escapeshellarg(__DIR__ . '/../scripts/background_tasks___handler.php')
+            . ' > /dev/null 2>&1 &';
+        exec($cmd);
+    }
 }
 
 /**

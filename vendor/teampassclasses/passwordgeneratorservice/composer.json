@@ -1,0 +1,25 @@
+{
+    "name": "teampassclasses/passwordgeneratorservice",
+    "description": "Generate passwords meeting a folder's minimum complexity requirements.",
+    "type": "library",
+    "license": "GPL-3.0-only",
+    "keywords": [
+        "password",
+        "generator",
+        "complexity"
+    ],
+    "authors": [
+        {
+            "name": "Nils Laumaillé"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "hackzilla/password-generator": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "TeampassClasses\\PasswordGeneratorService\\": "src/"
+        }
+    }
+}

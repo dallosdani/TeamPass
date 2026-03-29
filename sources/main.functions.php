@@ -6099,85 +6099,57 @@ function userHasAccessToBackupFile(int $userId, string $file, string $key, strin
  */
 function EnsurePersonalItemHasOnlyKeysForOwner(int $userId, int $itemId): bool
 {
-    // Check if user is admin
-    // Refuse access if user does not exist and/or is admin
-    $user = DB::queryFirstRow(
-        'SELECT admin
-        FROM ' . prefixTable('users') . '
-        WHERE id = %i',
+    // Single query: verify user is not admin, item is personal, and userId is the creator
+    $check = DB::queryFirstRow(
+        'SELECT 1
+        FROM ' . prefixTable('users') . ' AS u
+        JOIN ' . prefixTable('items') . ' AS i ON i.id = %i AND i.perso = 1
+        JOIN ' . prefixTable('log_items') . ' AS li ON li.id_item = i.id AND li.action = %s AND li.id_user = %i
+        WHERE u.id = %i AND u.admin = 0',
+        $itemId,
+        'at_creation',
+        $userId,
         $userId
     );
-    if (DB::count() === 0 || (int) $user['admin'] === 1) {
+    if ($check === null) {
         return false;
     }
 
-    // Get item info
-    $item = DB::queryFirstRow(
-        'SELECT i.perso, i.id_tree
-        FROM ' . prefixTable('items') . ' as i
-        WHERE i.id = %i',
-        $itemId
-    );
-    if (DB::count() === 0 || (int) $item['perso'] === 0) {
-        return false;
-    }
+    // Delete all sharekeys for this item except for the owner and TeamPass system users
+    $excludedUsers = [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID];
+    try {
+        DB::startTransaction();
 
-    // Get item owner
-    $itemOwner = DB::queryFirstRow(
-        'SELECT li.id_user
-        FROM ' . prefixTable('log_items') . ' as li
-        WHERE li.id_item = %i AND li.action = %s',
-        $itemId,
-        'at_creation'
-    );
-    if (DB::count() === 0 || (int) $itemOwner['id_user'] !== $userId) {
-        return false;
-    }
-
-    // Delete all keys for this item except for the owner and TeamPass system user
-    // Some TeamPass tables use `id`, others use `increment_id` as object identifier.
-    // Detect the real PK column at runtime for dependent tables to avoid SQL errors on upgraded instances.
-    $resolveObjectIdColumn = static function (string $tableName): string {
-        static $cache = [];
-        if (isset($cache[$tableName])) {
-            return $cache[$tableName];
-        }
-        DB::query(
-            'SHOW COLUMNS FROM ' . prefixTable($tableName) . ' LIKE %s',
-            'increment_id'
+        DB::delete(
+            prefixTable('sharekeys_items'),
+            'object_id = %i AND user_id NOT IN %ls',
+            $itemId,
+            $excludedUsers
         );
-        $cache[$tableName] = DB::count() > 0 ? 'increment_id' : 'id';
-        return $cache[$tableName];
-    };
+        DB::query(
+            'DELETE FROM ' . prefixTable('sharekeys_files') . '
+            WHERE object_id IN (SELECT id FROM ' . prefixTable('files') . ' WHERE id_item = %i) AND user_id NOT IN %ls',
+            $itemId,
+            $excludedUsers
+        );
+        DB::query(
+            'DELETE FROM ' . prefixTable('sharekeys_fields') . '
+            WHERE object_id IN (SELECT id FROM ' . prefixTable('categories_items') . ' WHERE item_id = %i) AND user_id NOT IN %ls',
+            $itemId,
+            $excludedUsers
+        );
+        DB::query(
+            'DELETE FROM ' . prefixTable('sharekeys_logs') . '
+            WHERE object_id IN (SELECT increment_id FROM ' . prefixTable('log_items') . ' WHERE id_item = %i) AND user_id NOT IN %ls',
+            $itemId,
+            $excludedUsers
+        );
 
-    $filesObjectIdColumn = $resolveObjectIdColumn('files');
-    $categoriesItemsObjectIdColumn = $resolveObjectIdColumn('categories_items');
-    $logItemsObjectIdColumn = $resolveObjectIdColumn('log_items');
-
-    DB::delete(
-        prefixTable('sharekeys_items'),
-        'object_id = %i AND user_id NOT IN %ls',
-        $itemId,
-        [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
-    );
-    DB::query(
-        'DELETE FROM ' . prefixTable('sharekeys_files') . '
-        WHERE object_id IN (SELECT ' . $filesObjectIdColumn . ' FROM ' . prefixTable('files') . ' WHERE id_item = %i) AND user_id NOT IN %ls',
-        $itemId,
-        [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
-    );
-    DB::query(
-        'DELETE FROM ' . prefixTable('sharekeys_fields') . '
-        WHERE object_id IN (SELECT ' . $categoriesItemsObjectIdColumn . ' FROM ' . prefixTable('categories_items') . ' WHERE item_id = %i) AND user_id NOT IN %ls',
-        $itemId,
-        [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
-    );
-    DB::query(
-        'DELETE FROM ' . prefixTable('sharekeys_logs') . '
-        WHERE object_id IN (SELECT increment_' . $logItemsObjectIdColumn . ' FROM ' . prefixTable('log_items') . ' WHERE id_item = %i) AND user_id NOT IN %ls',
-        $itemId,
-        [$userId, TP_USER_ID, API_USER_ID, OTV_USER_ID, SSH_USER_ID]
-    );
+        DB::commit();
+    } catch (Exception $e) {
+        DB::rollback();
+        return false;
+    }
 
     return true;
 }

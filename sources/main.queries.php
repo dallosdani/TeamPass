@@ -30,6 +30,7 @@ declare(strict_types=1);
  */
 
 use TeampassClasses\PasswordManager\PasswordManager;
+use TeampassClasses\PasswordGeneratorService\PasswordGeneratorService;
 use TeampassClasses\SessionManager\SessionManager;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use TeampassClasses\Language\Language;
@@ -345,6 +346,7 @@ function userHandler(string $post_type, array|null|string $dataReceived, array $
         'get_user_info',
         'increase_session_time',
         'generate_password',
+        'generate_smart_password',
         'refresh_list_items_seen',
         'ga_generate_qr',
         'user_get_session_time',
@@ -426,6 +428,24 @@ function userHandler(string $post_type, array|null|string $dataReceived, array $
                 (bool) filter_input(INPUT_POST, 'numerals', FILTER_VALIDATE_BOOLEAN),
                 (bool) filter_input(INPUT_POST, 'symbols', FILTER_VALIDATE_BOOLEAN),
                 $SETTINGS
+            );
+
+        /*
+        * Generate a password meeting the folder's minimum complexity requirement
+        */
+        case 'generate_smart_password'://action_user
+            $securePwd = (bool) filter_input(INPUT_POST, 'secure_pwd', FILTER_VALIDATE_BOOLEAN);
+            return prepareExchangedData(
+                (new PasswordGeneratorService())->generateForFolder(
+                    (int) filter_input(INPUT_POST, 'folder_id', FILTER_SANITIZE_NUMBER_INT),
+                    (int) filter_input(INPUT_POST, 'size', FILTER_SANITIZE_NUMBER_INT),
+                    $securePwd || (bool) filter_input(INPUT_POST, 'lowercase', FILTER_VALIDATE_BOOLEAN),
+                    $securePwd || (bool) filter_input(INPUT_POST, 'capitalize', FILTER_VALIDATE_BOOLEAN),
+                    $securePwd || (bool) filter_input(INPUT_POST, 'numerals', FILTER_VALIDATE_BOOLEAN),
+                    $securePwd || (bool) filter_input(INPUT_POST, 'symbols', FILTER_VALIDATE_BOOLEAN),
+                    (int) ($SETTINGS['pwd_maximum_length'] ?? 0)
+                ),
+                'encode'
             );
 
         /*

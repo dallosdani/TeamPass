@@ -14,6 +14,7 @@
     <source>
         <include>
             <directory suffix=".php">includes/libraries/teampassclasses</directory>
+            <directory suffix=".php">includes/libraries/bip39</directory>
             <directory suffix=".php">websocket/src</directory>
         </include>
     </source>

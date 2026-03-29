@@ -343,6 +343,62 @@ decryptUserObjectKeyWithMigration(sharekey, privateKey, objectId, userId, table)
 
 **Rule: always use `decryptUserObjectKeyWithMigration()` in new code** — never call `rsaDecrypt()` directly for sharekeys, so that v1 entries are upgraded transparently on access.
 
+**Rule: this applies to custom field sharekeys too** — every read path that decrypts a `sharekeys_fields` row must use `decryptUserObjectKeyWithMigration()`, not `decryptUserObjectKey()`. The SELECT must include `increment_id` so the migration function can update the row in place.
+
+---
+
+### Custom Fields Encryption
+
+Custom fields (defined in `teampass_categories`) can be individually marked as encrypted (`encrypted_data = 1`). Their values and sharekeys follow the same pattern as items but use dedicated tables.
+
+**Tables:**
+- `teampass_categories` — field definitions (`encrypted_data` flag, `type`, `masked`, etc.)
+- `teampass_categories_items` — field values per item (`data`, `encryption_type`, `field_id`, `item_id`)
+- `teampass_sharekeys_fields` — per-user sharekeys; `object_id` references `categories_items.id` (not `categories.id`)
+
+**`encryption_type` column in `teampass_categories_items`:**
+- `'not_set'` — value is stored in plaintext
+- `TP_ENCRYPTION_NAME` — value is AES-encrypted; a sharekey must exist in `sharekeys_fields`
+
+**Encryption flow (save/update):**
+```
+1. Encrypt before INSERT:
+   doDataEncryption($plaintext) → {encrypted, objectKey}
+   INSERT categories_items (data=encrypted, encryption_type=TP_ENCRYPTION_NAME)   ← atomic
+   $newId = DB::insertId()
+2. storeUsersShareKey('sharekeys_fields', ..., $newId, objectKey)
+   → one sharekeys_fields row per eligible user (RSA-encrypted objectKey)
+```
+
+**Rule: always encrypt before INSERT** — never insert plaintext and update afterwards. A failed UPDATE between the two steps would leave plaintext stored with `encryption_type='not_set'`, causing future reads to bypass decryption silently.
+
+**Decryption flow (read):**
+```php
+// Always fetch increment_id alongside share_key
+$userKey = DB::queryFirstRow(
+    'SELECT share_key, increment_id FROM teampass_sharekeys_fields
+     WHERE user_id = %i AND object_id = %i',
+    $userId, $categoriesItemsId
+);
+// Always use the migration-aware variant
+$objectKey = decryptUserObjectKeyWithMigration(
+    $userKey['share_key'],
+    $privateKey,
+    $publicKey,
+    intval($userKey['increment_id']),
+    'sharekeys_fields'
+);
+$plaintext = doDataDecryption($row['data'], $objectKey);
+```
+
+**Move item: personal folder → public folder**
+
+When an item moves from a personal folder to a public one, sharekeys must be distributed to all users. For custom fields, the loop must:
+1. Skip fields with `encryption_type = 'not_set'` (no sharekey needed)
+2. If the moving user has no sharekey for an encrypted field, the object key is **unrecoverable** — delete the `categories_items` row and log the incident rather than leaving an undecryptable entry in the database
+
+**Orphaned sharekey invariant:** a `categories_items` row with `encryption_type = TP_ENCRYPTION_NAME` must always have at least one corresponding row in `sharekeys_fields`. If this invariant is violated (e.g. due to a past bug), the encrypted value cannot be recovered and the field row should be deleted.
+
 ---
 
 ### WebSocket Architecture (feature/websockets)

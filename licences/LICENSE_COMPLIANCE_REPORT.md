@@ -1,6 +1,6 @@
 # Teampass License Compliance Report
 
-**Generated:** 2026-03-28 07:00:29
+**Generated:** 2026-03-29 19:20:37
 **Project License:** GNU General Public License v3.0
 
 ## PHP Dependencies (Composer)
@@ -113,6 +113,7 @@
 | teampassclasses/ldapextra | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
 | teampassclasses/nestedtree | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
 | teampassclasses/oauth2controller | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
+| teampassclasses/passwordgeneratorservice | dev-evol/password-generator | GPL-3.0-only | ✅ Compatible |
 | teampassclasses/passwordmanager | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
 | teampassclasses/performchecks | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
 | teampassclasses/sessionmanager | dev-evol/composer_update | GPL-3.0-only | ✅ Compatible |
@@ -136,8 +137,8 @@
 
 ## Summary
 
-- **Total Dependencies:** 121
-- **PHP Dependencies:** 116
+- **Total Dependencies:** 122
+- **PHP Dependencies:** 117
 - **JavaScript Dependencies:** 5
 - **Errors:** 0
 - **Warnings:** 1
@@ -170,4 +171,4 @@ php licences/compliance-checker.php
 
 ---
 
-*Auto-generated report - Last updated: 2026-03-28 07:00:29*
+*Auto-generated report - Last updated: 2026-03-29 19:20:37*

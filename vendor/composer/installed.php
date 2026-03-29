@@ -1363,6 +1363,15 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'teampassclasses/passwordgeneratorservice' => array(
+            'pretty_version' => 'dev-evol/password-generator',
+            'version' => 'dev-evol/password-generator',
+            'reference' => '33fdad5327c12ccefcfd0b406fa59ac494095176',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../teampassclasses/passwordgeneratorservice',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'teampassclasses/passwordmanager' => array(
             'pretty_version' => 'dev-evol/composer_update',
             'version' => 'dev-evol/composer_update',

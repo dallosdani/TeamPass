@@ -141,6 +141,13 @@
             "options": {
                 "symlink": false
             }
+        },
+        {
+            "type": "path",
+            "url": "includes/libraries/teampassclasses/passwordgeneratorservice",
+            "options": {
+                "symlink": false
+            }
         }
     ],
     "require": {
@@ -166,6 +173,7 @@
         "teampassclasses/emailservice": "*",
         "teampassclasses/folderservices": "*",
         "teampassclasses/cryptomanager": "*",
+        "teampassclasses/passwordgeneratorservice": "*",
         "illuminate/contracts": "^10.32",
         "illuminate/collections": "^10.48",
         "nesbot/carbon": "^2.71",

@@ -9538,6 +9538,46 @@
             "install-path": "../teampassclasses/oauth2controller"
         },
         {
+            "name": "teampassclasses/passwordgeneratorservice",
+            "version": "dev-evol/password-generator",
+            "version_normalized": "dev-evol/password-generator",
+            "dist": {
+                "type": "path",
+                "url": "includes/libraries/teampassclasses/passwordgeneratorservice",
+                "reference": "33fdad5327c12ccefcfd0b406fa59ac494095176"
+            },
+            "require": {
+                "hackzilla/password-generator": "*",
+                "php": "^8.1"
+            },
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "TeampassClasses\\PasswordGeneratorService\\": "src/"
+                }
+            },
+            "license": [
+                "GPL-3.0-only"
+            ],
+            "authors": [
+                {
+                    "name": "Nils Laumaillé"
+                }
+            ],
+            "description": "Generate passwords meeting a folder's minimum complexity requirements.",
+            "keywords": [
+                "complexity",
+                "generator",
+                "password"
+            ],
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            },
+            "install-path": "../teampassclasses/passwordgeneratorservice"
+        },
+        {
             "name": "teampassclasses/passwordmanager",
             "version": "dev-evol/composer_update",
             "version_normalized": "dev-evol/composer_update",

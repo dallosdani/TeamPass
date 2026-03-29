@@ -95,7 +95,7 @@ $csrf_token = $superGlobal->get('csrf_token', 'SESSION');
 
 	<link rel="stylesheet" href="../plugins/alertifyjs/css/alertify.min.css"/>
 	<link rel="stylesheet" href="../plugins/bootstrap/css/bootstrap.min.css" />
-	<link rel="stylesheet" href="../plugins/fontawesome-free-6/css/all.min.css" type="text/css">
+	<link rel="stylesheet" href="../plugins/fontawesome-free/css/all.min.css" type="text/css">
 	<link rel="stylesheet" href="css/install.css" type="text/css" />
     
 </head>

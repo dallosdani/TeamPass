@@ -79,10 +79,26 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 $var = [];
 $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk"></i>';
 
+// Load BIP-39 wordlist for current user language (used by the passphrase generator)
+require_once __DIR__ . '/../includes/libraries/bip39/loader.php';
+$bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
+
 ?>
 
 
 <script type="text/javascript">
+    // BIP-39 wordlist for the passphrase generator (language: <?php echo htmlspecialchars($session->get('user-language') ?? 'english', ENT_QUOTES, 'UTF-8'); ?>)
+    const TP_BIP39_WORDLIST = <?php echo json_encode($bip39Wordlist, JSON_UNESCAPED_UNICODE); ?>;
+
+    // Minimum word count and extra suffix requirements per folder complexity level
+    const TP_PASSPHRASE_RULES = {
+        0:  { minWords: 3, capitalize: false, appendSuffix: false },
+        20: { minWords: 3, capitalize: false, appendSuffix: false },
+        38: { minWords: 3, capitalize: true,  appendSuffix: false },
+        48: { minWords: 4, capitalize: true,  appendSuffix: false },
+        60: { minWords: 4, capitalize: true,  appendSuffix: true  },
+    };
+
     var requestRunning = false,
         clipboardForLogin,
         clipboardForPassword,
@@ -296,6 +312,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             'teampassApplication',
             function(teampassApplication) {
                 teampassApplication.selectedFolder = selectedFolderId,
+                teampassApplication.itemsListFolderId = selectedFolderId,
                 teampassApplication.selectedFolderTitle = selectedFolder.a_attr['data-title'],
                 teampassApplication.selectedFolderParentId = selectedFolder.parent !== "#" ? selectedFolder.parent.split('_')[1] : 0,
                 teampassApplication.selectedFolderParentTitle = selectedFolder.a_attr['data-title'],
@@ -402,7 +419,10 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         internalRefreshVisibleFolders(true);
 
         // show correct folder in Tree
-        let groupe_id = store.get('teampassApplication').itemsListFolderId;
+        // itemsListFolderId is only set via deep-link or .open-folder clicks;
+        // fall back to selectedFolder (updated on every jstree node selection).
+        let groupe_id = store.get('teampassApplication').itemsListFolderId ||
+                        store.get('teampassApplication').selectedFolder;
         if (groupe_id !== false &&
             ($('#jstree').jstree('get_selected', true)[0] === undefined ||
             'li_' + groupe_id !== $('#jstree').jstree('get_selected', true)[0].id)
@@ -919,6 +939,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 $('#pwd-definition-size').val(20);
                 // Set type of action
                 $('#form-item-button-save').data('action', 'new_item');
+                // Reset password strength bar so it doesn't carry over from a previous form open
+                $('#form-item-password-complex').val(0);
+                $('#form-item-password').pwstrength('forceUpdate');
                 // Does this folder contain Custom Fields
                 if (store.get('teampassItem').hasCustomCategories.length > 0) {
                     // Reset all categories first to avoid stale fields from previous folders
@@ -3000,7 +3023,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         }
     };
 
-    // Fields - show masked field
+    // Fields - show masked field while mouse button is held down
     var selectedElement;
     $('.item-details-card').on('mousedown', '.replace-asterisk', function(event) {
             mouseStillDown = true;
@@ -3023,6 +3046,24 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             $(selectedElement).html('<?php echo $var['hidden_asterisk']; ?>');
         }
     };
+
+    // Fields - toggle masked field visibility via reveal button
+    $(document).on('click', '.btn-reveal-field', function() {
+        const fieldId = $(this).data('field-id')
+        const $icon = $(this).find('i')
+        const $span = $('#card-item-field-value-' + fieldId).find('.replace-asterisk')
+        const isVisible = $icon.hasClass('fa-eye-slash')
+
+        if (isVisible) {
+            // Hide: restore asterisks and reset icon
+            $span.html('<?php echo $var['hidden_asterisk']; ?>')
+            $icon.removeClass('fa-solid fa-eye-slash text-warning').addClass('fa-regular fa-eye')
+        } else {
+            // Show: display actual value and update icon
+            $span.text($('#hidden-card-item-field-value-' + fieldId).val())
+            $icon.removeClass('fa-regular fa-eye').addClass('fa-solid fa-eye-slash text-warning')
+        }
+    })
 
 
     /**
@@ -3141,181 +3182,6 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             return prepareExchangedData(data, 'decode', '<?php echo $session->get('key'); ?>');
         });
     }
-
-    function rememberBestPasswordCandidate(bestCandidate, candidate, complexityBand) {
-        if (!candidate) {
-            return bestCandidate;
-        }
-
-        const score = candidate.generatedComplexity ?? 0;
-        const insideBand = score >= complexityBand.lowerBound
-            && (!Number.isFinite(complexityBand.upperBound) || score <= complexityBand.upperBound);
-        const exceedsBand = Number.isFinite(complexityBand.upperBound) && score > complexityBand.upperBound;
-        const distanceFromBand = score < complexityBand.lowerBound
-            ? complexityBand.lowerBound - score
-            : (exceedsBand ? score - complexityBand.upperBound : 0);
-
-        const enrichedCandidate = $.extend({}, candidate, {
-            complexityDistanceFromBand: distanceFromBand,
-            matchesRequestedComplexity: insideBand,
-            exceedsRequestedComplexity: exceedsBand,
-            generationSize: parseInt(candidate.generationOptions?.size, 10) || 0,
-        });
-
-        if (!bestCandidate) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.matchesRequestedComplexity === true && bestCandidate.matchesRequestedComplexity !== true) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.matchesRequestedComplexity !== true && bestCandidate.matchesRequestedComplexity === true) {
-            return bestCandidate;
-        }
-
-        if (enrichedCandidate.exceedsRequestedComplexity === false && bestCandidate.exceedsRequestedComplexity === true) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.exceedsRequestedComplexity === true && bestCandidate.exceedsRequestedComplexity === false) {
-            return bestCandidate;
-        }
-
-        if (enrichedCandidate.complexityDistanceFromBand < bestCandidate.complexityDistanceFromBand) {
-            return enrichedCandidate;
-        }
-
-        if (enrichedCandidate.complexityDistanceFromBand > bestCandidate.complexityDistanceFromBand) {
-            return bestCandidate;
-        }
-
-        if (enrichedCandidate.generationSize < bestCandidate.generationSize) {
-            return enrichedCandidate;
-        }
-
-        return bestCandidate;
-    }
-
-    function generatePasswordRespectingFolderComplexity(elementId, passwordGenerationOptions, requiredComplexity, searchState = null) {
-        const minSize = parseInt($('#pwd-definition-size option:first').val(), 10) || 4;
-        const maxSize = parseInt($('#pwd-definition-size option:last').val(), 10) || 20;
-
-        if (elementId !== 'form-item-password' || requiredComplexity <= 0) {
-            return requestGeneratedPassword(passwordGenerationOptions).then(function(data) {
-                if (data.error == 'true') {
-                    return data;
-                }
-
-                data.key = normalizeGeneratedPassword(data.key ?? '');
-                data.generationOptions = $.extend({}, passwordGenerationOptions);
-
-                return data;
-            });
-        }
-
-        // Determine the target complexity band from pwdOptions thresholds
-        const scoreThresholds = Array.isArray(pwdOptions.ui.scores)
-            ? pwdOptions.ui.scores.map(Number).filter(function(s) { return !Number.isNaN(s); }).sort(function(a, b) { return a - b; })
-            : [];
-        const lowerBound = parseInt(requiredComplexity, 10) || 0;
-        const thresholdIndex = scoreThresholds.indexOf(lowerBound);
-        const complexityBand = {
-            lowerBound: lowerBound,
-            upperBound: (thresholdIndex !== -1 && scoreThresholds[thresholdIndex + 1] !== undefined)
-                ? scoreThresholds[thresholdIndex + 1] - 1
-                : Number.POSITIVE_INFINITY,
-        };
-
-        const requestedSize = parseInt(passwordGenerationOptions.size, 10);
-        const initialSize = Math.min(maxSize, Math.max(minSize, Number.isNaN(requestedSize) ? 20 : requestedSize));
-
-        if (searchState === null) {
-            searchState = {
-                currentSize: initialSize,
-                lowerTriedSizes: {},
-                upperTriedSizes: {},
-                direction: 0,
-                totalAttempts: 0,
-                bestCandidate: null,
-            };
-        }
-
-        // Force all character types to maximize reach toward the target complexity
-        const effectiveOptions = $.extend({}, passwordGenerationOptions, {
-            size: Math.min(maxSize, Math.max(minSize, parseInt(searchState.currentSize, 10) || 20)),
-            secure_pwd: true,
-            lowercase: true,
-            capitalize: true,
-            numerals: true,
-            symbols: true,
-        });
-
-        return requestGeneratedPassword(effectiveOptions).then(function(data) {
-            if (data.error == 'true') {
-                return data;
-            }
-
-            const generatedPassword = normalizeGeneratedPassword(data.key ?? '');
-            data.key = generatedPassword;
-            data.generationOptions = effectiveOptions;
-
-            return syncItemPasswordComplexity(generatedPassword).then(function(generatedComplexity) {
-                data.generatedComplexity = generatedComplexity;
-                searchState.totalAttempts += 1;
-                searchState.bestCandidate = rememberBestPasswordCandidate(
-                    searchState.bestCandidate,
-                    data,
-                    complexityBand
-                );
-
-                const insideBand = generatedComplexity >= complexityBand.lowerBound
-                    && (!Number.isFinite(complexityBand.upperBound) || generatedComplexity <= complexityBand.upperBound);
-
-                if (insideBand === true) {
-                    return data;
-                }
-
-                if (generatedComplexity < complexityBand.lowerBound) {
-                    searchState.lowerTriedSizes[effectiveOptions.size] = true;
-                    searchState.direction = 1;
-                } else {
-                    searchState.upperTriedSizes[effectiveOptions.size] = true;
-                    searchState.direction = -1;
-                }
-
-                if (searchState.totalAttempts >= (maxSize - minSize + 1)) {
-                    return searchState.bestCandidate ?? data;
-                }
-
-                let nextSize = searchState.currentSize + searchState.direction;
-
-                while (nextSize >= minSize && nextSize <= maxSize) {
-                    if (searchState.lowerTriedSizes[nextSize] === true || searchState.upperTriedSizes[nextSize] === true) {
-                        nextSize += searchState.direction;
-                        continue;
-                    }
-
-                    break;
-                }
-
-                if (nextSize < minSize || nextSize > maxSize) {
-                    return searchState.bestCandidate ?? data;
-                }
-
-                searchState.currentSize = nextSize;
-
-                return generatePasswordRespectingFolderComplexity(
-                    elementId,
-                    passwordGenerationOptions,
-                    requiredComplexity,
-                    searchState
-                );
-            });
-        });
-    }
-
-
 
     /**
      * PLUPLOAD
@@ -4385,6 +4251,18 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                     }
                     // Store version
                     try { localStorage.setItem('tp_folders_version', data.folders_version || '') } catch(e) {}
+                    // foldersList is already in the store — still trigger subfolder display
+                    // in case ListerItems() was called before this AJAX completed.
+                    if (store.get('teampassUser').show_subfolders === 1) {
+                        const cachedFolders = store.get('teampassApplication').foldersList
+                        const currentFolder = parseInt(
+                            store.get('teampassApplication').itemsListFolderId ||
+                            store.get('teampassApplication').selectedFolder
+                        )
+                        if (cachedFolders !== undefined && !isNaN(currentFolder)) {
+                            displaySubfolders(cachedFolders, currentFolder)
+                        }
+                    }
                     return;
                 }
 
@@ -4559,6 +4437,18 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                 teampassApplication.foldersList = folders;
                             }
                         );
+                        // Trigger subfolder display now that foldersList is populated.
+                        // This covers the case where ListerItems() was called before this
+                        // AJAX completed (race condition on page load with a restored session).
+                        if (store.get('teampassUser').show_subfolders === 1) {
+                            const currentFolder = parseInt(
+                                store.get('teampassApplication').itemsListFolderId ||
+                                store.get('teampassApplication').selectedFolder
+                            )
+                            if (!isNaN(currentFolder)) {
+                                displaySubfolders(folders, currentFolder)
+                            }
+                        }
                     } else if (action === 'update') {
                         // Store the data
                         var currentFoldersList = store.get('teampassApplication').foldersList;
@@ -4740,11 +4630,16 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             // folder.parent_id in the store is encoded as integer by PHP JSON, so strict === would
             // fail on a string, causing an empty subfolder list after item save.
             const groupeIdInt = parseInt(groupe_id);
-            // if undefined wait 1.5s until queries are done
-            if(store.get('teampassApplication').foldersList === undefined) {
+            if (store.get('teampassApplication').foldersList === undefined) {
+                // foldersList not yet available: internalRefreshVisibleFolders() is still running.
+                // displaySubfolders() will be called from its AJAX callback once the data arrives.
+                // This timeout is a last-resort fallback only (e.g. very slow network).
                 setTimeout(() => {
-                displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
-                }, 1500);
+                    const fl = store.get('teampassApplication').foldersList
+                    if (fl !== undefined) {
+                        displaySubfolders(fl, groupeIdInt)
+                    }
+                }, 3000);
             } else {
                 displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
             }
@@ -5252,17 +5147,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
      * @return {[type]}      [description]
      */
     function rebuildPath(data) {
-        var new_path = new_path_elem = '';
+        var new_path = new_path_elem = ''
         $.each((data), function(i, value) {
-            new_path_elem = '';
+            new_path_elem = ''
             if (value['visible'] === 1) {
-                new_path_elem = ' data-id="' + value['id'] + '"';
+                new_path_elem = ' data-id="' + value['id'] + '"'
             }
+            const iconHtml = value['icon'] ? '<i class="' + value['icon'] + ' mr-1"></i>' : ''
+            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + iconHtml + value['title'] + '</li>'
+        })
 
-            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + value['title'] + '</li>';
-        });
-
-        return new_path;
+        return new_path
     }
 
     /**
@@ -6077,7 +5972,14 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                         )
                                     $('#card-item-field-' + field.id)
                                         .children(".btn-copy-clipboard-clear")
-                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id);
+                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id)
+                                    // Show reveal button and reset its icon state
+                                    $('#card-item-field-' + field.id)
+                                        .find('.btn-reveal-field')
+                                        .removeClass('hidden')
+                                        .find('i')
+                                        .removeClass('fa-solid fa-eye-slash text-warning')
+                                        .addClass('fa-regular fa-eye');
                                 } else {
                                     // Show Field
                                     $('#card-item-field-' + field.id)
@@ -7499,7 +7401,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         }
 
         var passwordGenerationOptions = {
-            type: 'generate_password',
+            type: 'generate_smart_password',
             type_category: 'action_user',
             size: $('#pwd-definition-size').val() ?? 20,
             lowercase: $('#pwd-definition-lcl').prop('checked'),
@@ -7507,16 +7409,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             capitalize: $('#pwd-definition-ucl').prop('checked'),
             symbols: $('#pwd-definition-symbols').prop('checked'),
             secure_pwd: secure_pwd,
+            folder_id: elementId === 'form-item-password' ? (store.get('teampassItem').folderId ?? 0) : 0,
             force: 'false',
             key: '<?php echo $session->get('key'); ?>'
         };
-        var requiredComplexity = elementId === 'form-item-password' ? parseInt(store.get('teampassItem').folderComplexity, 10) || 0 : 0;
 
-        generatePasswordRespectingFolderComplexity(
-            elementId,
-            passwordGenerationOptions,
-            requiredComplexity
-        ).done(function(data) {
+        requestGeneratedPassword(passwordGenerationOptions).done(function(data) {
             if (debugJavascript === true) console.log(data)
             if (data.error == 'true') {
                 // error
@@ -7531,16 +7429,9 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                 return false;
             }
 
-            if (data.matchesRequestedComplexity === false) {
-                toastr.warning(
-                    '<?php echo $lang->get('password_generation_not_compliant_with_folder_complexity'); ?>',
-                    '', { timeOut: 8000, progressBar: true }
-                );
-            }
-
             $('#' + elementId).val(data.key).focus();
-            if (elementId === 'form-item-password' && data.generationOptions) {
-                const opts = data.generationOptions;
+            if (elementId === 'form-item-password' && data.effective_options) {
+                const opts = data.effective_options;
                 $('#pwd-definition-size').val(String(opts.size));
                 $.each({
                     '#pwd-definition-lcl': opts.lowercase,
@@ -7556,12 +7447,192 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             // Form has changed
             userDidAChange = true;
-            if (debugJavascript === true) console.log('User did a change during generate_password > ' + userDidAChange);
+            if (debugJavascript === true) console.log('User did a change during generate_smart_password > ' + userDidAChange);
 
             // SHow button in sticky footer
             //$('#form-item-buttons').addClass('sticky-footer');
         });
     });
+
+    /**
+     * Generate a BIP-39 passphrase using cryptographically secure randomness.
+     * Applies minimum word count and optional suffix based on folder complexity.
+     *
+     * @param {number}  wordCount   Requested number of words (may be raised by complexity rules).
+     * @param {string}  separator   Word separator ('-', '_', '.', ' ', or '').
+     * @param {boolean} capitalize  Whether to capitalise the first letter of each word.
+     * @returns {string}
+     */
+    function generateBip39Passphrase(wordCount, separator, capitalize) {
+        const folderComplexity = store.get('teampassItem') ? (store.get('teampassItem').folderComplexity ?? 0) : 0
+        const rules = TP_PASSPHRASE_RULES[folderComplexity] || TP_PASSPHRASE_RULES[0]
+        const actualWordCount = Math.max(wordCount, rules.minWords)
+        const doCapitalize = capitalize || rules.capitalize
+
+        const indices = new Uint32Array(actualWordCount)
+        crypto.getRandomValues(indices)
+
+        const words = Array.from(indices).map(n => {
+            const word = TP_BIP39_WORDLIST[n % TP_BIP39_WORDLIST.length]
+            return doCapitalize ? word.charAt(0).toUpperCase() + word.slice(1) : word
+        })
+
+        const sep = separator === 'space' ? ' ' : separator
+        let passphrase = words.join(sep)
+
+        // Complexity level 60 requires digits + symbols: append a short suffix
+        if (rules.appendSuffix) {
+            const extra = new Uint8Array(2)
+            crypto.getRandomValues(extra)
+            const digit = extra[0] % 10
+            const symbolPool = ['!', '@', '#', '$', '%', '&', '*', '?']
+            const symbol = symbolPool[extra[1] % symbolPool.length]
+            passphrase += digit + symbol
+        }
+
+        return passphrase
+    }
+
+    // Tracks the last folder complexity applied to the passphrase options.
+    // null means "never synced" and triggers a reset on the first call.
+    let lastSyncedPassphraseComplexity = null
+
+    /**
+     * Sync the passphrase options with the current folder's complexity rules.
+     *
+     * - When the folder complexity CHANGES (including on first open): resets word count
+     *   to the folder minimum and sets capitalize according to folder rules.
+     * - When the folder complexity is UNCHANGED: only enforces the minimum floor
+     *   so the user's manual adjustments within a session are preserved.
+     *
+     * Options below the folder minimum are always disabled in the selector.
+     */
+    function syncPassphraseOptionsWithComplexity() {
+        const folderComplexity = store.get('teampassItem') ? (store.get('teampassItem').folderComplexity ?? 0) : 0
+        const rules = TP_PASSPHRASE_RULES[folderComplexity] || TP_PASSPHRASE_RULES[0]
+        const minWords = rules.minWords
+
+        // Always disable options below the folder minimum
+        $('#passphrase-word-count option').each(function() {
+            $(this).prop('disabled', parseInt($(this).val(), 10) < minWords)
+        })
+
+        if (lastSyncedPassphraseComplexity !== folderComplexity) {
+            // Folder changed (or first call): reset to folder minimum
+            $('#passphrase-word-count').val(String(minWords))
+            $('#passphrase-capitalize')
+                .prop('checked', rules.capitalize)
+                .closest('label').toggleClass('active', rules.capitalize)
+            lastSyncedPassphraseComplexity = folderComplexity
+        } else {
+            // Same folder: only raise word count if it fell below minimum
+            const currentVal = parseInt($('#passphrase-word-count').val(), 10) || minWords
+            if (currentVal < minWords) {
+                $('#passphrase-word-count').val(String(minWords))
+            }
+            // Folder requiring uppercase must always stay checked
+            if (rules.capitalize) {
+                $('#passphrase-capitalize').prop('checked', true).closest('label').addClass('active')
+            }
+        }
+    }
+
+    /**
+     * Passphrase generate button click handler.
+     */
+    $('#item-button-passphrase-generate').click(function() {
+        syncPassphraseOptionsWithComplexity()
+
+        const wordCount = parseInt($('#passphrase-word-count').val(), 10) || 4
+        const separator = $('#passphrase-separator').val()
+        const capitalize = $('#passphrase-capitalize').prop('checked')
+
+        const passphrase = generateBip39Passphrase(wordCount, separator, capitalize)
+        $('#form-item-password').val(passphrase).focus()
+
+        syncItemPasswordComplexity(passphrase)
+
+        userDidAChange = true
+        if (debugJavascript === true) console.log('Passphrase generated: ' + passphrase)
+    })
+
+    /**
+     * Show/hide the passphrase options panel.
+     * Syncs word count constraints with folder complexity before showing.
+     */
+    $('#item-button-passphrase-showOptions').click(function() {
+        if ($('#form-item-passphrase-options').hasClass('hidden')) {
+            syncPassphraseOptionsWithComplexity()
+            $('#form-item-passphrase-options').removeClass('hidden')
+        } else {
+            $('#form-item-passphrase-options').addClass('hidden')
+        }
+    })
+
+    // -------------------------------------------------------------------------
+    // Persist generator options in localStorage
+    // -------------------------------------------------------------------------
+
+    /**
+     * Save password generator options to localStorage on any option change.
+     */
+    $('#pwd-definition-size, .password-definition').on('change', function() {
+        try {
+            localStorage.setItem('tp_pwd_gen_opts', JSON.stringify({
+                size:    $('#pwd-definition-size').val(),
+                lcl:     $('#pwd-definition-lcl').prop('checked'),
+                ucl:     $('#pwd-definition-ucl').prop('checked'),
+                numeric: $('#pwd-definition-numeric').prop('checked'),
+                symbols: $('#pwd-definition-symbols').prop('checked'),
+                secure:  $('#pwd-definition-secure').prop('checked'),
+            }))
+        } catch (_) {}
+    })
+
+    /**
+     * Save passphrase generator options to localStorage on any option change.
+     * wordCount and capitalize are folder-dependent so they are saved for
+     * within-session use but NOT restored on the next page load.
+     * Only the separator is purely cosmetic and restored across sessions.
+     */
+    $('#passphrase-separator').on('change', function() {
+        try {
+            localStorage.setItem('tp_passphrase_gen_opts', JSON.stringify({
+                separator: $('#passphrase-separator').val(),
+            }))
+        } catch (_) {}
+    })
+
+    /**
+     * Load generator options from localStorage on page load.
+     * - Password generator: all options restored (size, character types).
+     * - Passphrase generator: only separator restored; word count and capitalize
+     *   are always derived from folder complexity via syncPassphraseOptionsWithComplexity().
+     */
+    ;(function loadGeneratorOptionsFromStorage() {
+        try {
+            const pwdOpts = JSON.parse(localStorage.getItem('tp_pwd_gen_opts') || 'null')
+            if (pwdOpts) {
+                if (pwdOpts.size) $('#pwd-definition-size').val(pwdOpts.size)
+                $.each({
+                    '#pwd-definition-lcl':     pwdOpts.lcl,
+                    '#pwd-definition-ucl':     pwdOpts.ucl,
+                    '#pwd-definition-numeric': pwdOpts.numeric,
+                    '#pwd-definition-symbols': pwdOpts.symbols,
+                    '#pwd-definition-secure':  pwdOpts.secure,
+                }, function(sel, checked) {
+                    $(sel).prop('checked', !!checked).closest('label').toggleClass('active', !!checked)
+                })
+            }
+        } catch (_) {}
+
+        try {
+            const ppOpts = JSON.parse(localStorage.getItem('tp_passphrase_gen_opts') || 'null')
+            if (ppOpts && ppOpts.separator !== undefined) {
+                $('#passphrase-separator').val(ppOpts.separator)
+            }
+        } catch (_) {}
+    })()
 
     /**
      * On tag badge click, launch the search query
@@ -7819,9 +7890,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             // Only if valid id
             if (!isNaN(folder_id)) {
+                // Close any open item detail/edit form before navigating to the new folder
+                closeItemDetailsCard();
+
                 // Prevent duplicate ListerItems via the select_node.jstree event handler
                 startedItemsListQuery = true;
-                
+
                 // List items on folder
                 ListerItems(folder_id, '', 0, 0, true);
 

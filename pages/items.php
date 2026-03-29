@@ -1256,6 +1256,9 @@ if ((int) $session_user_admin === 1) {
                                                 <button type="button" class="float-right btn btn-secondary btn-sm ml-1 btn-copy-clipboard-clear"  data-clipboard-target="card-item-field-value-' . $field['id'] . '">
                                                     <i class="fa-solid fa-copy"></i>
                                                 </button>
+                                                <button type="button" class="float-right btn btn-secondary btn-sm ml-1 btn-reveal-field hidden" data-field-id="' . $field['id'] . '">
+                                                    <i class="fa-regular fa-eye"></i>
+                                                </button>
                                                 <span class="card-item-field-value float-right ml-1" id="card-item-field-value-' . $field['id'] . '"></span>
                                             </li>';
                                         }

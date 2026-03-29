@@ -3000,7 +3000,7 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
         }
     };
 
-    // Fields - show masked field
+    // Fields - show masked field while mouse button is held down
     var selectedElement;
     $('.item-details-card').on('mousedown', '.replace-asterisk', function(event) {
             mouseStillDown = true;
@@ -3023,6 +3023,24 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             $(selectedElement).html('<?php echo $var['hidden_asterisk']; ?>');
         }
     };
+
+    // Fields - toggle masked field visibility via reveal button
+    $(document).on('click', '.btn-reveal-field', function() {
+        const fieldId = $(this).data('field-id')
+        const $icon = $(this).find('i')
+        const $span = $('#card-item-field-value-' + fieldId).find('.replace-asterisk')
+        const isVisible = $icon.hasClass('fa-eye-slash')
+
+        if (isVisible) {
+            // Hide: restore asterisks and reset icon
+            $span.html('<?php echo $var['hidden_asterisk']; ?>')
+            $icon.removeClass('fa-solid fa-eye-slash text-warning').addClass('fa-regular fa-eye')
+        } else {
+            // Show: display actual value and update icon
+            $span.text($('#hidden-card-item-field-value-' + fieldId).val())
+            $icon.removeClass('fa-regular fa-eye').addClass('fa-solid fa-eye-slash text-warning')
+        }
+    })
 
 
     /**
@@ -6077,7 +6095,14 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
                                         )
                                     $('#card-item-field-' + field.id)
                                         .children(".btn-copy-clipboard-clear")
-                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id);
+                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id)
+                                    // Show reveal button and reset its icon state
+                                    $('#card-item-field-' + field.id)
+                                        .find('.btn-reveal-field')
+                                        .removeClass('hidden')
+                                        .find('i')
+                                        .removeClass('fa-solid fa-eye-slash text-warning')
+                                        .addClass('fa-regular fa-eye');
                                 } else {
                                     // Show Field
                                     $('#card-item-field-' + field.id)

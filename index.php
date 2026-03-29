@@ -1201,10 +1201,10 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
     <!-- REQUIRED SCRIPTS -->
 
     <!-- Font Awesome Icons -->
-    <link href="plugins/fontawesome-free-6/css/fontawesome.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
-    <link href="plugins/fontawesome-free-6/css/solid.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
-    <link href="plugins/fontawesome-free-6/css/regular.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
-    <link href="plugins/fontawesome-free-6/css/brands.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
+    <link href="plugins/fontawesome-free/css/fontawesome.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
+    <link href="plugins/fontawesome-free/css/solid.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
+    <link href="plugins/fontawesome-free/css/regular.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
+    <link href="plugins/fontawesome-free/css/brands.min.css?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" rel="stylesheet">
     <!-- jQuery -->
     <script src="plugins/jquery/jquery.min.js?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>"></script>
     <script src="plugins/jquery/jquery.cookie.js?v=<?php echo TP_VERSION . '.' . TP_VERSION_MINOR; ?>" type="text/javascript"></script>

@@ -1,5 +1,47 @@
 <!-- docs/misc/troubleshooting.md -->
 
+## Custom field shows "decryption failed" or appears empty
+
+### Symptom
+
+In the item detail view, one or more custom fields shows an empty value with a warning icon, or the tooltip mentions `decryption_failed` or `error_no_sharekey_yet`.
+
+### Cause A — Keys are still being generated (`error_no_sharekey_yet`)
+
+After an item is created or a user's keys are regenerated, the background task distributes sharekeys to all eligible users. Until that task completes, the field value is encrypted but the user's personal sharekey does not yet exist.
+
+**Fix:** wait for the background task to complete, then refresh the page.
+
+1. Go to **Admin → Tasks**.
+2. Locate the key generation task for the relevant user or item.
+3. Once the status is `done`, reload the item — the field value should appear.
+
+### Cause B — Sharekey is missing or corrupted (`decryption_failed`)
+
+The user's sharekey for this specific field exists but could not decrypt the value. Possible causes:
+
+- The user's private key was regenerated after the item was last saved, and the re-encryption background task did not complete successfully.
+- The field was encrypted with a legacy phpseclib v1 key and the migration is still in progress.
+
+**Fix:**
+
+1. Go to **Admin → Tasks** and check whether a key generation or migration task for this user is pending or failed.
+2. If a task failed, check its error message and re-run the background task handler:
+   ```bash
+   php scripts/background_tasks___handler.php
+   ```
+3. If the problem persists for a specific user, go to **Admin → Users**, open the user, and use the **Re-encrypt** action to trigger a full sharekey rebuild.
+
+### Cause C — Orphaned encrypted value (permanent data loss)
+
+If an item was moved from a personal folder to a public folder while the encrypted field had no sharekey (due to a previous inconsistency), TeamPass deletes the field value during the move and logs an error. The value cannot be recovered.
+
+**How to confirm:** search the application error log or the TeamPass log for an entry containing `orphaned row deleted during personal→public move` with the item ID.
+
+**Fix:** re-enter the field value manually by editing the item.
+
+---
+
 ## LDAP login shows "wrong passphrase" on first-time login
 
 ### Symptom

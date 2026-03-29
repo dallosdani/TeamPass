@@ -3023,7 +3023,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         }
     };
 
-    // Fields - show masked field
+    // Fields - show masked field while mouse button is held down
     var selectedElement;
     $('.item-details-card').on('mousedown', '.replace-asterisk', function(event) {
             mouseStillDown = true;
@@ -3046,6 +3046,24 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             $(selectedElement).html('<?php echo $var['hidden_asterisk']; ?>');
         }
     };
+
+    // Fields - toggle masked field visibility via reveal button
+    $(document).on('click', '.btn-reveal-field', function() {
+        const fieldId = $(this).data('field-id')
+        const $icon = $(this).find('i')
+        const $span = $('#card-item-field-value-' + fieldId).find('.replace-asterisk')
+        const isVisible = $icon.hasClass('fa-eye-slash')
+
+        if (isVisible) {
+            // Hide: restore asterisks and reset icon
+            $span.html('<?php echo $var['hidden_asterisk']; ?>')
+            $icon.removeClass('fa-solid fa-eye-slash text-warning').addClass('fa-regular fa-eye')
+        } else {
+            // Show: display actual value and update icon
+            $span.text($('#hidden-card-item-field-value-' + fieldId).val())
+            $icon.removeClass('fa-regular fa-eye').addClass('fa-solid fa-eye-slash text-warning')
+        }
+    })
 
 
     /**
@@ -5100,17 +5118,17 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
      * @return {[type]}      [description]
      */
     function rebuildPath(data) {
-        var new_path = new_path_elem = '';
+        var new_path = new_path_elem = ''
         $.each((data), function(i, value) {
-            new_path_elem = '';
+            new_path_elem = ''
             if (value['visible'] === 1) {
-                new_path_elem = ' data-id="' + value['id'] + '"';
+                new_path_elem = ' data-id="' + value['id'] + '"'
             }
+            const iconHtml = value['icon'] ? '<i class="' + value['icon'] + ' mr-1"></i>' : ''
+            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + iconHtml + value['title'] + '</li>'
+        })
 
-            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + value['title'] + '</li>';
-        });
-
-        return new_path;
+        return new_path
     }
 
     /**
@@ -5925,7 +5943,14 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                         )
                                     $('#card-item-field-' + field.id)
                                         .children(".btn-copy-clipboard-clear")
-                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id);
+                                        .attr('data-clipboard-target', 'hidden-card-item-field-value-' + field.id)
+                                    // Show reveal button and reset its icon state
+                                    $('#card-item-field-' + field.id)
+                                        .find('.btn-reveal-field')
+                                        .removeClass('hidden')
+                                        .find('i')
+                                        .removeClass('fa-solid fa-eye-slash text-warning')
+                                        .addClass('fa-regular fa-eye');
                                 } else {
                                     // Show Field
                                     $('#card-item-field-' + field.id)
@@ -7836,9 +7861,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
             // Only if valid id
             if (!isNaN(folder_id)) {
+                // Close any open item detail/edit form before navigating to the new folder
+                closeItemDetailsCard();
+
                 // Prevent duplicate ListerItems via the select_node.jstree event handler
                 startedItemsListQuery = true;
-                
+
                 // List items on folder
                 ListerItems(folder_id, '', 0, 0, true);
 

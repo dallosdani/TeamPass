@@ -79,10 +79,26 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
 $var = [];
 $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk mr-2"></i><i class="fa-solid fa-asterisk"></i>';
 
+// Load BIP-39 wordlist for current user language (used by the passphrase generator)
+require_once __DIR__ . '/../includes/libraries/bip39/loader.php';
+$bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
+
 ?>
 
 
 <script type="text/javascript">
+    // BIP-39 wordlist for the passphrase generator (language: <?php echo htmlspecialchars($session->get('user-language') ?? 'english', ENT_QUOTES, 'UTF-8'); ?>)
+    const TP_BIP39_WORDLIST = <?php echo json_encode($bip39Wordlist, JSON_UNESCAPED_UNICODE); ?>;
+
+    // Minimum word count and extra suffix requirements per folder complexity level
+    const TP_PASSPHRASE_RULES = {
+        0:  { minWords: 3, capitalize: false, appendSuffix: false },
+        20: { minWords: 3, capitalize: false, appendSuffix: false },
+        38: { minWords: 3, capitalize: true,  appendSuffix: false },
+        48: { minWords: 4, capitalize: true,  appendSuffix: false },
+        60: { minWords: 4, capitalize: true,  appendSuffix: true  },
+    };
+
     var requestRunning = false,
         clipboardForLogin,
         clipboardForPassword,
@@ -7379,6 +7395,186 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
             //$('#form-item-buttons').addClass('sticky-footer');
         });
     });
+
+    /**
+     * Generate a BIP-39 passphrase using cryptographically secure randomness.
+     * Applies minimum word count and optional suffix based on folder complexity.
+     *
+     * @param {number}  wordCount   Requested number of words (may be raised by complexity rules).
+     * @param {string}  separator   Word separator ('-', '_', '.', ' ', or '').
+     * @param {boolean} capitalize  Whether to capitalise the first letter of each word.
+     * @returns {string}
+     */
+    function generateBip39Passphrase(wordCount, separator, capitalize) {
+        const folderComplexity = store.get('teampassItem') ? (store.get('teampassItem').folderComplexity ?? 0) : 0
+        const rules = TP_PASSPHRASE_RULES[folderComplexity] || TP_PASSPHRASE_RULES[0]
+        const actualWordCount = Math.max(wordCount, rules.minWords)
+        const doCapitalize = capitalize || rules.capitalize
+
+        const indices = new Uint32Array(actualWordCount)
+        crypto.getRandomValues(indices)
+
+        const words = Array.from(indices).map(n => {
+            const word = TP_BIP39_WORDLIST[n % TP_BIP39_WORDLIST.length]
+            return doCapitalize ? word.charAt(0).toUpperCase() + word.slice(1) : word
+        })
+
+        const sep = separator === 'space' ? ' ' : separator
+        let passphrase = words.join(sep)
+
+        // Complexity level 60 requires digits + symbols: append a short suffix
+        if (rules.appendSuffix) {
+            const extra = new Uint8Array(2)
+            crypto.getRandomValues(extra)
+            const digit = extra[0] % 10
+            const symbolPool = ['!', '@', '#', '$', '%', '&', '*', '?']
+            const symbol = symbolPool[extra[1] % symbolPool.length]
+            passphrase += digit + symbol
+        }
+
+        return passphrase
+    }
+
+    // Tracks the last folder complexity applied to the passphrase options.
+    // null means "never synced" and triggers a reset on the first call.
+    let lastSyncedPassphraseComplexity = null
+
+    /**
+     * Sync the passphrase options with the current folder's complexity rules.
+     *
+     * - When the folder complexity CHANGES (including on first open): resets word count
+     *   to the folder minimum and sets capitalize according to folder rules.
+     * - When the folder complexity is UNCHANGED: only enforces the minimum floor
+     *   so the user's manual adjustments within a session are preserved.
+     *
+     * Options below the folder minimum are always disabled in the selector.
+     */
+    function syncPassphraseOptionsWithComplexity() {
+        const folderComplexity = store.get('teampassItem') ? (store.get('teampassItem').folderComplexity ?? 0) : 0
+        const rules = TP_PASSPHRASE_RULES[folderComplexity] || TP_PASSPHRASE_RULES[0]
+        const minWords = rules.minWords
+
+        // Always disable options below the folder minimum
+        $('#passphrase-word-count option').each(function() {
+            $(this).prop('disabled', parseInt($(this).val(), 10) < minWords)
+        })
+
+        if (lastSyncedPassphraseComplexity !== folderComplexity) {
+            // Folder changed (or first call): reset to folder minimum
+            $('#passphrase-word-count').val(String(minWords))
+            $('#passphrase-capitalize')
+                .prop('checked', rules.capitalize)
+                .closest('label').toggleClass('active', rules.capitalize)
+            lastSyncedPassphraseComplexity = folderComplexity
+        } else {
+            // Same folder: only raise word count if it fell below minimum
+            const currentVal = parseInt($('#passphrase-word-count').val(), 10) || minWords
+            if (currentVal < minWords) {
+                $('#passphrase-word-count').val(String(minWords))
+            }
+            // Folder requiring uppercase must always stay checked
+            if (rules.capitalize) {
+                $('#passphrase-capitalize').prop('checked', true).closest('label').addClass('active')
+            }
+        }
+    }
+
+    /**
+     * Passphrase generate button click handler.
+     */
+    $('#item-button-passphrase-generate').click(function() {
+        syncPassphraseOptionsWithComplexity()
+
+        const wordCount = parseInt($('#passphrase-word-count').val(), 10) || 4
+        const separator = $('#passphrase-separator').val()
+        const capitalize = $('#passphrase-capitalize').prop('checked')
+
+        const passphrase = generateBip39Passphrase(wordCount, separator, capitalize)
+        $('#form-item-password').val(passphrase).focus()
+
+        syncItemPasswordComplexity(passphrase)
+
+        userDidAChange = true
+        if (debugJavascript === true) console.log('Passphrase generated: ' + passphrase)
+    })
+
+    /**
+     * Show/hide the passphrase options panel.
+     * Syncs word count constraints with folder complexity before showing.
+     */
+    $('#item-button-passphrase-showOptions').click(function() {
+        if ($('#form-item-passphrase-options').hasClass('hidden')) {
+            syncPassphraseOptionsWithComplexity()
+            $('#form-item-passphrase-options').removeClass('hidden')
+        } else {
+            $('#form-item-passphrase-options').addClass('hidden')
+        }
+    })
+
+    // -------------------------------------------------------------------------
+    // Persist generator options in localStorage
+    // -------------------------------------------------------------------------
+
+    /**
+     * Save password generator options to localStorage on any option change.
+     */
+    $('#pwd-definition-size, .password-definition').on('change', function() {
+        try {
+            localStorage.setItem('tp_pwd_gen_opts', JSON.stringify({
+                size:    $('#pwd-definition-size').val(),
+                lcl:     $('#pwd-definition-lcl').prop('checked'),
+                ucl:     $('#pwd-definition-ucl').prop('checked'),
+                numeric: $('#pwd-definition-numeric').prop('checked'),
+                symbols: $('#pwd-definition-symbols').prop('checked'),
+                secure:  $('#pwd-definition-secure').prop('checked'),
+            }))
+        } catch (_) {}
+    })
+
+    /**
+     * Save passphrase generator options to localStorage on any option change.
+     * wordCount and capitalize are folder-dependent so they are saved for
+     * within-session use but NOT restored on the next page load.
+     * Only the separator is purely cosmetic and restored across sessions.
+     */
+    $('#passphrase-separator').on('change', function() {
+        try {
+            localStorage.setItem('tp_passphrase_gen_opts', JSON.stringify({
+                separator: $('#passphrase-separator').val(),
+            }))
+        } catch (_) {}
+    })
+
+    /**
+     * Load generator options from localStorage on page load.
+     * - Password generator: all options restored (size, character types).
+     * - Passphrase generator: only separator restored; word count and capitalize
+     *   are always derived from folder complexity via syncPassphraseOptionsWithComplexity().
+     */
+    ;(function loadGeneratorOptionsFromStorage() {
+        try {
+            const pwdOpts = JSON.parse(localStorage.getItem('tp_pwd_gen_opts') || 'null')
+            if (pwdOpts) {
+                if (pwdOpts.size) $('#pwd-definition-size').val(pwdOpts.size)
+                $.each({
+                    '#pwd-definition-lcl':     pwdOpts.lcl,
+                    '#pwd-definition-ucl':     pwdOpts.ucl,
+                    '#pwd-definition-numeric': pwdOpts.numeric,
+                    '#pwd-definition-symbols': pwdOpts.symbols,
+                    '#pwd-definition-secure':  pwdOpts.secure,
+                }, function(sel, checked) {
+                    $(sel).prop('checked', !!checked).closest('label').toggleClass('active', !!checked)
+                })
+            }
+        } catch (_) {}
+
+        try {
+            const ppOpts = JSON.parse(localStorage.getItem('tp_passphrase_gen_opts') || 'null')
+            if (ppOpts && ppOpts.separator !== undefined) {
+                $('#passphrase-separator').val(ppOpts.separator)
+            }
+        } catch (_) {}
+    })()
 
     /**
      * On tag badge click, launch the search query

@@ -197,8 +197,13 @@ if ((int) $session_user_admin === 1) {
                                     <input id="form-item-password" type="password" class="form-control form-item-control" placeholder="<?php echo $lang->get('password'); ?>" data-field-name="pwd" data-change-ongoing="">
                                     <div class="input-group-append">
                                         <span class="input-group-text hidden" id="form-item-password-loader"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                                        <!-- Password generator group -->
                                         <button class="btn btn-secondary btn-no-click infotip password-generate" id="item-button-password-generate" title="<?php echo $lang->get('pw_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-random"></i></button>
                                         <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-showOptions" title="<?php echo $lang->get('options'); ?>"><i class="fa-solid fa-sliders-h"></i></button>
+                                        <!-- Passphrase generator group -->
+                                        <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-generate" title="<?php echo $lang->get('passphrase_generate'); ?>" data-id="form-item-password"><i class="fa-solid fa-comment-dots"></i></button>
+                                        <button class="btn btn-info btn-no-click infotip" id="item-button-passphrase-showOptions" title="<?php echo $lang->get('passphrase_options'); ?>"><i class="fa-solid fa-list-ul"></i></button>
+                                        <!-- Show/hide password -->
                                         <button class="btn btn-secondary btn-no-click infotip" id="item-button-password-show" title="<?php echo $lang->get('mask_pw'); ?>"><i class="fa-solid fa-low-vision"></i></button>
                                     </div>
                                 </div>
@@ -240,6 +245,40 @@ if ((int) $session_user_admin === 1) {
                                                 }
                                                 ?>
                                             </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-1 hidden" id="form-item-passphrase-options">
+                                    <div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Passphrase options">
+                                        <div class="input-group input-group-sm mr-2">
+                                            <div class="input-group-prepend">
+                                                <div class="input-group-text"><?php echo $lang->get('passphrase_words'); ?></div>
+                                            </div>
+                                            <select class="form-control form-control-sm" id="passphrase-word-count">
+                                                <option value="3">3</option>
+                                                <option value="4" selected>4</option>
+                                                <option value="5">5</option>
+                                                <option value="6">6</option>
+                                                <option value="7">7</option>
+                                                <option value="8">8</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group input-group-sm mr-2">
+                                            <div class="input-group-prepend">
+                                                <div class="input-group-text"><?php echo $lang->get('passphrase_separator'); ?></div>
+                                            </div>
+                                            <select class="form-control form-control-sm" id="passphrase-separator">
+                                                <option value="-" selected>-</option>
+                                                <option value=" "><?php echo $lang->get('passphrase_separator_space'); ?></option>
+                                                <option value="_">_</option>
+                                                <option value=".">.</option>
+                                                <option value=""><?php echo $lang->get('passphrase_separator_none'); ?></option>
+                                            </select>
+                                        </div>
+                                        <div class="btn-group btn-group-sm btn-group-toggle" data-toggle="buttons">
+                                            <label class="btn btn-secondary btn-sm active">
+                                                <input type="checkbox" id="passphrase-capitalize" checked><?php echo $lang->get('passphrase_capitalize'); ?>
+                                            </label>
                                         </div>
                                     </div>
                                 </div>

@@ -312,6 +312,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             'teampassApplication',
             function(teampassApplication) {
                 teampassApplication.selectedFolder = selectedFolderId,
+                teampassApplication.itemsListFolderId = selectedFolderId,
                 teampassApplication.selectedFolderTitle = selectedFolder.a_attr['data-title'],
                 teampassApplication.selectedFolderParentId = selectedFolder.parent !== "#" ? selectedFolder.parent.split('_')[1] : 0,
                 teampassApplication.selectedFolderParentTitle = selectedFolder.a_attr['data-title'],
@@ -418,7 +419,10 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         internalRefreshVisibleFolders(true);
 
         // show correct folder in Tree
-        let groupe_id = store.get('teampassApplication').itemsListFolderId;
+        // itemsListFolderId is only set via deep-link or .open-folder clicks;
+        // fall back to selectedFolder (updated on every jstree node selection).
+        let groupe_id = store.get('teampassApplication').itemsListFolderId ||
+                        store.get('teampassApplication').selectedFolder;
         if (groupe_id !== false &&
             ($('#jstree').jstree('get_selected', true)[0] === undefined ||
             'li_' + groupe_id !== $('#jstree').jstree('get_selected', true)[0].id)

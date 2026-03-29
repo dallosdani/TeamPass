@@ -1350,25 +1350,34 @@ switch ($inputData['type']) {
                                 $field['id']
                             );
 
+                            // Encrypt before INSERT so plaintext never lands in DB.
+                            // Resolves the atomicity window where a failed UPDATE would
+                            // leave plaintext stored with encryption_type='not_set'.
+                            if (intval($dataTmpCat['encrypted_data']) === 1) {
+                                $cryptedStuff   = doDataEncryption($field['value']);
+                                $dataToStore    = $cryptedStuff['encrypted'];
+                                $encryptionType = TP_ENCRYPTION_NAME;
+                            } else {
+                                $dataToStore    = $field['value'];
+                                $encryptionType = 'not_set';
+                            }
+
                             // store field text
                             DB::insert(
                                 prefixTable('categories_items'),
                                 array(
                                     'item_id' => $inputData['itemId'],
                                     'field_id' => $field['id'],
-                                    'data' => $field['value'],
+                                    'data' => $dataToStore,
                                     'data_iv' => '',
-                                    'encryption_type' => 'not_set',
+                                    'encryption_type' => $encryptionType,
                                 )
                             );
 
                             $newId = DB::insertId();
                             $dataTmpCat['field_item_id'] = $newId;
 
-                            // Should we encrypt the data
                             if (intval($dataTmpCat['encrypted_data']) === 1) {
-                                $cryptedStuff = doDataEncryption($field['value']);
-
                                 // Create sharekeys for users
                                 storeUsersShareKey(
                                     'sharekeys_fields',
@@ -1379,35 +1388,11 @@ switch ($inputData['type']) {
                                     true,   // delete all
                                 );
 
-                                // update value
-                                DB::update(
-                                    prefixTable('categories_items'),
-                                    array(
-                                        'data' => $cryptedStuff['encrypted'],
-                                        'data_iv' => '',
-                                        'encryption_type' => TP_ENCRYPTION_NAME,
-                                    ),
-                                    'id = %i',
-                                    $newId
-                                );
-
                                 array_push(
                                     $tasksToBePerformed,
                                     'item_field'
                                 );
                                 $encryptedFieldIsChanged = true;
-                            } else {
-                                // update value
-                                DB::update(
-                                    prefixTable('categories_items'),
-                                    array(
-                                        'data' => $field['value'],
-                                        'data_iv' => '',
-                                        'encryption_type' => 'not_set',
-                                    ),
-                                    'id = %i',
-                                    $newId
-                                );
                             }
 
                             // Store updates performed
@@ -2388,20 +2373,24 @@ switch ($inputData['type']) {
                 if (intval($field['encrypted_data']) === 1) {
                     // Get user key
                     $userKey = DB::queryFirstRow(
-                        'SELECT share_key
+                        'SELECT share_key, increment_id
                         FROM ' . prefixTable('sharekeys_fields') . '
                         WHERE user_id = %i AND object_id = %i',
                         $session->get('user-id'),
                         $field['id']
                     );
                     // Then decrypt original field value and encrypt with new key
+                    // Use migration-aware decryption to transparently upgrade v1→v3 sharekeys
                     $cryptedStuff = doDataEncryption(
                         base64_decode(
                             doDataDecryption(
                                 $field['data'],
-                                decryptUserObjectKey(
+                                decryptUserObjectKeyWithMigration(
                                     $userKey['share_key'] ?? '',
-                                    $session->get('user-private_key')
+                                    $session->get('user-private_key'),
+                                    $session->get('user-public_key'),
+                                    intval($userKey['increment_id'] ?? 0),
+                                    'sharekeys_fields'
                                 )
                             )
                         )
@@ -3042,7 +3031,7 @@ switch ($inputData['type']) {
                         // Get the object key for the user
                         //db::debugmode(true);
                         $userKey = DB::queryFirstRow(
-                            'SELECT share_key
+                            'SELECT share_key, increment_id
                             FROM ' . prefixTable('sharekeys_fields') . '
                             WHERE user_id = %i AND object_id = %i',
                             $session->get('user-id'),
@@ -3067,11 +3056,15 @@ switch ($inputData['type']) {
                             ];
                         } else {
                             // Data is encrypted in DB and we have a key
+                            // Use migration-aware decryption to transparently upgrade v1→v3 sharekeys
                             $decryptedValue = doDataDecryption(
                                 $row['data'],
-                                decryptUserObjectKey(
+                                decryptUserObjectKeyWithMigration(
                                     $userKey['share_key'],
-                                    $session->get('user-private_key')
+                                    $session->get('user-private_key'),
+                                    $session->get('user-public_key'),
+                                    intval($userKey['increment_id']),
+                                    'sharekeys_fields'
                                 )
                             );
                             if ($decryptedValue === '') {
@@ -4011,6 +4004,7 @@ switch ($inputData['type']) {
                         'id' => $elem->id,
                         'title' => htmlspecialchars(stripslashes(htmlspecialchars_decode($elem->title, ENT_QUOTES)), ENT_QUOTES),
                         'visible' => in_array($elem->id, $session->get('user-accessible_folders')) ? 1 : 0,
+                        'icon' => (string) ($elem->fa_icon ?? 'fas fa-folder'),
                     )
                 );
             }
@@ -5381,13 +5375,19 @@ switch ($inputData['type']) {
             }
 
             // Get fields for this Item
+            // Fetch encryption_type to skip non-encrypted fields and detect orphans
             $rows = DB::query(
-                'SELECT id
+                'SELECT id, encryption_type
                 FROM ' . prefixTable('categories_items') . '
                 WHERE item_id = %i',
                 $inputData['itemId']
             );
             foreach ($rows as $field) {
+                // Non-encrypted fields have no sharekey — nothing to distribute
+                if ($field['encryption_type'] === 'not_set') {
+                    continue;
+                }
+
                 $userKey = DB::queryFirstRow(
                     'SELECT share_key
                     FROM ' . prefixTable('sharekeys_fields') . '
@@ -5395,26 +5395,43 @@ switch ($inputData['type']) {
                     $session->get('user-id'),
                     $field['id']
                 );
-                if (DB::count() > 0) {
-                    $objectKey = decryptUserObjectKey($userKey['share_key'], $session->get('user-private_key'));
-
-                    // This is a public object
-                    $users = DB::query(
-                        'SELECT id, public_key
-                        FROM ' . prefixTable('users') . '
-                        WHERE id NOT IN %li
-                        AND public_key != ""',
-                        $tpUsersIDs
+                if (DB::count() === 0) {
+                    // Encrypted field with no sharekey: the object key is unrecoverable.
+                    // Keeping this row would cause a permanent decryption_failed for all users.
+                    // Delete the orphaned field value and log the incident.
+                    logEvents(
+                        $SETTINGS,
+                        'error',
+                        'move_item: encrypted field id=' . $field['id'] .
+                            ' (item=' . $inputData['itemId'] . ') has no sharekey' .
+                            ' for user=' . $session->get('user-id') .
+                            ' — orphaned row deleted during personal→public move',
+                        (string) $session->get('user-id'),
+                        (string) $session->get('user-login'),
+                        (string) $inputData['itemId']
                     );
-                    foreach ($users as $user) {
-                        // Insert in DB the new object key for this item by user
-                        insertOrUpdateSharekey(
-                            prefixTable('sharekeys_fields'),
-                            intval($field['id']),
-                            intval($user['id']),
-                            encryptUserObjectKey($objectKey, $user['public_key'])
-                        );
-                    }
+                    DB::delete(prefixTable('categories_items'), 'id = %i', $field['id']);
+                    continue;
+                }
+
+                $objectKey = decryptUserObjectKey($userKey['share_key'], $session->get('user-private_key'));
+
+                // This is a public object
+                $users = DB::query(
+                    'SELECT id, public_key
+                    FROM ' . prefixTable('users') . '
+                    WHERE id NOT IN %li
+                    AND public_key != ""',
+                    $tpUsersIDs
+                );
+                foreach ($users as $user) {
+                    // Insert in DB the new object key for this item by user
+                    insertOrUpdateSharekey(
+                        prefixTable('sharekeys_fields'),
+                        intval($field['id']),
+                        intval($user['id']),
+                        encryptUserObjectKey($objectKey, $user['public_key'])
+                    );
                 }
             }
 

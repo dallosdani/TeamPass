@@ -5252,17 +5252,17 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
      * @return {[type]}      [description]
      */
     function rebuildPath(data) {
-        var new_path = new_path_elem = '';
+        var new_path = new_path_elem = ''
         $.each((data), function(i, value) {
-            new_path_elem = '';
+            new_path_elem = ''
             if (value['visible'] === 1) {
-                new_path_elem = ' data-id="' + value['id'] + '"';
+                new_path_elem = ' data-id="' + value['id'] + '"'
             }
+            const iconHtml = value['icon'] ? '<i class="' + value['icon'] + ' mr-1"></i>' : ''
+            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + iconHtml + value['title'] + '</li>'
+        })
 
-            new_path += '<li class="breadcrumb-item pointer path-elem" id="path_elem_' + value['id'] + '"' + new_path_elem + '>' + value['title'] + '</li>';
-        });
-
-        return new_path;
+        return new_path
     }
 
     /**
@@ -7819,9 +7819,12 @@ $var['hidden_asterisk'] = '<i class="fa-solid fa-asterisk mr-2"></i><i class="fa
 
             // Only if valid id
             if (!isNaN(folder_id)) {
+                // Close any open item detail/edit form before navigating to the new folder
+                closeItemDetailsCard();
+
                 // Prevent duplicate ListerItems via the select_node.jstree event handler
                 startedItemsListQuery = true;
-                
+
                 // List items on folder
                 ListerItems(folder_id, '', 0, 0, true);
 

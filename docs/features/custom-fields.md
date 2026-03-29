@@ -66,6 +66,75 @@ Each field belongs to a category and defines a single input in the item form.
 
 ---
 
+## Encryption — behaviors and edge cases
+
+This section describes what TeamPass does with encrypted custom field values in specific situations. It is intended for administrators.
+
+### How encrypted field values are stored
+
+When a field has **Encrypted data** enabled, its value is:
+1. AES-encrypted with a random object key at save time.
+2. The object key is itself RSA-encrypted for each user who has access to the item's folder, and stored in a dedicated sharekeys table.
+
+A user can only read the field value if their personal sharekey exists in that table. If the sharekey is missing, the field shows an error message (see [Troubleshooting](../misc/troubleshooting.md)).
+
+---
+
+### Changing the "Encrypted data" flag on an existing field
+
+Toggling **Encrypted data** on a field that already has values stored **does not retroactively transform existing data**:
+
+| Before change | After change | Effect on stored values |
+|---|---|---|
+| Unencrypted | Encrypted | Existing values remain in plaintext. Only new values saved after the change are encrypted. |
+| Encrypted | Unencrypted | Existing values remain encrypted in the database. They will no longer be decryptable by users. |
+
+**Recommendation:** avoid changing the encryption flag on a field that already holds data. If you must do so, delete all existing values first (by editing each item), then change the flag.
+
+---
+
+### Copying an item
+
+When a user copies an item, each encrypted field value is:
+1. Decrypted using the user's current sharekey.
+2. Re-encrypted with a fresh object key for the copy.
+3. A new set of sharekeys is created for all users with access to the destination folder.
+
+If the user performing the copy does not have a sharekey for a given field (an edge case caused by a past inconsistency), the copied item will have an **empty value** for that field. The original item is not affected.
+
+---
+
+### Moving an item between folders
+
+#### Public folder → public folder (different access scopes)
+
+Sharekeys are redistributed: users who gain access receive new sharekeys, users who lose access have their sharekeys removed. Encrypted field values follow the same logic as the item password.
+
+#### Public folder → personal folder
+
+All field sharekeys held by other users are deleted. Only the moving user retains access to the encrypted field values.
+
+#### Personal folder → public folder
+
+This is the most sensitive case. TeamPass must create sharekeys for all users who will have access to the destination folder. For each encrypted field:
+
+- If the moving user **has a sharekey** for the field → sharekeys are created for all target users normally.
+- If the moving user **has no sharekey** for the field (orphaned encrypted value) → the field value is **permanently unrecoverable**. TeamPass deletes the orphaned row and logs an error. The item is moved successfully; only that specific field value is lost.
+
+> ⚠️ An orphaned encrypted field value means the object key is gone: the ciphertext exists in the database but cannot be decrypted by anyone. Deleting it is the only safe option. This situation can only arise from a previous bug or data inconsistency.
+
+---
+
+### Deleting a category or a field
+
+Deleting a **category** removes all fields within it and all stored values for those fields on every item, including encrypted ones. This operation is irreversible.
+
+Deleting an individual **field** similarly removes all stored values for that field across all items.
+
+There is no "soft delete" or archive — plan accordingly before removing a category or field that holds data.
+
+---
+
 ## For users
 
 When you open an item in a folder that has custom fields configured:

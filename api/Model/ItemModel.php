@@ -404,7 +404,7 @@ class ItemModel
         $zxcvbn = new Zxcvbn();
         $passwordStrength = $zxcvbn->passwordStrength($password);
         $passwordStrengthScore = convertPasswordStrength($passwordStrength['score']);
-error_log('Password strength score: ' . $passwordStrengthScore . ' | Required: ' . $requested_folder_complexity);
+
         if ($passwordStrengthScore < $requested_folder_complexity && (int) $itemInfos['no_complex_check_on_creation'] === 0) {
             throw new Exception('Password strength is too low');
         }

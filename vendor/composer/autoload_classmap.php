@@ -4012,6 +4012,7 @@ return array(
     'TeampassClasses\\LdapExtra\\OpenLdapExtra' => $vendorDir . '/teampassclasses/ldapextra/src/OpenLdapExtra.php',
     'TeampassClasses\\NestedTree\\NestedTree' => $vendorDir . '/teampassclasses/nestedtree/src/NestedTree.php',
     'TeampassClasses\\OAuth2Controller\\OAuth2Controller' => $vendorDir . '/teampassclasses/oauth2controller/src/OAuth2Controller.php',
+    'TeampassClasses\\PasswordGeneratorService\\PasswordGeneratorService' => $vendorDir . '/teampassclasses/passwordgeneratorservice/src/PasswordGeneratorService.php',
     'TeampassClasses\\PasswordManager\\PasswordManager' => $vendorDir . '/teampassclasses/passwordmanager/src/PasswordManager.php',
     'TeampassClasses\\PerformChecks\\PerformChecks' => $vendorDir . '/teampassclasses/performchecks/src/PerformChecks.php',
     'TeampassClasses\\SessionManager\\EncryptedSessionProxy' => $vendorDir . '/teampassclasses/sessionmanager/src/EncryptedSessionProxy.php',

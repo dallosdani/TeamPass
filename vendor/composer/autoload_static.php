@@ -58,6 +58,7 @@ class ComposerStaticInite3f3ee27f81ca21f7bd7499d7b935c11
             'TeampassClasses\\SessionManager\\' => 31,
             'TeampassClasses\\PerformChecks\\' => 30,
             'TeampassClasses\\PasswordManager\\' => 32,
+            'TeampassClasses\\PasswordGeneratorService\\' => 41,
             'TeampassClasses\\OAuth2Controller\\' => 33,
             'TeampassClasses\\NestedTree\\' => 27,
             'TeampassClasses\\LdapExtra\\' => 26,
@@ -249,6 +250,10 @@ class ComposerStaticInite3f3ee27f81ca21f7bd7499d7b935c11
         'TeampassClasses\\PasswordManager\\' => 
         array (
             0 => __DIR__ . '/..' . '/teampassclasses/passwordmanager/src',
+        ),
+        'TeampassClasses\\PasswordGeneratorService\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/teampassclasses/passwordgeneratorservice/src',
         ),
         'TeampassClasses\\OAuth2Controller\\' => 
         array (
@@ -4683,6 +4688,7 @@ class ComposerStaticInite3f3ee27f81ca21f7bd7499d7b935c11
         'TeampassClasses\\LdapExtra\\OpenLdapExtra' => __DIR__ . '/..' . '/teampassclasses/ldapextra/src/OpenLdapExtra.php',
         'TeampassClasses\\NestedTree\\NestedTree' => __DIR__ . '/..' . '/teampassclasses/nestedtree/src/NestedTree.php',
         'TeampassClasses\\OAuth2Controller\\OAuth2Controller' => __DIR__ . '/..' . '/teampassclasses/oauth2controller/src/OAuth2Controller.php',
+        'TeampassClasses\\PasswordGeneratorService\\PasswordGeneratorService' => __DIR__ . '/..' . '/teampassclasses/passwordgeneratorservice/src/PasswordGeneratorService.php',
         'TeampassClasses\\PasswordManager\\PasswordManager' => __DIR__ . '/..' . '/teampassclasses/passwordmanager/src/PasswordManager.php',
         'TeampassClasses\\PerformChecks\\PerformChecks' => __DIR__ . '/..' . '/teampassclasses/performchecks/src/PerformChecks.php',
         'TeampassClasses\\SessionManager\\EncryptedSessionProxy' => __DIR__ . '/..' . '/teampassclasses/sessionmanager/src/EncryptedSessionProxy.php',

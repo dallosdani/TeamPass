@@ -4251,6 +4251,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     }
                     // Store version
                     try { localStorage.setItem('tp_folders_version', data.folders_version || '') } catch(e) {}
+                    // foldersList is already in the store — still trigger subfolder display
+                    // in case ListerItems() was called before this AJAX completed.
+                    if (store.get('teampassUser').show_subfolders === 1) {
+                        const cachedFolders = store.get('teampassApplication').foldersList
+                        const currentFolder = parseInt(
+                            store.get('teampassApplication').itemsListFolderId ||
+                            store.get('teampassApplication').selectedFolder
+                        )
+                        if (cachedFolders !== undefined && !isNaN(currentFolder)) {
+                            displaySubfolders(cachedFolders, currentFolder)
+                        }
+                    }
                     return;
                 }
 
@@ -4425,6 +4437,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                                 teampassApplication.foldersList = folders;
                             }
                         );
+                        // Trigger subfolder display now that foldersList is populated.
+                        // This covers the case where ListerItems() was called before this
+                        // AJAX completed (race condition on page load with a restored session).
+                        if (store.get('teampassUser').show_subfolders === 1) {
+                            const currentFolder = parseInt(
+                                store.get('teampassApplication').itemsListFolderId ||
+                                store.get('teampassApplication').selectedFolder
+                            )
+                            if (!isNaN(currentFolder)) {
+                                displaySubfolders(folders, currentFolder)
+                            }
+                        }
                     } else if (action === 'update') {
                         // Store the data
                         var currentFoldersList = store.get('teampassApplication').foldersList;
@@ -4606,11 +4630,16 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             // folder.parent_id in the store is encoded as integer by PHP JSON, so strict === would
             // fail on a string, causing an empty subfolder list after item save.
             const groupeIdInt = parseInt(groupe_id);
-            // if undefined wait 1.5s until queries are done
-            if(store.get('teampassApplication').foldersList === undefined) {
+            if (store.get('teampassApplication').foldersList === undefined) {
+                // foldersList not yet available: internalRefreshVisibleFolders() is still running.
+                // displaySubfolders() will be called from its AJAX callback once the data arrives.
+                // This timeout is a last-resort fallback only (e.g. very slow network).
                 setTimeout(() => {
-                displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
-                }, 1500);
+                    const fl = store.get('teampassApplication').foldersList
+                    if (fl !== undefined) {
+                        displaySubfolders(fl, groupeIdInt)
+                    }
+                }, 3000);
             } else {
                 displaySubfolders(store.get('teampassApplication').foldersList, groupeIdInt);
             }

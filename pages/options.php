@@ -1357,6 +1357,18 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                             </div>
                         </div>
 
+                        <div class='row mb-2 option' data-keywords="users online connected visibility footer">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_show_online_users_list'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_show_online_users_list_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='show_online_users_list' data-toggle-on='<?php echo isset($SETTINGS['show_online_users_list']) === true && (int) $SETTINGS['show_online_users_list'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='show_online_users_list_input' value='<?php echo isset($SETTINGS['show_online_users_list']) && (int) $SETTINGS['show_online_users_list'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
+
                         <div class='row mb-2 option' data-keywords="folder creation">
                             <div class='col-10'>
                                 <?php echo $lang->get('subfolder_rights_as_parent'); ?>

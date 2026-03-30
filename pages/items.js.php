@@ -5715,19 +5715,38 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                         // show split mode or not
                         if (store.get('teampassUser').split_view_mode === 1) {
-                            // Optionnal splited item view
-                            $('#folder-tree-container').removeClass('col-md-5').addClass('col-md-3');
-                            $('#items-list-container').removeClass('col-md-7').addClass('col-md-4');
-                            $('#items-details-container').removeClass('col-md-12').addClass('col-md-5');
+                            // Optional split item view
+                            $('#folders-tree-card').removeClass('hidden');
+
+                            $('#folder-tree-container')
+                                .removeClass('hidden col-md-5')
+                                .addClass('col-md-3');
+
+                            $('#items-list-container')
+                                .removeClass('hidden col-md-7')
+                                .addClass('col-md-4');
+
+                            $('#items-details-container')
+                                .removeClass('hidden col-md-12')
+                                .addClass('col-md-5');
+
                             // Reduce menu size and trigger event listener
                             if ($('body').hasClass('sidebar-collapse') === false) {
                                 $('a[data-widget="pushmenu"]').click();
                             }
                         } else {
-                            // Defaut = full screen item view
-                            $('#folder-tree-container').removeClass('col-md-5').addClass('hidden');
-                            $('#items-list-container').removeClass('col-md-7').addClass('hidden');
-                            $('#items-details-container').removeClass('col-md-5').addClass('col-md-12');
+                            // Default = full screen item view
+                            $('#folder-tree-container')
+                                .removeClass('col-md-3')
+                                .addClass('col-md-5 hidden');
+
+                            $('#items-list-container')
+                                .removeClass('col-md-4')
+                                .addClass('col-md-7 hidden');
+
+                            $('#items-details-container')
+                                .removeClass('col-md-5')
+                                .addClass('col-md-12');
                         }
                         
                         // Show item details

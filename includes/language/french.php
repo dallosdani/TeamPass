@@ -471,7 +471,7 @@ return array(
     'settings_upload_imageresize_options_w' => 'Redimensionnement des Images en Largeur (en pixels)',
     'settings_upload_imageresize_options_h' => 'Redimensionnement des Images en Hauteur (en pixels)',
     'settings_upload_imageresize_options_q' => 'Qualité de l’Image redimensionnée',
-    'settings_importing' => 'Permettre d’importer des données depuis des fichiers CVS/KeyPass',
+    'settings_importing' => 'Permettre d’importer des données depuis des fichiers CSV/KeePass',
     'db_items_edited' => 'Éléments actuellement en cours d’édition',
     'item_edition_start_hour' => 'Édition démarrée depuis',
     'settings_delay_for_item_edition' => 'Après quelle durée, en minutes, l’édition d’un Élément est-elle considérée comme échouée',

@@ -348,6 +348,17 @@ foreach ($redisDefaults as $key => $value) {
 }
 // --->
 
+// <---
+// ==========================================
+// Footer online users panel setting (disabled by default)
+// ==========================================
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+    VALUES ('admin', 'show_online_users_list', '0', UNIX_TIMESTAMP())"
+);
+// --->
+
 // Close connection
 mysqli_close($db_link);
 

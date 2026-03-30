@@ -1371,7 +1371,7 @@ if (
                                 '<div class="form-group mb-0">'+
                                     '<label for="warningModal-admin-reset-user-password"><?php echo $lang->get('user_password'); ?></label>'+
                                     '<div class="input-group">'+
-                                        '<input type="text" readonly class="form-control form-item-control" id="warningModal-admin-reset-user-password" value="'+data_next1.user_password+'">'+
+                                        '<input type="text" readonly class="form-control form-item-control" id="warningModal-admin-reset-user-password" value="">'+
                                         '<div class="input-group-append">'+
                                             '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-admin-reset-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
                                                 '<i class="fa-solid fa-copy"></i>'+
@@ -1385,6 +1385,7 @@ if (
                                 false,
                                 false
                             );
+                            $('#warningModal-admin-reset-user-password').val(data_next1.user_password);
                         }
 
                         $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('generate_new_keys_end'); ?>');
@@ -2476,7 +2477,7 @@ if (
             genericError: <?php echo json_encode($lang->get('an_error_occurred')); ?>
         };
 
-        const defaultAvatarUrl = <?php echo json_encode((string) $SETTINGS['cpassman_url'] . '/includes/images/photo.jpg'); ?>;
+        const defaultAvatarUrl = <?php echo json_encode((isset($SETTINGS['cpassman_url']) ? (string) $SETTINGS['cpassman_url'] : '') . '/includes/images/photo.jpg'); ?>;
 
         function renderAvatar(user) {
             const avatarUrl = user && typeof user.avatar_url === 'string' && user.avatar_url !== ''

@@ -2100,7 +2100,15 @@ return array(
     'not_secure' => 'Non sécurisé',
     'admin_update_badge' => 'Mise à jour',
     'admin_new_version_available' => 'version %s disponible',
-    'no_online_users' => 'Aucun utilisateur n\'est actuellement connecté',
+    'passphrase_generate' => 'Générer une phrase de passe',
+    'passphrase_options' => 'Options de la phrase de passe',
+    'passphrase_words' => 'Mots',
+    'passphrase_separator' => 'Séparateur',
+    'passphrase_separator_space' => 'Espace',
+    'passphrase_separator_none' => 'Aucun',
+    'passphrase_capitalize' => 'Majuscule au début de chaque mot',
+    'no_online_users' => 'Aucun utilisateur n’est actuellement connecté',
     'settings_show_online_users_list' => 'Autoriser l’affichage de la liste des utilisateurs connectés',
     'settings_show_online_users_list_tip' => 'Quand cette option est activée, les utilisateurs authentifiés peuvent ouvrir le panneau du footer pour consulter la liste des utilisateurs actuellement connectés. Quand elle est désactivée, seul le nombre d’utilisateurs connectés reste visible dans l’infobulle.',
+
 );

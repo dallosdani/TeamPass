@@ -733,7 +733,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                         '<div class="form-group">'+
                             '<label for="warningModal-generated-user-password"><?php echo $lang->get('user_password'); ?></label>'+
                             '<div class="input-group">'+
-                                '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-password" value="'+store.get('teampassUser').admin_new_user_password+'">'+
+                                '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-password" value="">'+
                                 '<div class="input-group-append">'+
                                     '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-generated-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
                                         '<i class="fa-solid fa-copy"></i>'+
@@ -743,7 +743,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                         '</div>'+
                         '<div class="form-group mb-0">'+
                             '<label for="warningModal-generated-user-otc"><?php echo $lang->get('user_temporary_encryption_code'); ?></label>'+
-                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-otc" value="'+store.get('teampassUser').admin_new_user_temporary_encryption_code+'">'+
+                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-otc" value="">'+
                         '</div>'+
                     '</div>'
                     :
@@ -757,6 +757,8 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 false,
                 false
             );
+            $('#warningModal-generated-user-password').val(store.get('teampassUser').admin_new_user_password);
+            $('#warningModal-generated-user-otc').val(store.get('teampassUser').admin_new_user_temporary_encryption_code);
             $('#warningModal').modal('show');
 
             $(document).on('click', '#warningModal-button-user-pwd', function() {
@@ -1167,7 +1169,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                                     '<div class="form-group mb-0">'+
                                         '<label for="warningModal-created-user-password"><?php echo $lang->get('user_password'); ?></label>'+
                                         '<div class="input-group">'+
-                                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-created-user-password" value="' + data.user_password + '">'+
+                                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-created-user-password" value="">'+
                                             '<div class="input-group-append">'+
                                                 '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-created-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
                                                     '<i class="fa-solid fa-copy"></i>'+
@@ -1181,6 +1183,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                                     false,
                                     false
                                 );
+                                $('#warningModal-created-user-password').val(data.user_password);
                             }
                             // ---
                         } else {

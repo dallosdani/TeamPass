@@ -143,16 +143,6 @@ const TP_TRANSPARENT_RECOVERY_USER_COUNTS = {
     migratedUsers: <?php echo $transparentRecoveryMigratedUsersNoSystem; ?>
 };
 
-const TP_ONLINE_USERS_I18N = {
-    title: <?php echo json_encode($lang->get('users_online')); ?>,
-    empty: <?php echo json_encode($lang->get('no_online_users')); ?>,
-    loading: <?php echo json_encode($lang->get('loading')); ?>,
-    close: <?php echo json_encode($lang->get('close')); ?>,
-    online: <?php echo json_encode($lang->get('online')); ?>,
-    unknown: <?php echo json_encode($lang->get('unknown')); ?>,
-    genericError: <?php echo json_encode($lang->get('an_error_occurred')); ?>
-};
-
 
 /**
  * ADMIN
@@ -1003,8 +993,6 @@ function initDashboardTab() {
     AdminRefreshManager.start('system_status', loadSystemStatus, 60000, 'status-refresh-countdown')
     AdminRefreshManager.start('system_health', loadSystemHealth, 60000, null)
 }
-
-// ===================================
 
 // ===================================
 // ONLINE USERS SIDEBAR SYNC

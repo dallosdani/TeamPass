@@ -3894,57 +3894,6 @@ case 'save_sending_statistics':
     break;
 
 // ========================================
-// ONLINE USERS LIST ENDPOINT
-// ========================================
-
-case 'get_online_users_list':
-    /**
-     * Get currently connected users for the admin dashboard footer panel.
-     * TeamPass system accounts (TP / OTV / API) are excluded, like in get_dashboard_stats.
-     *
-     * @return array {
-     *   count: int,
-     *   users: array<int, array{id:int, login:string, name:string, lastname:string}>
-     * }
-     */
-
-    $onlineUsers = DB::query(
-        'SELECT id, login, name, lastname
-        FROM ' . prefixTable('users') . "
-        WHERE session_end > %i
-          AND disabled = %i
-          AND deleted_at IS NULL
-          AND LOWER(login) NOT IN ('tp', 'otv', 'api')
-        ORDER BY
-            CASE WHEN lastname IS NULL OR lastname = '' THEN 1 ELSE 0 END ASC,
-            lastname ASC,
-            name ASC,
-            login ASC",
-        time(),
-        0
-    );
-
-    $onlineUsersList = [];
-    foreach ($onlineUsers as $user) {
-        $onlineUsersList[] = array(
-            'id' => (int) $user['id'],
-            'login' => isset($user['login']) === true ? (string) $user['login'] : '',
-            'name' => isset($user['name']) === true ? (string) $user['name'] : '',
-            'lastname' => isset($user['lastname']) === true ? (string) $user['lastname'] : '',
-        );
-    }
-
-    echo prepareExchangedData(
-        array(
-            'error' => false,
-            'count' => count($onlineUsersList),
-            'users' => $onlineUsersList,
-        ),
-        'encode'
-    );
-    break;
-
-// ========================================
 // LIVE ACTIVITY ENDPOINT
 // ========================================
 

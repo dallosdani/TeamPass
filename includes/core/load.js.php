@@ -2476,6 +2476,16 @@ if (
             genericError: <?php echo json_encode($lang->get('an_error_occurred')); ?>
         };
 
+        const defaultAvatarUrl = <?php echo json_encode((string) $SETTINGS['cpassman_url'] . '/includes/images/photo.jpg'); ?>;
+
+        function renderAvatar(user) {
+            const avatarUrl = user && typeof user.avatar_url === 'string' && user.avatar_url !== ''
+                ? user.avatar_url
+                : defaultAvatarUrl;
+
+            return `<img src="${tpEscapeHtml(avatarUrl)}" alt="" class="tp-online-users-avatar-img" onerror="this.onerror=null;this.src='${tpEscapeHtml(defaultAvatarUrl)}';">`;
+        }
+
         let drawerOpen = false;
         let summaryTimer = null;
         let drawerPositionFrame = null;
@@ -2604,17 +2614,15 @@ if (
                     .replace(/\s+/g, ' ')
                     .trim();
                 const primaryLabel = fullName !== '' ? fullName : (user.login || i18n.unknown);
-                const secondaryLabel = fullName !== '' ? (user.login || '') : '';
 
                 return `
                     <div class="list-group-item tp-online-users-item">
                         <div class="d-flex align-items-center">
                             <span class="tp-online-users-avatar">
-                                <i class="fa-solid fa-user"></i>
+                                ${renderAvatar(user)}
                             </span>
                             <div class="tp-online-users-meta flex-grow-1">
                                 <div class="font-weight-bold text-truncate">${tpEscapeHtml(primaryLabel)}</div>
-                                ${secondaryLabel !== '' ? `<div class="small text-muted text-truncate">${tpEscapeHtml(secondaryLabel)}</div>` : ''}
                             </div>
                             <span class="badge badge-success ml-2">${tpEscapeHtml(i18n.online)}</span>
                         </div>

@@ -738,16 +738,52 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
                     <!-- /.sidebar-menu -->
                 <div class="menu-footer">
                     <div class="" id="sidebar-footer">
+                        <?php $canOpenOnlineUsersDrawer = isset($SETTINGS['show_online_users_list']) === true && (int) $SETTINGS['show_online_users_list'] === 1; ?>
                         <i class="fa-solid fa-clock-o mr-2 infotip text-info pointer" title="<?php echo htmlspecialchars($lang->get('server_time') . ' ' .
                             date($date_format, (int) $server['request_time']) . ' - ' .
                             date($time_format, (int) $server['request_time']), ENT_QUOTES, 'UTF-8'); ?>"></i>
-                        <i class="fa-solid fa-users mr-2 infotip text-info pointer" title="<?php echo $session_nb_users_online . ' ' . $lang->get('users_online'); ?>"></i>
+                        <?php if ($canOpenOnlineUsersDrawer === true) { ?>
+                        <button
+                            type="button"
+                            class="btn btn-link tp-sidebar-footer-action text-info infotip pointer"
+                            id="sidebar-online-users-trigger"
+                            title="<?php echo (int) $session_nb_users_online . ' ' . $lang->get('users_online'); ?>"
+                            aria-label="<?php echo (int) $session_nb_users_online . ' ' . $lang->get('users_online'); ?>"
+                            aria-expanded="false"
+                        >
+                            <i class="fa-solid fa-users"></i>
+                        </button>
+                        <?php } else { ?>
+                        <i
+                            class="fa-solid fa-users mr-2 infotip text-info pointer"
+                            id="sidebar-online-users-indicator"
+                            title="<?php echo (int) $session_nb_users_online . ' ' . $lang->get('users_online'); ?>"
+                            aria-label="<?php echo (int) $session_nb_users_online . ' ' . $lang->get('users_online'); ?>"
+                        ></i>
+                        <?php } ?>
                         <a href="<?php echo DOCUMENTATION_URL; ?>" target="_blank" class="text-info"><i class="fa-solid fa-book mr-2 infotip" title="<?php echo $lang->get('documentation_canal'); ?>"></i></a>
                         <a href="<?php echo HELP_URL; ?>" target="_blank" class="text-info"><i class="fa-solid fa-life-ring mr-2 infotip" title="<?php echo $lang->get('admin_help'); ?>"></i></a>
                         <?php if ($session_user_admin === 1) : ?><i class="fa-solid fa-bug infotip pointer text-info" title="<?php echo $lang->get('bugs_page'); ?>" onclick="generateBugReport()"></i><?php endif; ?>
+                        <?php if ($canOpenOnlineUsersDrawer === true) { ?>
+                        <div id="online-users-drawer" class="tp-online-users-drawer hidden" aria-hidden="true">
+                            <div class="card card-outline card-info mb-0 shadow">
+                                <div class="card-header py-2">
+                                    <h3 class="card-title">
+                                        <i class="fa-solid fa-users mr-2"></i><?php echo $lang->get('users_online'); ?>
+                                        <span class="badge badge-info ml-2" id="online-users-drawer-count"><?php echo (int) $session_nb_users_online; ?></span>
+                                    </h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div id="online-users-drawer-content" class="tp-online-users-drawer-content">
+                                        <div class="p-3 text-center text-muted">
+                                            <i class="fa-solid fa-spinner fa-spin mr-2"></i><?php echo $lang->get('loading'); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php } ?>
                     </div>
-                    <?php
-    ?>
                 </div>
                 </div>
                 <!-- /.sidebar -->
@@ -1317,9 +1353,103 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
             display: none !important;
         }
 
+
+        #sidebar-footer {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: nowrap;
+            overflow: visible;
+        }
+
+        .tp-sidebar-footer-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            text-decoration: none !important;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .tp-sidebar-footer-action:hover,
+        .tp-sidebar-footer-action:focus {
+            color: #7fd8ff !important;
+            text-decoration: none !important;
+        }
+
+        .tp-sidebar-footer-action:focus {
+            outline: none;
+        }
+
+        .tp-online-users-drawer {
+            position: fixed;
+            left: 1rem;
+            bottom: 4rem;
+            width: min(340px, calc(100vw - 1rem));
+            z-index: 1065;
+            overflow: visible;
+        }
+
+        .tp-online-users-drawer .card {
+            border-radius: 0.85rem;
+            overflow: hidden;
+        }
+
+        .tp-online-users-drawer-content {
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .tp-online-users-item {
+            padding: 0.5rem 0.75rem;
+            border-left: 0;
+            border-right: 0;
+        }
+
+        .tp-online-users-item .font-weight-bold {
+            font-size: 0.95rem;
+            line-height: 1.15;
+        }
+
+        .tp-online-users-item .small {
+            line-height: 1.1;
+        }
+
+        .tp-online-users-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-right: 0.6rem;
+            border-radius: 999px;
+            background: rgba(23, 162, 184, 0.12);
+            color: #17a2b8;
+            flex: 0 0 28px;
+            font-size: 0.9rem;
+        }
+
+        .dark-mode .tp-online-users-avatar {
+            background: rgba(255, 255, 255, 0.08);
+            color: #8bd3dd;
+        }
+
+        .tp-online-users-meta {
+            min-width: 0;
+        }
+
         @media (max-width: 767.98px) {
             .tp-sidebar-version-badge {
                 display: none !important;
+            }
+
+            .tp-online-users-drawer {
+                width: min(340px, calc(100vw - 1rem));
             }
         }
     </style>

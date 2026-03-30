@@ -968,7 +968,7 @@ function systemHandler(string $post_type, array|null|string $dataReceived, array
 
             if ($includeUsers === 1 && $canViewList === true) {
                 $onlineUsers = DB::query(
-                    'SELECT id, login, name, lastname
+                    'SELECT id, login, name, lastname, avatar
                     FROM ' . prefixTable('users') . "
                     WHERE session_end > %i
                       AND disabled = %i
@@ -990,6 +990,9 @@ function systemHandler(string $post_type, array|null|string $dataReceived, array
                         'login' => isset($user['login']) === true ? (string) $user['login'] : '',
                         'name' => isset($user['name']) === true ? (string) $user['name'] : '',
                         'lastname' => isset($user['lastname']) === true ? (string) $user['lastname'] : '',
+                        'avatar_url' => (empty(isset($user['avatar']) === true ? trim((string) $user['avatar']) : '') === true
+                            ? (string) $SETTINGS['cpassman_url'] . '/includes/images/photo.jpg'
+                            : (string) $SETTINGS['cpassman_url'] . '/includes/avatars/' . rawurlencode(trim((string) $user['avatar']))),
                     );
                 }
 

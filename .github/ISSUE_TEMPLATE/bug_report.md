@@ -17,7 +17,7 @@ https://github.com/nilsteampassnet/TeamPass/discussions
 > admin panel under **Admin > Bug icon on bottom left**. Attaching it here
 > speeds up the investigation significantly.
 
-If this template is not followed, the issue may be closed without a response.
+IF THIS TEMPLATE IS NOT FOLLOWED, the issue may be closed without a response.
 -->
 
 ## Steps to reproduce

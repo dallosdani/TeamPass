@@ -562,7 +562,7 @@ class DatabaseInstaller
             array('admin', 'allow_import', '0'),
             array('admin', 'proxy_ip', ''),
             array('admin', 'proxy_port', ''),
-            array('admin', 'upload_maxfilesize', '10mb'),
+            array('admin', 'upload_maxfilesize', '100mb'),
             array('admin', 'upload_docext', 'doc,docx,dotx,xls,xlsx,xltx,rtf,csv,txt,pdf,ppt,pptx,pot,dotx,xltx'),
             array('admin', 'upload_imagesext', 'jpg,jpeg,gif,png'),
             array('admin', 'upload_pkgext', '7z,rar,tar,zip'),

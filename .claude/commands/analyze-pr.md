@@ -83,7 +83,7 @@ Pour chaque fichier `.js` ou `.js.php` modifié :
 
 ### 3.6 Impact install / upgrade
 
-- Y a-t-il des modifications de schéma sans script d'upgrade ?
+- Y a-t-il des modifications de schéma sans script d'upgrade ou d'installation ?
 - Les nouvelles constantes sont-elles ajoutées dans `includes/config/include.php` ?
 - La version `TP_VERSION` doit-elle être incrémentée ?
 

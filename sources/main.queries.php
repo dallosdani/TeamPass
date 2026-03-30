@@ -956,6 +956,79 @@ function systemHandler(string $post_type, array|null|string $dataReceived, array
             );
 
         /*
+         * Get online users status for footer indicator / drawer
+         */
+        case 'get_online_users_status'://action_system
+            $includeUsers = is_array($dataReceived) === true && isset($dataReceived['include_users']) === true
+                ? (int) filter_var($dataReceived['include_users'], FILTER_SANITIZE_NUMBER_INT)
+                : 0;
+
+            $canViewList = isset($SETTINGS['show_online_users_list']) === true
+                && (int) $SETTINGS['show_online_users_list'] === 1;
+
+            if ($includeUsers === 1 && $canViewList === true) {
+                $onlineUsers = DB::query(
+                    'SELECT id, login, name, lastname, avatar
+                    FROM ' . prefixTable('users') . "
+                    WHERE session_end > %i
+                      AND disabled = %i
+                      AND deleted_at IS NULL
+                      AND LOWER(login) NOT IN ('tp', 'otv', 'api')
+                    ORDER BY
+                        CASE WHEN lastname IS NULL OR lastname = '' THEN 1 ELSE 0 END ASC,
+                        lastname ASC,
+                        name ASC,
+                        login ASC",
+                    time(),
+                    0
+                );
+
+                $onlineUsersList = [];
+                foreach ($onlineUsers as $user) {
+                    $onlineUsersList[] = array(
+                        'id' => (int) $user['id'],
+                        'login' => isset($user['login']) === true ? (string) $user['login'] : '',
+                        'name' => isset($user['name']) === true ? (string) $user['name'] : '',
+                        'lastname' => isset($user['lastname']) === true ? (string) $user['lastname'] : '',
+                        'avatar_url' => (empty(isset($user['avatar']) === true ? trim((string) $user['avatar']) : '') === true
+                            ? (string) $SETTINGS['cpassman_url'] . '/includes/images/photo.jpg'
+                            : (string) $SETTINGS['cpassman_url'] . '/includes/avatars/' . rawurlencode(trim((string) $user['avatar']))),
+                    );
+                }
+
+                return prepareExchangedData(
+                    array(
+                        'error' => false,
+                        'count' => count($onlineUsersList),
+                        'can_view_list' => true,
+                        'users' => $onlineUsersList,
+                    ),
+                    'encode'
+                );
+            }
+
+            $onlineUsersCount = (int) DB::queryFirstField(
+                'SELECT COUNT(*)
+                FROM ' . prefixTable('users') . "
+                WHERE session_end > %i
+                  AND disabled = %i
+                  AND deleted_at IS NULL
+                  AND LOWER(login) NOT IN ('tp', 'otv', 'api')",
+                time(),
+                0
+            );
+
+            return prepareExchangedData(
+                array(
+                    'error' => false,
+                    'count' => $onlineUsersCount,
+                    'can_view_list' => $canViewList,
+                    'users' => array(),
+                ),
+                'encode'
+            );
+
+        /*
          * Generates a TOKEN with CRYPT
          */
         case 'save_token'://action_system

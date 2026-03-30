@@ -703,7 +703,8 @@ class DatabaseInstaller
             array('admin', 'network_whitelist_enabled', '0'),
             array('admin', 'network_security_mode', 'direct'),
             array('admin', 'network_security_header', 'x-forwarded-for'),
-            array('admin', 'network_trusted_proxies', '')
+            array('admin', 'network_trusted_proxies', ''),
+            array('admin', 'show_online_users_list', '0')
         );
         foreach ($aMiscVal as $elem) {
             $value = isset($elem[3]) ? $elem[3] : 0;

@@ -545,6 +545,10 @@ function loadDashboardStats() {
                 $('#stat-users-online').text(data.users.online)
                 $('#stat-users-blocked').text(data.users.blocked)
                 $('#stat-users-warned').text(data.users.warned !== undefined ? data.users.warned : '-')
+                updateSidebarOnlineUsersCounter(data.users.online)
+                if (typeof window.TeamPassOnlineUsers !== 'undefined' && window.TeamPassOnlineUsers.isOpen() === true) {
+                    window.TeamPassOnlineUsers.reloadList(true)
+                }
                 
                 // Items stats
                 $('#stat-items-total').text(data.items.total)
@@ -988,6 +992,16 @@ function initDashboardTab() {
     AdminRefreshManager.start('live_activity', loadLiveActivity, 10000, 'activity-refresh-countdown')
     AdminRefreshManager.start('system_status', loadSystemStatus, 60000, 'status-refresh-countdown')
     AdminRefreshManager.start('system_health', loadSystemHealth, 60000, null)
+}
+
+// ===================================
+// ONLINE USERS SIDEBAR SYNC
+// ===================================
+
+function updateSidebarOnlineUsersCounter(count) {
+    if (typeof window.TeamPassOnlineUsers !== 'undefined' && typeof window.TeamPassOnlineUsers.applyCount === 'function') {
+        window.TeamPassOnlineUsers.applyCount(count)
+    }
 }
 
 // ===================================

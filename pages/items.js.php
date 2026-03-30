@@ -5738,13 +5738,11 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             // Default = full screen item view
                             $('#folder-tree-container')
                                 .removeClass('col-md-3')
-                                .addClass('col-md-5')
-                                .addClass('hidden');
+                                .addClass('col-md-5 hidden');
 
                             $('#items-list-container')
                                 .removeClass('col-md-4')
-                                .addClass('col-md-7')
-                                .addClass('hidden');
+                                .addClass('col-md-7 hidden');
 
                             $('#items-details-container')
                                 .removeClass('col-md-5')

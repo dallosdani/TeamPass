@@ -1432,6 +1432,15 @@ if ((null === $session->get('user-validite_pw') || empty($session->get('user-val
             color: #17a2b8;
             flex: 0 0 28px;
             font-size: 0.9rem;
+            overflow: hidden;
+        }
+
+        .tp-online-users-avatar-img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 999px;
         }
 
         .dark-mode .tp-online-users-avatar {

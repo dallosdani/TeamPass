@@ -2102,4 +2102,7 @@ return array(
     'passphrase_separator_space' => 'Space',
     'passphrase_separator_none' => 'None',
     'passphrase_capitalize' => 'Capitalize',
-);
+    'no_online_users' => 'No user is currently connected',
+    'settings_show_online_users_list' => 'Allow displaying connected users list',
+    'settings_show_online_users_list_tip' => 'When enabled, authenticated users can open the footer panel to view the list of currently connected users. When disabled, only the number of connected users remains visible in the tooltip.',
+    );

@@ -1733,9 +1733,16 @@ switch ($post_type) {
         break;
 
     case 'save_api_status':
-        // Do query
-        DB::query('SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s', 'admin', 'api');
+        $timestamp = time();
+
+        // Save API status
+        DB::query(
+            'SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s',
+            'admin',
+            'api'
+        );
         $counter = DB::count();
+
         if ($counter === 0) {
             DB::insert(
                 prefixTable('misc'),
@@ -1743,7 +1750,7 @@ switch ($post_type) {
                     'type' => 'admin',
                     'intitule' => 'api',
                     'valeur' => $post_status,
-                    'created_at' => time(),
+                    'created_at' => $timestamp,
                 )
             );
         } else {
@@ -1751,14 +1758,105 @@ switch ($post_type) {
                 prefixTable('misc'),
                 array(
                     'valeur' => $post_status,
-                    'updated_at' => time(),
+                    'updated_at' => $timestamp,
                 ),
                 'type = %s AND intitule = %s',
                 'admin',
                 'api'
             );
         }
-        $SETTINGS['api'] = $post_status;
+
+        $SETTINGS['api'] = (string) $post_status;
+
+        // Silent default save of browser extension FQDN on first API activation
+        if ((int) $post_status === 1) {
+            $currentBrowserExtensionFqdn = isset($SETTINGS['browser_extension_fqdn']) === true
+                ? trim((string) $SETTINGS['browser_extension_fqdn'])
+                : '';
+
+            if ($currentBrowserExtensionFqdn === '') {
+                $cpassmanUrl = isset($SETTINGS['cpassman_url']) === true
+                    ? trim((string) $SETTINGS['cpassman_url'])
+                    : '';
+
+                if ($cpassmanUrl === '') {
+                    $detectedBrowserExtensionFqdn = 'localhost';
+                } else {
+                    if (strpos($cpassmanUrl, 'http') !== 0 && strpos($cpassmanUrl, '//') !== 0) {
+                        $cpassmanUrl = 'http://' . $cpassmanUrl;
+                    }
+
+                    $parsedUrl = parse_url($cpassmanUrl);
+                    $host = isset($parsedUrl['host']) === true
+                        ? strtolower(trim((string) $parsedUrl['host'], '.'))
+                        : 'localhost';
+
+                    // Same localhost behaviour as pages/api.php
+                    if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) === true) {
+                        $path = isset($parsedUrl['path']) === true
+                            ? trim((string) $parsedUrl['path'], '/')
+                            : '';
+
+                        if ($path !== '') {
+                            $segments = explode('/', $path);
+                            if (
+                                $segments[0] !== ''
+                                && strpos($segments[0], '.php') === false
+                            ) {
+                                $host = (string) $segments[0];
+                            }
+                        }
+                    }
+
+                    $detectedBrowserExtensionFqdn = $host;
+                }
+
+                // Sanitize before storage
+                $detectedBrowserExtensionFqdn = htmlspecialchars(
+                    $detectedBrowserExtensionFqdn,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                );
+
+                // Read the current DB value
+                $fqdnRow = DB::queryFirstRow(
+                    'SELECT valeur FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s',
+                    'admin',
+                    'browser_extension_fqdn'
+                );
+
+                if ($fqdnRow === null) {
+                    // Row does not exist yet → insert it
+                    DB::insert(
+                        prefixTable('misc'),
+                        array(
+                            'type' => 'admin',
+                            'intitule' => 'browser_extension_fqdn',
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'created_at' => $timestamp,
+                        )
+                    );
+                    $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
+                } elseif (trim((string) $fqdnRow['valeur']) === '') {
+                    // Row exists but is empty → update only in that case
+                    DB::update(
+                        prefixTable('misc'),
+                        array(
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'updated_at' => $timestamp,
+                        ),
+                        'type = %s AND intitule = %s',
+                        'admin',
+                        'browser_extension_fqdn'
+                    );
+                    $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
+                }
+                // else: a non-empty value already exists in DB → we keep it
+            }
+        }
+
+        ConfigManager::invalidateCache();
+
         break;
 
     case 'run_duo_config_check':

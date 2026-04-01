@@ -1084,6 +1084,147 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
         return { init: init };
     })();
 
+const tpHealthLogSettings = (function() {
+    const sessionKey = "<?php echo $session->get('key'); ?>";
+    const t = {
+        server_answer_error: "<?php echo addslashes($lang->get('server_answer_error')); ?>",
+        saved: "<?php echo addslashes($lang->get('done')); ?>"
+    };
+
+    function safeDecode(resp) {
+        try {
+            if ((resp || '').toString().trim() === '') {
+                return { error: true, message: t.server_answer_error };
+            }
+            return prepareExchangedData(resp, 'decode', sessionKey);
+        } catch (e) {
+            return { error: true, message: t.server_answer_error };
+        }
+    }
+
+    function ajax(type, payload, cb) {
+        $.post(
+            'sources/admin.queries.php',
+            {
+                type: type,
+                data: prepareExchangedData(JSON.stringify(payload || {}), 'encode', sessionKey),
+                key: sessionKey
+            },
+            function(resp) {
+                const decoded = safeDecode(resp);
+                if (typeof cb === 'function') {
+                    cb(decoded);
+                }
+            }
+        );
+    }
+
+    function showAlert(type, message) {
+        const $alert = $('#health-logs-settings-alert');
+        if (!$alert.length) {
+            return;
+        }
+
+        $alert.removeClass('d-none alert-success alert-danger alert-warning alert-info')
+            .addClass('alert-' + type)
+            .text(message || '');
+    }
+
+    function toggleManualRows(mode, clearValues) {
+        const isManual = String(mode || 'auto') === 'manual';
+        const shouldClear = clearValues === true;
+
+        $('#health-log-teampass-path-row').toggleClass('hidden', !isManual);
+        $('#health-log-php-fpm-path-row').toggleClass('hidden', !isManual);
+        $('#health-logs-settings-save-row').toggleClass('hidden', !isManual);
+
+        if (isManual === false && shouldClear === true) {
+            $('#health_teampass_log_path').val('');
+            $('#health_php_fpm_log_path').val('');
+        }
+    }
+
+    function applySettings(settings) {
+        settings = settings || {};
+        const mode = (settings.health_logs_mode || 'auto').toString();
+        $('#health_logs_mode').val(mode);
+        $('#health_teampass_log_path').val((settings.health_teampass_log_path || '').toString());
+        $('#health_php_fpm_log_path').val((settings.health_php_fpm_log_path || '').toString());
+        toggleManualRows(mode);
+    }
+
+    function loadSettings() {
+        ajax('health_logs_get_settings', {}, function(response) {
+            if (!response || response.error) {
+                showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                return;
+            }
+
+            applySettings((response.result || {}).settings || {});
+        });
+    }
+
+    function saveSettings(showSuccessAlert) {
+        const mode = ($('#health_logs_mode').val() || 'auto').toString();
+
+        ajax(
+            'health_logs_save_settings',
+            {
+                health_logs_mode: mode,
+                health_teampass_log_path: mode === 'manual' ? $('#health_teampass_log_path').val() : '',
+                health_php_fpm_log_path: mode === 'manual' ? $('#health_php_fpm_log_path').val() : ''
+            },
+            function(response) {
+                if (!response || response.error) {
+                    showAlert('danger', (response && response.message) ? response.message : t.server_answer_error);
+                    return;
+                }
+
+                applySettings((response.result || {}).settings || {});
+                if (showSuccessAlert === true) {
+                    showAlert('success', response.message || t.saved);
+                } else {
+                    $('#health-logs-settings-alert').addClass('d-none').text('');
+                }
+            }
+        );
+    }
+
+    function bindEvents() {
+        $(document).on('change', '#health_logs_mode', function() {
+            const selectedMode = ($(this).val() || 'auto').toString();
+            const clearValues = selectedMode !== 'manual';
+
+            toggleManualRows(selectedMode, clearValues);
+            saveSettings(selectedMode !== 'manual');
+        });
+
+        $(document).on('click', '#health-logs-settings-save', function(e) {
+            e.preventDefault();
+            saveSettings(true);
+        });
+    }
+
+    function init() {
+        if (!$('#health-logs-settings-block').length) {
+            return;
+        }
+
+        bindEvents();
+        loadSettings();
+    }
+
+    return {
+        init: init
+    };
+})();
+
+$(function() {
+    tpHealthLogSettings.init();
+});
+
+
+
     $(function() {
         tpNetworkAcl.init();
     });

@@ -132,12 +132,21 @@ var TP_HEALTH_L10N = {
     corrupted_reason_len_mismatch: "<?php echo addslashes($lang->get('health_corrupted_reason_len_mismatch')); ?>",
     corrupted_reason_exception_fmt: "<?php echo addslashes($lang->get('health_corrupted_reason_exception_fmt')); ?>",
 
-    apache_log_checking: "<?php echo addslashes($lang->get('health_apache_log_loading')); ?>",
-    apache_log_failed: "<?php echo addslashes($lang->get('health_apache_log_failed')); ?>",
-    apache_log_not_found_fmt: "<?php echo addslashes($lang->get('health_apache_log_not_found_fmt')); ?>",
-    apache_log_not_readable_fmt: "<?php echo addslashes($lang->get('health_apache_log_not_readable_fmt')); ?>",
-    apache_log_fix_hint: "<?php echo addslashes($lang->get('health_apache_log_fix_hint')); ?>",
-    apache_log_fix_hint_missing: "<?php echo addslashes($lang->get('health_apache_log_fix_hint_missing')); ?>",
+    runtime_log_checking: "<?php echo addslashes($lang->get('health_runtime_log_loading')); ?>",
+    runtime_log_failed: "<?php echo addslashes($lang->get('health_runtime_log_failed')); ?>",
+    runtime_log_not_found_fmt: "<?php echo addslashes($lang->get('health_runtime_log_not_found_fmt')); ?>",
+    runtime_log_not_readable_fmt: "<?php echo addslashes($lang->get('health_runtime_log_not_readable_fmt')); ?>",
+    runtime_log_not_configured: "<?php echo addslashes($lang->get('health_log_not_configured')); ?>",
+    runtime_log_not_detected: "<?php echo addslashes($lang->get('health_log_not_detected')); ?>",
+    runtime_log_invalid_path: "<?php echo addslashes($lang->get('health_log_invalid_path')); ?>",
+    runtime_log_not_used: "<?php echo addslashes($lang->get('health_log_not_used')); ?>",
+    runtime_log_empty_fmt: "<?php echo addslashes($lang->get('health_runtime_log_empty_fmt')); ?>",
+    runtime_log_fix_hint: "<?php echo addslashes($lang->get('health_runtime_log_fix_hint')); ?>",
+    runtime_log_fix_hint_missing: "<?php echo addslashes($lang->get('health_runtime_log_fix_hint_missing')); ?>",
+    runtime_logs_context_mode_fmt: "<?php echo addslashes($lang->get('health_runtime_logs_context_mode_fmt')); ?>",
+    runtime_logs_context_server_fmt: "<?php echo addslashes($lang->get('health_runtime_logs_context_server_fmt')); ?>",
+    logs_mode_auto: "<?php echo addslashes($lang->get('health_logs_mode_auto')); ?>",
+    logs_mode_manual: "<?php echo addslashes($lang->get('health_logs_mode_manual')); ?>",
     copied: "<?php echo addslashes($lang->get('copied')); ?>",
     clipboard_error: "<?php echo addslashes($lang->get('clipboard_error')); ?>"
 
@@ -160,12 +169,20 @@ $(document).ready(function() {
         tpShowCorruptedItemsList();
     });
 
-    $('#health-apache-log-check-btn').on('click', function() {
-        tpCheckApacheErrorLog();
+    $('#health-runtime-logs-check-btn').on('click', function() {
+        tpCheckRuntimeLogs();
     });
 
-    $('#health-apache-log-copy-btn').on('click', function() {
-        tpCopyApacheErrorLogToClipboard();
+    $('#health-server-log-copy-btn').on('click', function() {
+        tpCopyRuntimeLogToClipboard('server');
+    });
+
+    $('#health-teampass-log-copy-btn').on('click', function() {
+        tpCopyRuntimeLogToClipboard('teampass');
+    });
+
+    $('#health-php-fpm-log-copy-btn').on('click', function() {
+        tpCopyRuntimeLogToClipboard('php-fpm');
     });
 
     tpLoadHealthReport();
@@ -870,6 +887,7 @@ function tpRenderLogs(report) {
     $('#health-total-logs').text(Number(logs.total || 0));
     $('#health-error-logs').text(Number(logs.errors || 0));
     $('#health-connection-logs').text(Number(logs.connections || 0));
+    tpRenderRuntimeLogsContext(logs.runtime_context || {});
 
     var $labels = $('#health-top-labels');
     $labels.empty();
@@ -1038,26 +1056,135 @@ function tpShowCorruptedItemsList() {
     });
 }
 
-function tpCheckApacheErrorLog() {
-    var $btn = $('#health-apache-log-check-btn');
+function tpRenderRuntimeLogsContext(context) {
+    context = context || {};
+
+    var modeLabel = String(context.mode || 'auto') === 'manual'
+        ? TP_HEALTH_L10N.logs_mode_manual
+        : TP_HEALTH_L10N.logs_mode_auto;
+    var serverSoftware = String(context.server_software || '');
+    var serverFamily = String(context.server_family || '');
+
+    var parts = [];
+    parts.push(TP_HEALTH_L10N.runtime_logs_context_mode_fmt.replace('%s', modeLabel));
+
+    if (serverSoftware) {
+        parts.push(TP_HEALTH_L10N.runtime_logs_context_server_fmt.replace('%s', serverSoftware));
+    } else if (serverFamily) {
+        parts.push(TP_HEALTH_L10N.runtime_logs_context_server_fmt.replace('%s', serverFamily));
+    }
+
+    $('#health-runtime-logs-context').text(parts.join(' • '));
+}
+
+function tpResetRuntimeLogPane(prefix) {
+    $('#' + prefix + '-error').hide().text('');
+    $('#' + prefix + '-fix').hide();
+    $('#' + prefix + '-fix-text').text('');
+    $('#' + prefix + '-fix-cmd').hide().text('');
+    $('#' + prefix + '-content').hide().text('');
+    $('#' + prefix + '-copy-btn').prop('disabled', true);
+}
+
+function tpRuntimeLogMessage(result) {
+    if (!result) {
+        return TP_HEALTH_L10N.runtime_log_failed;
+    }
+
+    if (result.access === 'not_used') {
+        return TP_HEALTH_L10N.runtime_log_not_used;
+    }
+    if (result.access === 'empty') {
+        return TP_HEALTH_L10N.runtime_log_empty_fmt.replace('%s', tpEscapeHtml(result.log_path || ''));
+    }
+    if (result.access === 'not_configured') {
+        return TP_HEALTH_L10N.runtime_log_not_configured;
+    }
+    if (result.access === 'invalid_path') {
+        return TP_HEALTH_L10N.runtime_log_invalid_path;
+    }
+    if (result.access === 'not_found') {
+        if (!result.log_path) {
+            return TP_HEALTH_L10N.runtime_log_not_detected;
+        }
+        return TP_HEALTH_L10N.runtime_log_not_found_fmt.replace('%s', tpEscapeHtml(result.log_path || ''));
+    }
+    if (result.access === 'not_readable') {
+        return TP_HEALTH_L10N.runtime_log_not_readable_fmt.replace('%s', tpEscapeHtml(result.log_path || ''));
+    }
+
+    return TP_HEALTH_L10N.runtime_log_failed;
+}
+
+function tpApplyRuntimeLogResult(prefix, result) {
+    tpResetRuntimeLogPane(prefix);
+
+    if (!result) {
+        $('#' + prefix + '-error').show().text(TP_HEALTH_L10N.runtime_log_failed);
+        return;
+    }
+
+    if (result.access === 'ok') {
+        var content = String(result.content || '');
+        $('#' + prefix + '-content').show().text(content);
+
+        if (content.length > 0) {
+            $('#' + prefix + '-copy-btn').prop('disabled', false);
+        }
+        return;
+    }
+
+    var message = tpRuntimeLogMessage(result);
+    var commands = result.fix_commands || [];
+
+    if ((result.access === 'not_found' && TP_HEALTH_L10N.runtime_log_fix_hint_missing) || (result.access === 'not_readable' && TP_HEALTH_L10N.runtime_log_fix_hint)) {
+        message += ' ' + (result.access === 'not_found' ? TP_HEALTH_L10N.runtime_log_fix_hint_missing : TP_HEALTH_L10N.runtime_log_fix_hint);
+    }
+
+    if (commands.length > 0) {
+        $('#' + prefix + '-fix-text').text(message);
+        $('#' + prefix + '-fix-cmd').show().text(commands.join('\n'));
+        $('#' + prefix + '-fix').show();
+        return;
+    }
+
+    if (result.access === 'empty') {
+        $('#' + prefix + '-fix-text').text(message);
+        $('#' + prefix + '-fix-cmd').hide().text('');
+        $('#' + prefix + '-fix').show();
+        return;
+    }
+
+    if (result.role === 'php_fpm' && (result.access === 'not_used' || result.access === 'not_configured' || result.access === 'not_found')) {
+        $('#' + prefix + '-fix-text').text(message);
+        $('#' + prefix + '-fix-cmd').hide().text('');
+        $('#' + prefix + '-fix').show();
+        return;
+    }
+
+    $('#' + prefix + '-error').show().text(message);
+}
+
+function tpCheckRuntimeLogs() {
+    var $btn = $('#health-runtime-logs-check-btn');
     var $icon = $btn.find('i');
-    var lines = Number($('#health-apache-log-lines').val() || 50);
+    var lines = Number($('#health-runtime-log-lines').val() || 50);
 
-    $('#health-apache-log-error').hide().text('');
-    $('#health-apache-log-fix').hide();
-    $('#health-apache-log-content').hide().text('');
-
-    $('#health-apache-log-copy-btn').prop('disabled', true);
+    tpResetRuntimeLogPane('health-server-log');
+    tpResetRuntimeLogPane('health-teampass-log');
+    tpResetRuntimeLogPane('health-php-fpm-log');
 
     $btn.prop('disabled', true);
     $icon.removeClass('fa-search').addClass('fa-spinner fa-spin');
 
-    $('#health-apache-log-content').show().text(TP_HEALTH_L10N.apache_log_checking);
+    $('#health-server-log-content').show().text(TP_HEALTH_L10N.runtime_log_checking);
+    $('#health-teampass-log-content').show().text(TP_HEALTH_L10N.runtime_log_checking);
+    $('#health-php-fpm-log-content').show().text(TP_HEALTH_L10N.runtime_log_checking);
 
     $.post(
         'sources/utilities.queries.php',
         {
-            type: 'health_check_apache_error_log',
+            type: 'health_check_runtime_logs',
             data: prepareExchangedData(JSON.stringify({lines: lines}), 'encode', tpHealthKey),
             key: tpHealthKey
         },
@@ -1068,63 +1195,45 @@ function tpCheckApacheErrorLog() {
             $icon.removeClass('fa-spinner fa-spin').addClass('fa-search');
 
             if (data && data.error) {
-                $('#health-apache-log-content').hide();
-                toastr.error(data.message || TP_HEALTH_L10N.apache_log_failed);
+                tpResetRuntimeLogPane('health-server-log');
+                tpResetRuntimeLogPane('health-teampass-log');
+                tpResetRuntimeLogPane('health-php-fpm-log');
+                toastr.error(data.message || TP_HEALTH_L10N.runtime_log_failed);
                 return;
             }
 
             if (!data || !data.result) {
-                $('#health-apache-log-content').hide();
-                toastr.error(TP_HEALTH_L10N.apache_log_failed);
+                tpResetRuntimeLogPane('health-server-log');
+                tpResetRuntimeLogPane('health-teampass-log');
+                tpResetRuntimeLogPane('health-php-fpm-log');
+                toastr.error(TP_HEALTH_L10N.runtime_log_failed);
                 return;
             }
 
-            var r = data.result;
-            if (r.access === 'ok') {
-                var content = (r.content || '');
-                $('#health-apache-log-content').show().text(content);
-
-                if (content.length > 0) {
-                    $('#health-apache-log-copy-btn').prop('disabled', false);
-                }
-                return;
-            }
-
-            $('#health-apache-log-content').hide();
-
-            var msg = '';
-            if (r.access === 'not_found') {
-                msg = TP_HEALTH_L10N.apache_log_not_found_fmt.replace('%s', tpEscapeHtml(r.log_path || ''));
-                if (TP_HEALTH_L10N.apache_log_fix_hint_missing) {
-                    msg += ' ' + TP_HEALTH_L10N.apache_log_fix_hint_missing;
-                }
-            } else if (r.access === 'not_readable') {
-                msg = TP_HEALTH_L10N.apache_log_not_readable_fmt.replace('%s', tpEscapeHtml(r.log_path || ''));
-                if (TP_HEALTH_L10N.apache_log_fix_hint) {
-                    msg += ' ' + TP_HEALTH_L10N.apache_log_fix_hint;
-                }
-            } else {
-                msg = TP_HEALTH_L10N.apache_log_failed;
-            }
-
-            $('#health-apache-log-fix-text').text(msg);
-
-            var cmds = r.fix_commands || [];
-            $('#health-apache-log-fix-cmd').text(cmds.join('\n'));
-            $('#health-apache-log-fix').show();
+            var result = data.result || {};
+            tpRenderRuntimeLogsContext(result.context || {});
+            tpApplyRuntimeLogResult('health-server-log', result.server || null);
+            tpApplyRuntimeLogResult('health-teampass-log', result.teampass || null);
+            tpApplyRuntimeLogResult('health-php-fpm-log', result.php_fpm || null);
         }
     ).fail(function() {
         $btn.prop('disabled', false);
         $icon.removeClass('fa-spinner fa-spin').addClass('fa-search');
-        $('#health-apache-log-content').hide();
-        toastr.error(TP_HEALTH_L10N.apache_log_failed);
+        tpResetRuntimeLogPane('health-server-log');
+        tpResetRuntimeLogPane('health-teampass-log');
+        tpResetRuntimeLogPane('health-php-fpm-log');
+        toastr.error(TP_HEALTH_L10N.runtime_log_failed);
     });
 }
 
-
-
-function tpCopyApacheErrorLogToClipboard() {
-    var text = $('#health-apache-log-content').text() || '';
+function tpCopyRuntimeLogToClipboard(role) {
+    var prefix = 'health-server-log';
+    if (role === 'teampass') {
+        prefix = 'health-teampass-log';
+    } else if (role === 'php-fpm') {
+        prefix = 'health-php-fpm-log';
+    }
+    var text = $('#' + prefix + '-content').text() || '';
     if (!text) {
         return;
     }
@@ -1209,12 +1318,12 @@ function tpDownloadReportJson() {
         }, 0);
     }
 
-    var lines = Number($('#health-apache-log-lines').val() || 50);
+    var lines = Number($('#health-runtime-log-lines').val() || 50);
 
     $.post(
         'sources/utilities.queries.php',
         {
-            type: 'health_check_apache_error_log',
+            type: 'health_check_runtime_logs',
             data: prepareExchangedData(JSON.stringify({lines: lines}), 'encode', tpHealthKey),
             key: tpHealthKey
         },
@@ -1226,18 +1335,13 @@ function tpDownloadReportJson() {
             }
 
             if (data && data.result) {
-                reportToExport.logs.apache_error_log = data.result;
+                reportToExport.logs.runtime_context = data.result.context || {};
+                reportToExport.logs.server_error_log = data.result.server || {};
+                reportToExport.logs.teampass_error_log = data.result.teampass || {};
+                reportToExport.logs.php_fpm_error_log = data.result.php_fpm || {};
             } else if (data && data.error) {
-                reportToExport.logs.apache_error_log = {
-                    access: 'error',
-                    log_path: '/var/log/apache2/teampass_error.log',
-                    lines: lines,
-                    message: (data.message || '')
-                };
-            } else {
-                reportToExport.logs.apache_error_log = {
-                    access: 'error',
-                    log_path: '/var/log/apache2/teampass_error.log',
+                reportToExport.logs.runtime_logs_error = {
+                    message: (data.message || ''),
                     lines: lines
                 };
             }

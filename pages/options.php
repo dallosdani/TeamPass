@@ -1060,6 +1060,62 @@ $zones = timezone_list();
                                 <div class='toggle toggle-modern' id='insert_manual_entry_item_history' data-toggle-on='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) === true && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='insert_manual_entry_item_history_input' value='<?php echo isset($SETTINGS['insert_manual_entry_item_history']) && (int) $SETTINGS['insert_manual_entry_item_history'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
+<?php $healthLogsMode = isset($SETTINGS['health_logs_mode']) === true && in_array((string) $SETTINGS['health_logs_mode'], ['auto', 'manual'], true) === true ? (string) $SETTINGS['health_logs_mode'] : 'auto'; ?>
+
+                        <div id='health-logs-settings-block'>
+                            <div id='health-logs-settings-alert' class='alert d-none mb-2'></div>
+
+                            <div class='row mb-2'>
+                                <div class='col-12 text-muted font-weight-bold'>
+                                    <i class="fa-solid fa-file-waveform mr-2"></i><?php echo $lang->get('health_runtime_logs'); ?>
+                                </div>
+                            </div>
+
+                            <div class='row mb-2 option' data-keywords="health logs runtime apache nginx teampass php-fpm log path auto manual">
+                                <div class='col-8'>
+                                    <?php echo $lang->get('health_logs_mode'); ?>
+                                    <small class='form-text text-muted'>
+                                        <?php echo $lang->get('health_logs_mode_tip'); ?>
+                                    </small>
+                                </div>
+                                <div class='col-4'>
+                                    <select class='form-control form-control-sm' id='health_logs_mode'>
+                                        <option value='auto' <?php echo $healthLogsMode === 'auto' ? 'selected' : ''; ?>><?php echo $lang->get('health_logs_mode_auto'); ?></option>
+                                        <option value='manual' <?php echo $healthLogsMode === 'manual' ? 'selected' : ''; ?>><?php echo $lang->get('health_logs_mode_manual'); ?></option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class='row mb-2 option <?php echo $healthLogsMode === 'manual' ? '' : 'hidden'; ?>' id='health-log-teampass-path-row' data-keywords="health logs teampass dedicated vhost apache nginx error log path">
+                                <div class='col-12'>
+                                    <?php echo $lang->get('health_teampass_log_path'); ?>
+                                    <small class='form-text text-muted'>
+                                        <?php echo $lang->get('health_teampass_log_path_tip'); ?>
+                                    </small>
+                                    <input type='text' class='form-control form-control-sm mt-2' id='health_teampass_log_path' value='<?php echo htmlspecialchars((string) ($SETTINGS['health_teampass_log_path'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>'>
+                                </div>
+                            </div>
+
+                            <div class='row mb-2 option <?php echo $healthLogsMode === 'manual' ? '' : 'hidden'; ?>' id='health-log-php-fpm-path-row' data-keywords="health logs php-fpm fpm pool error log path">
+                                <div class='col-12'>
+                                    <?php echo $lang->get('health_php_fpm_log_path'); ?>
+                                    <small class='form-text text-muted'>
+                                        <?php echo $lang->get('health_php_fpm_log_path_tip'); ?>
+                                    </small>
+                                    <input type='text' class='form-control form-control-sm mt-2' id='health_php_fpm_log_path' value='<?php echo htmlspecialchars((string) ($SETTINGS['health_php_fpm_log_path'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>'>
+                                </div>
+                            </div>
+
+                            <div class='row mb-0 <?php echo $healthLogsMode === 'manual' ? '' : 'hidden'; ?>' id='health-logs-settings-save-row'>
+                                <div class='col-12 text-right'>
+                                    <button type='button' class='btn btn-primary btn-sm' id='health-logs-settings-save'>
+                                        <i class='fas fa-save mr-1'></i><?php echo $lang->get('save'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+
                         
                     </div>
                 </div>

@@ -925,13 +925,13 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
                         <div class="card">
                             <div class="card-header">
-                                <h3 class="card-title"><i class="fas fa-exclamation-triangle mr-2"></i><?php echo $lang->get('health_apache_error_log'); ?></h3>
+                                <h3 class="card-title"><i class="fas fa-exclamation-triangle mr-2"></i><?php echo $lang->get('health_runtime_logs'); ?></h3>
                                 <div class="card-tools">
-                                    <div class="input-group input-group-sm" style="width: 320px;">
+                                    <div class="input-group input-group-sm" style="width: 260px;">
                                         <div class="input-group-prepend">
-                                            <span class="input-group-text"><?php echo $lang->get('health_apache_log_lines'); ?></span>
+                                            <span class="input-group-text"><?php echo $lang->get('health_runtime_log_lines'); ?></span>
                                         </div>
-                                        <select class="custom-select" id="health-apache-log-lines">
+                                        <select class="custom-select" id="health-runtime-log-lines">
                                             <option value="50" selected>50</option>
                                             <option value="100">100</option>
                                             <option value="200">200</option>
@@ -939,23 +939,72 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
                                             <option value="1000">1000</option>
                                         </select>
                                         <div class="input-group-append">
-                                            <button type="button" class="btn btn-primary" id="health-apache-log-check-btn">
-                                                <i class="fas fa-search mr-1"></i><?php echo $lang->get('health_apache_log_check'); ?>
-                                            </button>
-                                            <button type="button" class="btn btn-secondary" id="health-apache-log-copy-btn" disabled>
-                                                <i class="fas fa-copy mr-1"></i><?php echo $lang->get('copy'); ?>
+                                            <button type="button" class="btn btn-primary" id="health-runtime-logs-check-btn">
+                                                <i class="fas fa-search mr-1"></i><?php echo $lang->get('health_runtime_log_check'); ?>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-body">
-                                <div class="alert alert-danger" id="health-apache-log-error" style="display:none;"></div>
-                                <div class="alert alert-warning" id="health-apache-log-fix" style="display:none;">
-                                    <div class="mb-2" id="health-apache-log-fix-text"></div>
-                                    <pre class="mb-0" id="health-apache-log-fix-cmd" style="white-space: pre-wrap;"></pre>
+                                <div class="small text-muted mb-3" id="health-runtime-logs-context"></div>
+
+                                <div class="card card-outline card-secondary mb-3">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><i class="fas fa-server mr-2"></i><?php echo $lang->get('health_server_error_log'); ?></h3>
+                                        <div class="card-tools">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="health-server-log-copy-btn" disabled>
+                                                <i class="fas fa-copy mr-1"></i><?php echo $lang->get('copy'); ?>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-danger" id="health-server-log-error" style="display:none;"></div>
+                                        <div class="alert alert-warning" id="health-server-log-fix" style="display:none;">
+                                            <div class="mb-2" id="health-server-log-fix-text"></div>
+                                            <pre class="mb-0" id="health-server-log-fix-cmd" style="white-space: pre-wrap;"></pre>
+                                        </div>
+                                        <pre id="health-server-log-content" class="p-2 mb-0" style="display:none; max-height: 380px; overflow:auto; background-color: #f8f9fa; border: 1px solid #dee2e6; white-space: pre-wrap;"></pre>
+                                    </div>
                                 </div>
-                                <pre id="health-apache-log-content" class="p-2" style="display:none; max-height: 380px; overflow:auto; background-color: #f8f9fa; border: 1px solid #dee2e6; white-space: pre-wrap;"></pre>
+
+                                <div class="card card-outline card-secondary mb-3">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><i class="fas fa-file-alt mr-2"></i><?php echo $lang->get('health_teampass_error_log'); ?></h3>
+                                        <div class="card-tools">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="health-teampass-log-copy-btn" disabled>
+                                                <i class="fas fa-copy mr-1"></i><?php echo $lang->get('copy'); ?>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-danger" id="health-teampass-log-error" style="display:none;"></div>
+                                        <div class="alert alert-warning" id="health-teampass-log-fix" style="display:none;">
+                                            <div class="mb-2" id="health-teampass-log-fix-text"></div>
+                                            <pre class="mb-0" id="health-teampass-log-fix-cmd" style="white-space: pre-wrap;"></pre>
+                                        </div>
+                                        <pre id="health-teampass-log-content" class="p-2 mb-0" style="display:none; max-height: 380px; overflow:auto; background-color: #f8f9fa; border: 1px solid #dee2e6; white-space: pre-wrap;"></pre>
+                                    </div>
+                                </div>
+
+                                <div class="card card-outline card-secondary">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><i class="fas fa-code-branch mr-2"></i><?php echo $lang->get('health_php_fpm_error_log'); ?></h3>
+                                        <div class="card-tools">
+                                            <button type="button" class="btn btn-secondary btn-sm" id="health-php-fpm-log-copy-btn" disabled>
+                                                <i class="fas fa-copy mr-1"></i><?php echo $lang->get('copy'); ?>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-danger" id="health-php-fpm-log-error" style="display:none;"></div>
+                                        <div class="alert alert-warning" id="health-php-fpm-log-fix" style="display:none;">
+                                            <div class="mb-2" id="health-php-fpm-log-fix-text"></div>
+                                            <pre class="mb-0" id="health-php-fpm-log-fix-cmd" style="white-space: pre-wrap;"></pre>
+                                        </div>
+                                        <pre id="health-php-fpm-log-content" class="p-2 mb-0" style="display:none; max-height: 380px; overflow:auto; background-color: #f8f9fa; border: 1px solid #dee2e6; white-space: pre-wrap;"></pre>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

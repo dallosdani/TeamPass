@@ -1554,6 +1554,7 @@ logItems(
                     'top_labels' => $topLabels,
                     'top_users' => $topUsers,
                     'recent' => $recent,
+                    'runtime_context' => tpHealthBuildRuntimeLogsContext($SETTINGS),
                 ),
             );
 
@@ -1685,8 +1686,8 @@ logItems(
             );
             break;
 
-        // Apache error log (on-demand check)
-        case 'health_check_apache_error_log':
+        // Runtime logs (on-demand check)
+        case 'health_check_runtime_logs':
             // Check KEY
             if ($post_key !== $session->get('key')) {
                 echo prepareExchangedData(
@@ -1707,79 +1708,14 @@ logItems(
                 $lines = 1000;
             }
 
-            $logPath = '/var/log/apache2/teampass_error.log';
-            $logDir = dirname($logPath);
-
-            // If directory is not traversable by the webserver user, file_exists() on the file will return false.
-            if (file_exists($logDir) === true && is_dir($logDir) === true && is_executable($logDir) === false) {
-                echo prepareExchangedData(
-                    array(
-                        'error' => false,
-                        'result' => array(
-                            'access' => 'not_readable',
-                            'log_path' => $logPath,
-                            'lines' => $lines,
-                            'fix_commands' => array(
-                                'sudo usermod -aG $(stat -c %G ' . $logDir . ') www-data',
-                                'sudo systemctl restart apache2',
-                                'sudo systemctl restart $(systemctl list-units --type=service --all | awk "/php.*fpm/ {print $1}") 2>/dev/null || true',
-                            ),
-                        ),
-                    ),
-                    'encode'
-                );
-                break;
-            }
-
-            if (file_exists($logPath) === false) {
-                echo prepareExchangedData(
-                    array(
-                        'error' => false,
-                        'result' => array(
-                            'access' => 'not_found',
-                            'log_path' => $logPath,
-                            'lines' => $lines,
-                            'fix_commands' => array(
-                                'grep -R "ErrorLog" -n /etc/apache2/sites-enabled /etc/apache2/sites-available | grep -i teampass',
-                                'ls -la /var/log/apache2 | grep -i teampass',
-                            ),
-                        ),
-                    ),
-                    'encode'
-                );
-                break;
-            }
-
-            if (is_readable($logPath) === false) {
-                echo prepareExchangedData(
-                    array(
-                        'error' => false,
-                        'result' => array(
-                            'access' => 'not_readable',
-                            'log_path' => $logPath,
-                            'lines' => $lines,
-                            'fix_commands' => array(
-                                'sudo usermod -aG $(stat -c %G ' . $logDir . ') www-data',
-                                'sudo systemctl restart apache2',
-                                'sudo systemctl restart $(systemctl list-units --type=service --all | awk "/php.*fpm/ {print $1}") 2>/dev/null || true',
-                            ),
-                        ),
-                    ),
-                    'encode'
-                );
-                break;
-            }
-
-            $content = tpTailFileLines($logPath, $lines, 1024 * 1024 * 2);
-
             echo prepareExchangedData(
                 array(
                     'error' => false,
                     'result' => array(
-                        'access' => 'ok',
-                        'log_path' => $logPath,
-                        'lines' => $lines,
-                        'content' => $content,
+                        'context' => tpHealthBuildRuntimeLogsContext($SETTINGS),
+                        'server' => tpHealthResolveLogResult('server', $SETTINGS, $lines),
+                        'teampass' => tpHealthResolveLogResult('teampass', $SETTINGS, $lines),
+                        'php_fpm' => tpHealthResolveLogResult('php_fpm', $SETTINGS, $lines),
                     ),
                 ),
                 'encode'
@@ -4170,4 +4106,995 @@ function tpGetSystemChecks(array $phpIni, array $tpSettings, Language $lang): ar
     }
 
     return $checks;
+}
+
+
+function tpHealthNormalizeLogsMode(string $mode): string
+{
+    $mode = trim(strtolower($mode));
+
+    return in_array($mode, ['auto', 'manual'], true) === true ? $mode : 'auto';
+}
+
+function tpHealthSanitizeManualLogPath(string $path): string
+{
+    return trim(str_replace("\0", '', $path));
+}
+
+function tpHealthIsAbsolutePath(string $path): bool
+{
+    return $path !== '' && str_starts_with($path, '/');
+}
+
+function tpHealthGetServerSoftware(): string
+{
+    return isset($_SERVER['SERVER_SOFTWARE']) === true ? trim((string) $_SERVER['SERVER_SOFTWARE']) : '';
+}
+
+function tpHealthPhpFpmIsEnabled(): bool
+{
+    return PHP_SAPI === 'fpm-fcgi';
+}
+
+function tpHealthGetRuntimeProcessUser(): string
+{
+    if (function_exists('posix_geteuid') === true && function_exists('posix_getpwuid') === true) {
+        $userInfo = posix_getpwuid(posix_geteuid());
+        if (is_array($userInfo) === true && empty($userInfo['name']) === false) {
+            return (string) $userInfo['name'];
+        }
+    }
+
+    $fallback = trim((string) get_current_user());
+
+    return $fallback !== '' ? $fallback : 'www-data';
+}
+
+function tpHealthDetectWebServerFamily(string $serverSoftware): string
+{
+    $serverSoftware = strtolower($serverSoftware);
+
+    if ($serverSoftware === '') {
+        return 'unknown';
+    }
+    if (str_contains($serverSoftware, 'nginx') === true || str_contains($serverSoftware, 'openresty') === true) {
+        return 'nginx';
+    }
+    if (str_contains($serverSoftware, 'apache') === true || str_contains($serverSoftware, 'httpd') === true) {
+        return 'apache';
+    }
+    if (str_contains($serverSoftware, 'litespeed') === true) {
+        return 'litespeed';
+    }
+
+    return 'other';
+}
+
+function tpHealthUniqueNonEmptyStrings(array $values): array
+{
+    $normalized = array();
+    foreach ($values as $value) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            continue;
+        }
+        $normalized[$value] = $value;
+    }
+
+    return array_values($normalized);
+}
+
+function tpHealthGetHostHints(array $SETTINGS): array
+{
+    $host = '';
+    if (isset($SETTINGS['cpassman_url']) === true && empty($SETTINGS['cpassman_url']) === false) {
+        $parsed = parse_url((string) $SETTINGS['cpassman_url']);
+        if (is_array($parsed) === true && isset($parsed['host']) === true) {
+            $host = strtolower(trim((string) $parsed['host']));
+        }
+    }
+
+    $hostSlug = preg_replace('/[^a-z0-9.-]+/i', '-', $host);
+    $hostSlug = is_string($hostSlug) === true ? trim($hostSlug, '-') : '';
+    $hostUnderscore = str_replace(['.', '-'], '_', $hostSlug);
+
+    $firstLabel = '';
+    if ($host !== '') {
+        $parts = explode('.', $host);
+        $firstLabel = trim((string) ($parts[0] ?? ''));
+    }
+
+    $dirSlug = '';
+    if (isset($SETTINGS['cpassman_dir']) === true && empty($SETTINGS['cpassman_dir']) === false) {
+        $dirBaseName = basename((string) $SETTINGS['cpassman_dir']);
+        $dirSlugTmp = preg_replace('/[^a-z0-9_-]+/i', '-', $dirBaseName);
+        $dirSlug = is_string($dirSlugTmp) === true ? trim($dirSlugTmp, '-') : '';
+    }
+
+    return array(
+        'host' => $host,
+        'host_slug' => $hostSlug,
+        'host_underscore' => $hostUnderscore,
+        'first_label' => $firstLabel,
+        'dir_slug' => $dirSlug,
+    );
+}
+
+function tpHealthScoreLogCandidate(string $role, string $path, array $SETTINGS, string $serverFamily): int
+{
+    $score = 0;
+    $pathLower = strtolower(trim($path));
+    $basename = basename($pathLower);
+    $hints = tpHealthGetHostHints($SETTINGS);
+
+    if ($role === 'teampass') {
+        if (str_contains($pathLower, 'teampass') === true) {
+            $score += 200;
+        }
+        if (
+            preg_match('/(^|[^a-z0-9])teampass(?:[_\.-]?error|error)(?:\.[a-z0-9_-]+)?\.log$/i', $basename) === 1
+            || in_array($basename, array('teampass_error.log', 'teampass-error.log'), true) === true
+        ) {
+            $score += 260;
+        }
+        foreach (array('host', 'host_slug', 'host_underscore', 'first_label', 'dir_slug') as $key) {
+            $needle = strtolower((string) ($hints[$key] ?? ''));
+            if ($needle !== '' && str_contains($pathLower, $needle) === true) {
+                $score += 45;
+            }
+        }
+        if (in_array($basename, array('error.log', 'error_log'), true) === true) {
+            $score -= 180;
+        }
+    } elseif ($role === 'server') {
+        if (in_array($basename, array('error.log', 'error_log'), true) === true) {
+            $score += 180;
+        }
+        if (str_contains($pathLower, 'teampass') === true) {
+            $score -= 120;
+        }
+    } elseif ($role === 'php_fpm') {
+        $phpVersion = strtolower(PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION);
+        if (str_contains($basename, 'php' . $phpVersion . '-fpm') === true) {
+            $score += 200;
+        }
+        if (str_contains($basename, 'php-fpm') === true || str_contains($basename, 'fpm') === true) {
+            $score += 80;
+        }
+        foreach (array('first_label', 'dir_slug') as $key) {
+            $needle = strtolower((string) ($hints[$key] ?? ''));
+            if ($needle !== '' && str_contains($pathLower, $needle) === true) {
+                $score += 30;
+            }
+        }
+    }
+
+    if ($serverFamily === 'apache' && str_contains($pathLower, '/apache2/') === true) {
+        $score += 10;
+    }
+    if ($serverFamily === 'nginx' && str_contains($pathLower, '/nginx/') === true) {
+        $score += 10;
+    }
+
+    return $score;
+}
+
+function tpHealthSortLogCandidates(array $paths, string $role, array $SETTINGS, string $serverFamily): array
+{
+    $scored = array();
+    foreach (tpHealthUniqueNonEmptyStrings($paths) as $path) {
+        $scored[] = array(
+            'path' => $path,
+            'score' => tpHealthScoreLogCandidate($role, $path, $SETTINGS, $serverFamily),
+        );
+    }
+
+    usort(
+        $scored,
+        static function (array $left, array $right): int {
+            if ((int) $left['score'] === (int) $right['score']) {
+                return strcmp((string) $left['path'], (string) $right['path']);
+            }
+            return (int) $right['score'] <=> (int) $left['score'];
+        }
+    );
+
+    $sorted = array();
+    foreach ($scored as $entry) {
+        $sorted[] = (string) $entry['path'];
+    }
+
+    return $sorted;
+}
+
+
+
+function tpHealthReadSmallConfigFile(string $path): string
+{
+    if ($path === '' || file_exists($path) === false || is_file($path) === false || is_readable($path) === false) {
+        return '';
+    }
+
+    $content = file_get_contents($path);
+
+    return is_string($content) === true ? $content : '';
+}
+
+function tpHealthGetApacheConfigPaths(): array
+{
+    $paths = array();
+    foreach (array(
+        '/etc/apache2/apache2.conf',
+        '/etc/apache2/sites-enabled/*.conf',
+        '/etc/apache2/sites-available/*.conf',
+        '/etc/httpd/conf/httpd.conf',
+        '/etc/httpd/conf.d/*.conf',
+        '/usr/local/apache2/conf/httpd.conf',
+    ) as $pattern) {
+        foreach (glob($pattern) ?: array() as $path) {
+            if (is_string($path) === true && $path !== '' && is_file($path) === true && is_readable($path) === true) {
+                $paths[$path] = $path;
+            }
+        }
+    }
+
+    return array_values($paths);
+}
+
+function tpHealthGetNginxConfigPaths(): array
+{
+    $paths = array();
+    foreach (array(
+        '/etc/nginx/nginx.conf',
+        '/etc/nginx/sites-enabled/*',
+        '/etc/nginx/sites-available/*',
+        '/etc/nginx/conf.d/*.conf',
+        '/usr/local/openresty/nginx/conf/nginx.conf',
+        '/usr/local/openresty/nginx/conf/conf.d/*.conf',
+    ) as $pattern) {
+        foreach (glob($pattern) ?: array() as $path) {
+            if (is_string($path) === true && $path !== '' && is_file($path) === true && is_readable($path) === true) {
+                $paths[$path] = $path;
+            }
+        }
+    }
+
+    return array_values($paths);
+}
+
+function tpHealthGetApacheLogDirCandidates(): array
+{
+    $candidates = array('/var/log/apache2', '/var/log/httpd', '/usr/local/apache/logs');
+    $envvarsPath = '/etc/apache2/envvars';
+
+    if (is_file($envvarsPath) === true && is_readable($envvarsPath) === true) {
+        $envvars = file_get_contents($envvarsPath);
+        if (is_string($envvars) === true && preg_match('/^\s*(?:export\s+)?APACHE_LOG_DIR=(["\']?)([^\r\n"\']+)\1/m', $envvars, $matches) === 1) {
+            $candidates[] = trim((string) ($matches[2] ?? ''));
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($candidates);
+}
+
+function tpHealthResolveApacheLogDirectivePath(string $rawPath, string $configPath): string
+{
+    $path = trim($rawPath, " \t\n\r\0\x0B\"';");
+    if ($path === '' || str_starts_with($path, '|') === true) {
+        return '';
+    }
+
+    foreach (tpHealthGetApacheLogDirCandidates() as $logDir) {
+        $path = str_replace('${APACHE_LOG_DIR}', $logDir, $path);
+    }
+
+    if (preg_match('/\$\{[A-Z0-9_]+\}/i', $path) === 1) {
+        return '';
+    }
+
+    if (tpHealthIsAbsolutePath($path) === true) {
+        return $path;
+    }
+
+    $candidate = dirname($configPath) . '/' . ltrim($path, '/');
+
+    return tpHealthIsAbsolutePath($candidate) === true ? $candidate : '';
+}
+
+function tpHealthResolveNginxLogDirectivePath(string $rawPath, string $configPath): string
+{
+    $path = trim((string) preg_replace('/\s+.+$/', '', trim($rawPath)), " \t\n\r\0\x0B\"';");
+    if ($path === '') {
+        return '';
+    }
+
+    if (tpHealthIsAbsolutePath($path) === true) {
+        return $path;
+    }
+
+    $candidate = dirname($configPath) . '/' . ltrim($path, '/');
+
+    return tpHealthIsAbsolutePath($candidate) === true ? $candidate : '';
+}
+
+function tpHealthGetConfigMatchScore(string $content, array $SETTINGS): int
+{
+    $content = strtolower($content);
+    $hints = tpHealthGetHostHints($SETTINGS);
+    $score = 0;
+
+    $host = strtolower((string) ($hints['host'] ?? ''));
+    $hostSlug = strtolower((string) ($hints['host_slug'] ?? ''));
+    $hostUnderscore = strtolower((string) ($hints['host_underscore'] ?? ''));
+    $dirSlug = strtolower((string) ($hints['dir_slug'] ?? ''));
+    $cpassmanDir = strtolower(trim((string) ($SETTINGS['cpassman_dir'] ?? '')));
+
+    foreach (array($host, $hostSlug, $hostUnderscore) as $needle) {
+        if ($needle !== '' && str_contains($content, $needle) === true) {
+            $score += 5;
+        }
+    }
+
+    if ($dirSlug !== '' && str_contains($content, $dirSlug) === true) {
+        $score += 3;
+    }
+    if ($cpassmanDir !== '' && str_contains($content, $cpassmanDir) === true) {
+        $score += 6;
+    }
+
+    return $score;
+}
+
+function tpHealthExtractApacheErrorLogsFromConfig(string $configPath): array
+{
+    $content = tpHealthReadSmallConfigFile($configPath);
+    if ($content === '') {
+        return array();
+    }
+
+    $paths = array();
+    if (preg_match_all('/^\s*ErrorLog\s+(.+)$/mi', $content, $matches) > 0) {
+        foreach ($matches[1] as $rawPath) {
+            $resolvedPath = tpHealthResolveApacheLogDirectivePath((string) $rawPath, $configPath);
+            if ($resolvedPath !== '') {
+                $paths[] = $resolvedPath;
+            }
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($paths);
+}
+
+function tpHealthExtractNginxErrorLogsFromConfig(string $configPath): array
+{
+    $content = tpHealthReadSmallConfigFile($configPath);
+    if ($content === '') {
+        return array();
+    }
+
+    $paths = array();
+    if (preg_match_all('/^\s*error_log\s+([^;]+);/mi', $content, $matches) > 0) {
+        foreach ($matches[1] as $rawPath) {
+            $resolvedPath = tpHealthResolveNginxLogDirectivePath((string) $rawPath, $configPath);
+            if ($resolvedPath !== '') {
+                $paths[] = $resolvedPath;
+            }
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($paths);
+}
+
+function tpHealthFindDedicatedErrorLogsFromConfig(array $SETTINGS, string $serverFamily): array
+{
+    $configPaths = $serverFamily === 'nginx' ? tpHealthGetNginxConfigPaths() : tpHealthGetApacheConfigPaths();
+    $entries = array();
+
+    foreach ($configPaths as $configPath) {
+        $content = tpHealthReadSmallConfigFile($configPath);
+        if ($content === '') {
+            continue;
+        }
+
+        $score = tpHealthGetConfigMatchScore($content, $SETTINGS);
+        if ($score <= 0) {
+            continue;
+        }
+
+        $paths = $serverFamily === 'nginx'
+            ? tpHealthExtractNginxErrorLogsFromConfig($configPath)
+            : tpHealthExtractApacheErrorLogsFromConfig($configPath);
+
+        if (empty($paths) === false) {
+            $entries[] = array(
+                'score' => $score,
+                'paths' => $paths,
+            );
+        }
+    }
+
+    usort(
+        $entries,
+        static function (array $left, array $right): int {
+            return $right['score'] <=> $left['score'];
+        }
+    );
+
+    $paths = array();
+    foreach ($entries as $entry) {
+        foreach ($entry['paths'] as $path) {
+            $paths[] = $path;
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($paths);
+}
+
+function tpHealthFindServerErrorLogsFromConfig(string $serverFamily): array
+{
+    $configPaths = $serverFamily === 'nginx'
+        ? array('/etc/nginx/nginx.conf', '/usr/local/openresty/nginx/conf/nginx.conf')
+        : array('/etc/apache2/apache2.conf', '/etc/httpd/conf/httpd.conf', '/usr/local/apache2/conf/httpd.conf');
+
+    $paths = array();
+    foreach ($configPaths as $configPath) {
+        if (is_file($configPath) === false || is_readable($configPath) === false) {
+            continue;
+        }
+
+        $paths = array_merge(
+            $paths,
+            $serverFamily === 'nginx'
+                ? tpHealthExtractNginxErrorLogsFromConfig($configPath)
+                : tpHealthExtractApacheErrorLogsFromConfig($configPath)
+        );
+    }
+
+    return tpHealthUniqueNonEmptyStrings($paths);
+}
+
+function tpHealthBuildRuntimeLogsContext(array $SETTINGS): array
+{
+    $serverSoftware = tpHealthGetServerSoftware();
+
+    return array(
+        'mode' => tpHealthNormalizeLogsMode((string) ($SETTINGS['health_logs_mode'] ?? 'auto')),
+        'server_software' => $serverSoftware,
+        'server_family' => tpHealthDetectWebServerFamily($serverSoftware),
+        'health_teampass_log_path' => tpHealthSanitizeManualLogPath((string) ($SETTINGS['health_teampass_log_path'] ?? '')),
+        'health_php_fpm_log_path' => tpHealthSanitizeManualLogPath((string) ($SETTINGS['health_php_fpm_log_path'] ?? '')),
+        'php_fpm_enabled' => tpHealthPhpFpmIsEnabled(),
+        'php_version' => PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION,
+        'runtime_user' => tpHealthGetRuntimeProcessUser(),
+    );
+}
+
+
+
+function tpHealthBuildServerLogCandidates(array $SETTINGS, string $serverFamily): array
+{
+    $apacheCandidates = array(
+        '/var/log/apache2/error.log',
+        '/var/log/httpd/error_log',
+        '/usr/local/apache/logs/error_log',
+    );
+
+    $nginxCandidates = array(
+        '/var/log/nginx/error.log',
+        '/usr/local/openresty/nginx/logs/error.log',
+    );
+
+    if ($serverFamily === 'apache') {
+        return tpHealthSortLogCandidates(
+            array_merge(tpHealthFindServerErrorLogsFromConfig('apache'), $apacheCandidates),
+            'server',
+            $SETTINGS,
+            $serverFamily
+        );
+    }
+
+    if ($serverFamily === 'nginx') {
+        return tpHealthSortLogCandidates(
+            array_merge(tpHealthFindServerErrorLogsFromConfig('nginx'), $nginxCandidates),
+            'server',
+            $SETTINGS,
+            $serverFamily
+        );
+    }
+
+    return tpHealthSortLogCandidates(
+        array_merge(tpHealthFindServerErrorLogsFromConfig('apache'), tpHealthFindServerErrorLogsFromConfig('nginx'), $apacheCandidates, $nginxCandidates),
+        'server',
+        $SETTINGS,
+        $serverFamily
+    );
+}
+
+
+
+function tpHealthBuildTeampassLogCandidates(array $SETTINGS, string $serverFamily): array
+{
+    $hints = tpHealthGetHostHints($SETTINGS);
+    $host = (string) ($hints['host'] ?? '');
+    $hostSlug = (string) ($hints['host_slug'] ?? '');
+    $hostUnderscore = (string) ($hints['host_underscore'] ?? '');
+    $dirSlug = (string) ($hints['dir_slug'] ?? '');
+
+    $apacheCandidates = array(
+        '/var/log/apache2/teampass_error.log',
+        '/var/log/apache2/teampass-error.log',
+    );
+
+    $nginxCandidates = array(
+        '/var/log/nginx/teampass.error.log',
+        '/var/log/nginx/teampass_error.log',
+    );
+
+    if ($host !== '') {
+        $apacheCandidates[] = '/var/log/apache2/' . $host . '_error.log';
+        $apacheCandidates[] = '/var/log/apache2/' . $host . '-error.log';
+        $apacheCandidates[] = '/var/log/httpd/' . $host . '_error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $host . '.error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $host . '-error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $host . '_error.log';
+    }
+
+    if ($hostSlug !== '' && $hostSlug !== $host) {
+        $apacheCandidates[] = '/var/log/apache2/' . $hostSlug . '_error.log';
+        $apacheCandidates[] = '/var/log/apache2/' . $hostSlug . '-error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $hostSlug . '.error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $hostSlug . '-error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $hostSlug . '_error.log';
+    }
+
+    if ($hostUnderscore !== '') {
+        $apacheCandidates[] = '/var/log/apache2/' . $hostUnderscore . '_error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $hostUnderscore . '.error.log';
+    }
+
+    if ($dirSlug !== '') {
+        $apacheCandidates[] = '/var/log/apache2/' . $dirSlug . '_error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $dirSlug . '.error.log';
+        $nginxCandidates[] = '/var/log/nginx/' . $dirSlug . '_error.log';
+    }
+
+    if ($serverFamily === 'apache') {
+        return tpHealthSortLogCandidates(
+            array_merge(tpHealthFindDedicatedErrorLogsFromConfig($SETTINGS, 'apache'), $apacheCandidates),
+            'teampass',
+            $SETTINGS,
+            $serverFamily
+        );
+    }
+
+    if ($serverFamily === 'nginx') {
+        return tpHealthSortLogCandidates(
+            array_merge(tpHealthFindDedicatedErrorLogsFromConfig($SETTINGS, 'nginx'), $nginxCandidates),
+            'teampass',
+            $SETTINGS,
+            $serverFamily
+        );
+    }
+
+    return tpHealthSortLogCandidates(
+        array_merge(tpHealthFindDedicatedErrorLogsFromConfig($SETTINGS, 'apache'), tpHealthFindDedicatedErrorLogsFromConfig($SETTINGS, 'nginx'), $apacheCandidates, $nginxCandidates),
+        'teampass',
+        $SETTINGS,
+        $serverFamily
+    );
+}
+
+
+function tpHealthBuildPhpFpmLogCandidates(array $SETTINGS): array
+{
+    $hints = tpHealthGetHostHints($SETTINGS);
+    $firstLabel = (string) ($hints['first_label'] ?? '');
+    $dirSlug = (string) ($hints['dir_slug'] ?? '');
+    $phpVersion = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+
+    $candidates = array(
+        '/var/log/php' . $phpVersion . '-fpm.log',
+        '/var/log/php-fpm.log',
+        '/var/log/php-fpm/error.log',
+        '/var/log/php-fpm/www-error.log',
+        '/var/log/php-fpm/www.log',
+    );
+
+    if ($firstLabel !== '') {
+        $candidates[] = '/var/log/fpm-php.' . $firstLabel . '-www.log';
+        $candidates[] = '/var/log/php-fpm/' . $firstLabel . '.log';
+        $candidates[] = '/var/log/php-fpm/' . $firstLabel . '-error.log';
+    }
+
+    if ($dirSlug !== '') {
+        $candidates[] = '/var/log/fpm-php.' . $dirSlug . '-www.log';
+        $candidates[] = '/var/log/php-fpm/' . $dirSlug . '.log';
+    }
+
+    return tpHealthSortLogCandidates($candidates, 'php_fpm', $SETTINGS, 'php_fpm');
+}
+
+function tpHealthInferPhpFpmServiceNames(string $logPath): array
+{
+    $services = array();
+
+    if (tpHealthPhpFpmIsEnabled() === true) {
+        $services[] = 'php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '-fpm';
+    }
+
+    if ($logPath !== '') {
+        $basename = basename($logPath);
+        if (preg_match('/^(php[0-9]+\.[0-9]+-fpm)/i', $basename, $matches) === 1) {
+            $services[] = strtolower((string) $matches[1]);
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($services);
+}
+
+
+function tpHealthBuildReadAccessCommands(string $logPath): array
+{
+    if ($logPath === '' || tpHealthIsAbsolutePath($logPath) === false) {
+        return array();
+    }
+
+    $runtimeUser = preg_replace('/[^a-zA-Z0-9._-]+/', '', tpHealthGetRuntimeProcessUser());
+    $runtimeUser = is_string($runtimeUser) === true ? trim($runtimeUser) : '';
+    if ($runtimeUser === '') {
+        return array();
+    }
+
+    $commands = array();
+    $safeLogPath = escapeshellarg($logPath);
+    $safeRuntimeUser = escapeshellarg($runtimeUser);
+    $logDir = dirname($logPath);
+    $normalizedDir = str_replace('\\', '/', $logDir);
+    $normalizedPath = str_replace('\\', '/', $logPath);
+    $isPhpFpmLog = preg_match('/(?:^|[\/])(php[0-9]+\.[0-9]+-fpm|php-fpm|fpm-php)[^\/]*\.log$/i', $normalizedPath) === 1;
+    $isApacheOrNginxLog = str_starts_with($normalizedDir, '/var/log/apache2') === true
+        || str_starts_with($normalizedDir, '/var/log/nginx') === true
+        || str_starts_with($normalizedDir, '/var/log/httpd') === true;
+
+    if ($isPhpFpmLog === true) {
+        $commands[] = 'sudo chgrp ' . $safeRuntimeUser . ' ' . $safeLogPath;
+        $commands[] = 'sudo chmod 640 ' . $safeLogPath;
+
+        $services = tpHealthInferPhpFpmServiceNames($logPath);
+        if (count($services) === 0) {
+            $commands[] = 'sudo systemctl restart php-fpm.service || true';
+        } else {
+            foreach ($services as $serviceName) {
+                $commands[] = 'sudo systemctl restart ' . escapeshellarg($serviceName . '.service') . ' || true';
+            }
+        }
+
+        return tpHealthUniqueNonEmptyStrings($commands);
+    }
+
+    if ($isApacheOrNginxLog === true) {
+        $commands[] = 'sudo usermod -a -G adm ' . $safeRuntimeUser;
+        if (str_starts_with($normalizedDir, '/var/log/nginx') === true) {
+            $commands[] = 'sudo systemctl restart nginx.service || true';
+        } else {
+            $commands[] = 'sudo systemctl restart apache2.service || sudo systemctl restart httpd.service || true';
+        }
+
+        if (tpHealthPhpFpmIsEnabled() === true) {
+            $services = tpHealthInferPhpFpmServiceNames('');
+            if (count($services) === 0) {
+                $commands[] = 'sudo systemctl restart php-fpm.service || true';
+            } else {
+                foreach ($services as $serviceName) {
+                    $commands[] = 'sudo systemctl restart ' . escapeshellarg($serviceName . '.service') . ' || true';
+                }
+            }
+        }
+
+        return tpHealthUniqueNonEmptyStrings($commands);
+    }
+
+    $commands[] = 'sudo chgrp ' . $safeRuntimeUser . ' ' . $safeLogPath;
+    $commands[] = 'sudo chmod 640 ' . $safeLogPath;
+
+    if (tpHealthPhpFpmIsEnabled() === true) {
+        $services = tpHealthInferPhpFpmServiceNames('');
+        if (count($services) === 0) {
+            $commands[] = 'sudo systemctl restart php-fpm.service || true';
+        } else {
+            foreach ($services as $serviceName) {
+                $commands[] = 'sudo systemctl restart ' . escapeshellarg($serviceName . '.service') . ' || true';
+            }
+        }
+    }
+
+    return tpHealthUniqueNonEmptyStrings($commands);
+}
+
+
+
+function tpHealthGetFixCommands(string $role, string $serverFamily, string $logPath, string $access = ''): array
+{
+    if ($role === 'php_fpm' && tpHealthPhpFpmIsEnabled() === false) {
+        return array();
+    }
+
+    if ($access === 'not_readable') {
+        return tpHealthBuildReadAccessCommands($logPath);
+    }
+
+    $safeLogPath = $logPath !== '' ? escapeshellarg($logPath) : "''";
+
+    if ($role === 'php_fpm') {
+        $commands = array();
+        $services = tpHealthInferPhpFpmServiceNames($logPath);
+        $commands[] = 'find /var/log -maxdepth 2 -type f \( -name "php*-fpm*.log" -o -name "fpm-php*.log" \) 2>/dev/null || true';
+        $commands[] = 'systemctl list-units --type=service --all | grep -Ei "php[0-9]+\.[0-9]+-fpm|php-fpm|fpm" || true';
+
+        foreach ($services as $serviceName) {
+            $commands[] = 'systemctl status ' . escapeshellarg($serviceName . '.service') . ' --no-pager -n 20 || true';
+            $commands[] = 'journalctl -u ' . escapeshellarg($serviceName . '.service') . ' --no-pager -n 50 || true';
+        }
+
+        return tpHealthUniqueNonEmptyStrings($commands);
+    }
+
+    if ($role === 'teampass') {
+        if ($serverFamily === 'nginx') {
+            return tpHealthUniqueNonEmptyStrings(array(
+                'grep -R -n -E "server_name|root|error_log" /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d /usr/local/openresty/nginx/conf 2>/dev/null || true',
+                'systemctl status nginx.service --no-pager -n 20 || true',
+                'journalctl -u nginx.service --no-pager -n 50 || true',
+            ));
+        }
+
+        return tpHealthUniqueNonEmptyStrings(array(
+            'grep -R -n -E "ServerName|ServerAlias|DocumentRoot|ErrorLog" /etc/apache2/sites-enabled /etc/apache2/sites-available /etc/httpd/conf.d /etc/httpd/conf 2>/dev/null || true',
+            'systemctl status apache2.service --no-pager -n 20 || systemctl status httpd.service --no-pager -n 20 || true',
+            'journalctl -u apache2.service -u httpd.service --no-pager -n 50 || true',
+        ));
+    }
+
+    if ($serverFamily === 'nginx') {
+        return tpHealthUniqueNonEmptyStrings(array(
+            'grep -R -n -E "error_log" /etc/nginx/nginx.conf /etc/nginx/conf.d /usr/local/openresty/nginx/conf 2>/dev/null || true',
+            'systemctl status nginx.service --no-pager -n 20 || true',
+            'journalctl -u nginx.service --no-pager -n 50 || true',
+        ));
+    }
+
+    if ($serverFamily === 'apache') {
+        return tpHealthUniqueNonEmptyStrings(array(
+            'grep -R -n -E "ErrorLog" /etc/apache2/apache2.conf /etc/httpd/conf/httpd.conf /usr/local/apache2/conf/httpd.conf 2>/dev/null || true',
+            'systemctl status apache2.service --no-pager -n 20 || systemctl status httpd.service --no-pager -n 20 || true',
+            'journalctl -u apache2.service -u httpd.service --no-pager -n 50 || true',
+        ));
+    }
+
+    return tpHealthUniqueNonEmptyStrings(array(
+        'journalctl --no-pager -n 50 | grep -Ei "nginx|apache|httpd|php.*fpm|fpm" || true',
+    ));
+}
+
+
+function tpHealthInspectLogPath(string $logPath, int $lines, array $meta): array
+{
+    $fileSize = null;
+    if ($logPath !== '' && file_exists($logPath) === true) {
+        $size = @filesize($logPath);
+        $fileSize = $size !== false ? (int) $size : null;
+    }
+
+    $base = array(
+        'role' => (string) ($meta['role'] ?? ''),
+        'mode' => (string) ($meta['mode'] ?? 'auto'),
+        'server_family' => (string) ($meta['server_family'] ?? 'unknown'),
+        'server_software' => (string) ($meta['server_software'] ?? ''),
+        'log_path' => $logPath,
+        'lines' => $lines,
+        'content' => '',
+        'content_length' => 0,
+        'file_size' => $fileSize,
+    );
+
+    if ($logPath === '') {
+        return array_merge(
+            $base,
+            array(
+                'access' => 'not_configured',
+                'fix_commands' => tpHealthGetFixCommands((string) ($meta['role'] ?? ''), (string) ($meta['server_family'] ?? 'unknown'), $logPath, 'not_configured'),
+            )
+        );
+    }
+
+    $logDir = dirname($logPath);
+    if (file_exists($logDir) === true && is_dir($logDir) === true && is_executable($logDir) === false) {
+        return array_merge(
+            $base,
+            array(
+                'access' => 'not_readable',
+                'fix_commands' => tpHealthGetFixCommands((string) ($meta['role'] ?? ''), (string) ($meta['server_family'] ?? 'unknown'), $logPath, 'not_readable'),
+            )
+        );
+    }
+
+    if (file_exists($logPath) === false) {
+        return array_merge(
+            $base,
+            array(
+                'access' => 'not_found',
+                'fix_commands' => tpHealthGetFixCommands((string) ($meta['role'] ?? ''), (string) ($meta['server_family'] ?? 'unknown'), $logPath, 'not_found'),
+            )
+        );
+    }
+
+    if (is_readable($logPath) === false) {
+        return array_merge(
+            $base,
+            array(
+                'access' => 'not_readable',
+                'fix_commands' => tpHealthGetFixCommands((string) ($meta['role'] ?? ''), (string) ($meta['server_family'] ?? 'unknown'), $logPath, 'not_readable'),
+            )
+        );
+    }
+
+    $content = tpTailFileLines($logPath, $lines, 1024 * 1024 * 2);
+    $contentLength = strlen($content);
+
+    return array_merge(
+        $base,
+        array(
+            'access' => $contentLength > 0 ? 'ok' : 'empty',
+            'fix_commands' => array(),
+            'content' => $content,
+            'content_length' => $contentLength,
+        )
+    );
+}
+
+
+function tpHealthResolveLogResult(string $role, array $SETTINGS, int $lines): array
+{
+    $context = tpHealthBuildRuntimeLogsContext($SETTINGS);
+    $mode = (string) ($context['mode'] ?? 'auto');
+    $serverFamily = (string) ($context['server_family'] ?? 'unknown');
+    $serverSoftware = (string) ($context['server_software'] ?? '');
+
+    $manualPath = '';
+    if ($role === 'teampass') {
+        $manualPath = tpHealthSanitizeManualLogPath((string) ($SETTINGS['health_teampass_log_path'] ?? ''));
+    } elseif ($role === 'php_fpm') {
+        $manualPath = tpHealthSanitizeManualLogPath((string) ($SETTINGS['health_php_fpm_log_path'] ?? ''));
+    }
+
+    $meta = array(
+        'role' => $role,
+        'mode' => $mode,
+        'server_family' => $serverFamily,
+        'server_software' => $serverSoftware,
+    );
+
+    if ($role === 'php_fpm' && $mode !== 'manual' && tpHealthPhpFpmIsEnabled() === false) {
+        return array_merge(
+            $meta,
+            array(
+                'log_path' => '',
+                'lines' => $lines,
+                'access' => 'not_used',
+                'fix_commands' => array(),
+                'content' => '',
+                'content_length' => 0,
+            )
+        );
+    }
+
+    if ($mode === 'manual' && in_array($role, array('teampass', 'php_fpm'), true) === true) {
+        if ($manualPath === '') {
+            return array_merge(
+                $meta,
+                array(
+                    'log_path' => '',
+                    'lines' => $lines,
+                    'access' => 'not_configured',
+                    'fix_commands' => array(),
+                    'content' => '',
+                    'content_length' => 0,
+                )
+            );
+        }
+
+        if (tpHealthIsAbsolutePath($manualPath) === false) {
+            return array_merge(
+                $meta,
+                array(
+                    'log_path' => $manualPath,
+                    'lines' => $lines,
+                    'access' => 'invalid_path',
+                    'fix_commands' => array(),
+                    'content' => '',
+                    'content_length' => 0,
+                )
+            );
+        }
+
+        return tpHealthInspectLogPath($manualPath, $lines, $meta);
+    }
+
+    if ($role === 'server') {
+        $candidates = tpHealthBuildServerLogCandidates($SETTINGS, $serverFamily);
+    } elseif ($role === 'teampass') {
+        $candidates = tpHealthBuildTeampassLogCandidates($SETTINGS, $serverFamily);
+    } else {
+        $candidates = tpHealthBuildPhpFpmLogCandidates($SETTINGS);
+    }
+
+    if (empty($candidates) === true) {
+        return array_merge(
+            $meta,
+            array(
+                'log_path' => '',
+                'lines' => $lines,
+                'access' => $role === 'php_fpm' ? 'not_used' : 'not_found',
+                'fix_commands' => array(),
+                'content' => '',
+                'content_length' => 0,
+            )
+        );
+    }
+
+    $firstEmpty = null;
+    $firstUnreadable = null;
+    foreach ($candidates as $candidate) {
+        $candidateResult = tpHealthInspectLogPath($candidate, $lines, $meta);
+
+        if ($candidateResult['access'] === 'ok') {
+            $candidateResult['candidates'] = $candidates;
+            return $candidateResult;
+        }
+
+        if ($candidateResult['access'] === 'empty' && $firstEmpty === null) {
+            $firstEmpty = $candidateResult;
+            continue;
+        }
+
+        if ($candidateResult['access'] === 'not_readable' && $firstUnreadable === null) {
+            $firstUnreadable = $candidateResult;
+        }
+    }
+
+    if ($firstEmpty !== null) {
+        $firstEmpty['candidates'] = $candidates;
+        return $firstEmpty;
+    }
+
+    if ($firstUnreadable !== null) {
+        $firstUnreadable['candidates'] = $candidates;
+        return $firstUnreadable;
+    }
+
+    return array_merge(
+        $meta,
+        array(
+            'log_path' => (string) ($candidates[0] ?? ''),
+            'lines' => $lines,
+            'access' => 'not_found',
+            'candidates' => $candidates,
+            'fix_commands' => tpHealthGetFixCommands($role, $serverFamily, (string) ($candidates[0] ?? ''), 'not_found'),
+            'content' => '',
+            'content_length' => 0,
+        )
+    );
+}
+
+
+function tpHealthReadRuntimeLogs(array $SETTINGS, int $lines): array
+{
+    $context = tpHealthBuildRuntimeLogsContext($SETTINGS);
+
+    return array(
+        'context' => $context,
+        'server' => tpHealthResolveLogResult('server', $SETTINGS, $lines),
+        'teampass' => tpHealthResolveLogResult('teampass', $SETTINGS, $lines),
+        'php_fpm' => tpHealthResolveLogResult('php_fpm', $SETTINGS, $lines),
+    );
 }

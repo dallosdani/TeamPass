@@ -1801,7 +1801,7 @@ switch ($post_type) {
                             $segments = explode('/', $path);
                             if (
                                 $segments[0] !== ''
-                                && strpos($segments[0], '.php') === false
+                                && strpos((string) $segments[0], '.php') === false
                             ) {
                                 $host = (string) $segments[0];
                             }
@@ -2559,6 +2559,8 @@ switch ($post_type) {
             )['string'];
         }
 
+        $timestamp = time();
+
         // Check if setting is already in DB. If NO then insert, if YES then update.
         $data = DB::query(
             'SELECT * FROM ' . prefixTable('misc') . '
@@ -2574,7 +2576,7 @@ switch ($post_type) {
                     'valeur' => $post_value,
                     'type' => 'admin',
                     'intitule' => $post_field,
-                    'created_at' => time(),
+                    'created_at' => $timestamp,
                 )
             );
             // in case of stats enabled, add the actual time
@@ -2582,10 +2584,10 @@ switch ($post_type) {
                 DB::insert(
                     prefixTable('misc'),
                     array(
-                        'valeur' => time(),
+                        'valeur' => $timestamp,
                         'type' => 'admin',
                         'intitule' => $post_field . '_time',
-                        'updated_at' => time(),
+                        'updated_at' => $timestamp,
                     )
                 );
             }
@@ -2595,7 +2597,7 @@ switch ($post_type) {
                 prefixTable('misc'),
                 array(
                     'valeur' => $post_value,
-                    'updated_at' => time(),
+                    'updated_at' => $timestamp,
                 ),
                 'type = %s AND intitule = %s',
                 'admin',
@@ -2619,7 +2621,7 @@ switch ($post_type) {
                             'valeur' => 0,
                             'type' => 'admin',
                             'intitule' => $post_field . '_time',
-                            'created_at' => time(),
+                            'created_at' => $timestamp,
                         )
                     );
                 } else {
@@ -2627,7 +2629,94 @@ switch ($post_type) {
                         prefixTable('misc'),
                         array(
                             'valeur' => 0,
-                            'updated_at' => time(),
+                            'updated_at' => $timestamp,
+                        ),
+                        'type = %s AND intitule = %s',
+                        'admin',
+                        $post_field . '_time'
+                    );
+                }
+            }
+        }
+
+        // Keep local settings array aligned with the saved value
+        $SETTINGS[$post_field] = $post_value;
+
+        // Silent default save of browser extension FQDN on first API activation
+        if ($post_field === 'api' && (int) $post_value === 1) {
+            $currentBrowserExtensionFqdn = isset($SETTINGS['browser_extension_fqdn']) === true
+                ? trim((string) $SETTINGS['browser_extension_fqdn'])
+                : '';
+
+            if ($currentBrowserExtensionFqdn === '') {
+                $cpassmanUrl = isset($SETTINGS['cpassman_url']) === true
+                    ? trim((string) $SETTINGS['cpassman_url'])
+                    : '';
+
+                if ($cpassmanUrl === '') {
+                    $detectedBrowserExtensionFqdn = 'localhost';
+                } else {
+                    if (strpos($cpassmanUrl, 'http') !== 0 && strpos($cpassmanUrl, '//') !== 0) {
+                        $cpassmanUrl = 'http://' . $cpassmanUrl;
+                    }
+
+                    $parsedUrl = parse_url($cpassmanUrl);
+                    $host = isset($parsedUrl['host']) === true
+                        ? strtolower(trim((string) $parsedUrl['host'], '.'))
+                        : 'localhost';
+
+                    // Same localhost behaviour as pages/api.php
+                    if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) === true) {
+                        $path = isset($parsedUrl['path']) === true
+                            ? trim((string) $parsedUrl['path'], '/')
+                            : '';
+
+                        if ($path !== '') {
+                            $segments = explode('/', $path);
+                            if (
+                                $segments[0] !== ''
+                                && strpos((string) $segments[0], '.php') === false
+                            ) {
+                                $host = (string) $segments[0];
+                            }
+                        }
+                    }
+
+                    $detectedBrowserExtensionFqdn = $host;
+                }
+
+                // Sanitize before storage
+                $detectedBrowserExtensionFqdn = htmlspecialchars(
+                    $detectedBrowserExtensionFqdn,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                );
+
+                $fqdnRow = DB::queryFirstRow(
+                    'SELECT valeur
+                    FROM ' . prefixTable('misc') . '
+                    WHERE type = %s AND intitule = %s',
+                    'admin',
+                    'browser_extension_fqdn'
+                );
+
+                if ($fqdnRow === null) {
+                    DB::insert(
+                        prefixTable('misc'),
+                        array(
+                            'type' => 'admin',
+                            'intitule' => 'browser_extension_fqdn',
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'created_at' => $timestamp,
+                        )
+                    );
+                    $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
+                } elseif (trim((string) $fqdnRow['valeur']) === '') {
+                    DB::update(
+                        prefixTable('misc'),
+                        array(
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'updated_at' => $timestamp,
                         ),
                         'type = %s AND intitule = %s',
                         'admin',

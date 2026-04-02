@@ -140,7 +140,7 @@ class TaskWorker {
 
         if (!is_dir($targetDir)) {
             // mkdir can fail if the directory was created concurrently; the second is_dir check handles that race
-            $mkdirResult = mkdir($targetDir, 0770, true);
+            $mkdirResult = mkdir($targetDir, 0750, true);
             if ($mkdirResult === false && !is_dir($targetDir)) {
                 throw new Exception('Cannot create backup target dir: ' . $targetDir);
             }

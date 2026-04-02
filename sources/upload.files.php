@@ -286,7 +286,7 @@ $filePath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
 // Create target dir
 if (!file_exists($targetDir)) {
     try {
-        mkdir($targetDir, 0777, true);
+        mkdir($targetDir, 0750, true);
     } catch (Exception $e) {
         print_r($e);
     }

@@ -36,7 +36,7 @@ class Logger
         // Ensure log directory exists
         $logDir = dirname($logFile);
         if (!is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
+            mkdir($logDir, 0750, true);
         }
     }
 

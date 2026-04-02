@@ -2601,11 +2601,10 @@ function getFileExtension(string $file): string
 
 function recursiveChmod(
     string $path,
-    int $filePerm = 0644,
-    int  $dirPerm = 0755
+    int $filePerm = 0640,
+    int  $dirPerm = 0750
 ) {
     // Check if the path exists
-    $path = basename($path);
     if (! file_exists($path)) {
         return false;
     }
@@ -2630,9 +2629,9 @@ function recursiveChmod(
             recursiveChmod($path.'/'.$entry, $filePerm, $dirPerm);
         }
 
-        // When we are done with the contents of the directory, we chmod the directory itself
+        // Chmod the directory itself with directory permissions (not file permissions)
         try {
-            chmod($path, $filePerm);
+            chmod($path, $dirPerm);
         } catch (Exception $e) {
             return false;
         }

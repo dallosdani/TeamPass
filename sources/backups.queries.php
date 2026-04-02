@@ -785,7 +785,7 @@ try {
             if ($outputDir === '') $outputDir = $defaultDir;
 
             // Safety: prevent path traversal / outside files folder
-            @mkdir($outputDir, 0770, true);
+            @mkdir($outputDir, 0750, true);
             $baseReal = realpath($baseFilesDir) ?: $baseFilesDir;
             $dirReal = realpath($outputDir);
 
@@ -819,7 +819,7 @@ try {
 
             $baseFilesDir = (string)($SETTINGS['path_to_files_folder'] ?? (__DIR__ . '/../files'));
             $dir = (string)tpGetSettingsValue('bck_scheduled_output_dir', rtrim($baseFilesDir, '/') . '/backups');
-            @mkdir($dir, 0770, true);
+            @mkdir($dir, 0750, true);
             // Build a relative path from files/ root (output_dir can be a subfolder)
             $filesRoot = realpath($baseFilesDir);
             $dirReal = realpath($dir);
@@ -941,7 +941,7 @@ try {
             $now = time();
             $baseFilesDir = (string)($SETTINGS['path_to_files_folder'] ?? (__DIR__ . '/../files'));
             $dir = (string)tpGetSettingsValue('bck_scheduled_output_dir', rtrim($baseFilesDir, '/') . '/backups');
-            @mkdir($dir, 0770, true);
+            @mkdir($dir, 0750, true);
 
             // avoid duplicates
             $pending = (int)DB::queryFirstField(

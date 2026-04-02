@@ -427,11 +427,11 @@ $triggerFile = $absolutePath . '/files/teampass_background_tasks.trigger';
 $lockFile    = $absolutePath . '/files/teampass_background_tasks.lock';
 if (!file_exists($triggerFile)) {
     @file_put_contents($triggerFile, (string) time());
-    @chmod($triggerFile, 0664);
+    @chmod($triggerFile, 0640); // owner=rw, group=r, world=none
 }
 if (!file_exists($lockFile)) {
     @file_put_contents($lockFile, (string) time());
-    @chmod($lockFile, 0664);
+    @chmod($lockFile, 0640); // owner=rw, group=r, world=none
 }
 
 // ============================================================

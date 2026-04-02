@@ -233,11 +233,13 @@ class teampassInstaller
                 ];
             }
 
-            // Folders and permissions to apply
+            // Folders and permissions to apply.
+            // 0750: owner=rwx, group=rx, world=none — web server user can traverse and read.
+            // 0640: owner=rw, group=r, world=none — web server user can read, never execute.
             $directories = [
-                $absolutePath              => ['dir' => 0770, 'file' => 0740],
-                $absolutePath . '/files'   => ['dir' => 0770, 'file' => 0770],
-                $absolutePath . '/upload'  => ['dir' => 0770, 'file' => 0770],
+                $absolutePath              => ['dir' => 0750, 'file' => 0640],
+                $absolutePath . '/files'   => ['dir' => 0750, 'file' => 0640],
+                $absolutePath . '/upload'  => ['dir' => 0750, 'file' => 0640],
             ];
 
             // Apply permissions
@@ -450,7 +452,7 @@ if (isset($_SESSION[\'settings\'][\'timezone\']) === true) {
             $triggerFile = $absolutePath . '/files/teampass_background_tasks.trigger';
             if (!file_exists($triggerFile)) {
                 @file_put_contents($triggerFile, (string) time());
-                @chmod($triggerFile, 0664);
+                @chmod($triggerFile, 0640); // owner=rw, group=r, world=none
             }
 
             // Initialize background tasks lock file
@@ -458,7 +460,7 @@ if (isset($_SESSION[\'settings\'][\'timezone\']) === true) {
             $lockFile = $absolutePath . '/files/teampass_background_tasks.lock';
             if (!file_exists($lockFile)) {
                 @file_put_contents($lockFile, (string) time());
-                @chmod($lockFile, 0664);
+                @chmod($lockFile, 0640); // owner=rw, group=r, world=none
             }
 
             // Check if user TP exists

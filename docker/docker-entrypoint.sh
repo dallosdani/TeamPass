@@ -92,8 +92,9 @@ set_permissions() {
     chown -R nginx:nginx /var/www/html/includes/libraries/csrfp/log
 
     chmod 700 /var/www/html/sk
-    chmod 755 /var/www/html/files
-    chmod 755 /var/www/html/upload
+    chmod 750 /var/www/html/files
+    chmod 750 /var/www/html/upload
+    chmod 750 /var/www/html/includes/libraries/csrfp/log
 
     echo -e "${GREEN}✅ Permissions set${NC}"
 }

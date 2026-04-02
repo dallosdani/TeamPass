@@ -222,19 +222,72 @@ $csrf_token = $superGlobal->get('csrf_token', 'SESSION');
 							<div class="card-body">
 								<div>
 									<div class="alert alert-info" role="alert">
-										<i class="fa-solid fa-info-circle"></i>&nbsp;Next requirements are expected to run Teampass.
+										<i class="fa-solid fa-info-circle"></i>&nbsp;The following requirements must be met before Teampass can be installed.
+										For detailed explanations and remediation commands, see the
+										<a href="https://documentation.teampass.net/#/install/file-permissions" target="_blank" rel="noopener"><strong>file permissions documentation</strong></a>.
 									</div>
 								</div>
-								<ul>
-									<li>Directory <code>/install/</code> is writable&nbsp;<span id="check0"></span></li>
-									<li>Directory <code>/includes/</code> is writable&nbsp;<span id="check1"></span></li>
-									<li>Directory <code>/includes/config/</code> is writable&nbsp;<span id="check2"></span></li>
-									<li>Directory <code>/includes/avatars/</code> is writable&nbsp;<span id="check3"></span></li>
-									<li>Directory <code>/includes/libraries/csrfp/libs/</code> is writable&nbsp;<span id="check4"></span></li>
-									<li>Directory <code>/includes/libraries/csrfp/js/</code> is writable&nbsp;<span id="check5"></span></li>
-									<li>Directory <code>/includes/libraries/csrfp/log/</code> is writable&nbsp;<span id="check6"></span></li>
-									<li>Directory <code>/files/</code> is writable&nbsp;<span id="check7"></span></li>
-									<li>Directory <code>/upload/</code> is writable&nbsp;<span id="check8"></span></li>
+								<ul class="list-unstyled">
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check2" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/includes/config/</code> <span class="badge badge-secondary">required — install/upgrade</span>
+												<div class="text-muted small">Stores <code>settings.php</code> (encrypted database credentials). Must be writable during installation and upgrades only.</div>
+												<div id="check2-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/includes/config</code></div>
+											</div>
+										</div>
+									</li>
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check3" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/includes/avatars/</code> <span class="badge badge-light border">optional</span>
+												<div class="text-muted small">Stores user avatar images. Only required if users upload a profile picture.</div>
+												<div id="check3-hint" class="text-warning small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/includes/avatars</code></div>
+											</div>
+										</div>
+									</li>
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check4" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/includes/libraries/csrfp/libs/</code> <span class="badge badge-secondary">required — install/upgrade</span>
+												<div class="text-muted small">Stores <code>csrfp.config.php</code> (CSRF protection token). Written once during installation.</div>
+												<div id="check4-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/includes/libraries/csrfp/libs</code></div>
+											</div>
+										</div>
+									</li>
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check6" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/includes/libraries/csrfp/log/</code> <span class="badge badge-secondary">required — runtime</span>
+												<div class="text-muted small">Receives CSRF protection audit log entries during normal operation.</div>
+												<div id="check6-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/includes/libraries/csrfp/log</code></div>
+											</div>
+										</div>
+									</li>
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check7" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/files/</code> <span class="badge badge-secondary">required — runtime</span>
+												<div class="text-muted small">Stores background task trigger and lock files, exported backups, and restore logs.</div>
+												<div id="check7-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/files</code></div>
+											</div>
+										</div>
+									</li>
+									<li class="mb-3">
+										<div class="d-flex align-items-start">
+											<span id="check8" style="min-width:20px" class="mr-2 mt-1"></span>
+											<div>
+												<code>/upload/</code> <span class="badge badge-light border">optional</span>
+												<div class="text-muted small">Stores encrypted file attachments uploaded by users. Only required if the file attachment feature is enabled.</div>
+												<div id="check8-hint" class="text-warning small d-none mt-1"><i class="fas fa-wrench mr-1"></i>Fix: <code>chmod 0750 &lt;teampass&gt;/upload</code></div>
+											</div>
+										</div>
+									</li>
 									<li>PHP extension <code>mbstring</code> is loaded&nbsp;<span id="check9"></span></li>
 									<li>PHP extension <code>openssl</code> is loaded&nbsp;<span id="check10"></span></li>
 									<li>PHP extension <code>bcmath</code> is loaded&nbsp;<span id="check11"></span></li>

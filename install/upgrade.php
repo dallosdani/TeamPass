@@ -252,33 +252,112 @@ if (!isset($_GET['step']) && !isset($post_step)) {
                 <div class="col-12">
                     <div class="card card-primary">
                         <div class="card-header">
-                            <h5>Next elements will be checked</h5>
+                            <h5>Requirements check</h5>
                         </div>
                         <div class="card-body">
 
                             <div id="res_step1">
-                            <span>File "settings.php" is writable</span><br />
-                            <span>Directory "/install/" is writable</span><br />
-                            <span>Directory "/includes/" is writable</span><br />
-                            <span>Directory "/includes/config/" is writable</span><br />
-                            <span>Directory "/includes/avatars/" is writable</span><br />
-                            <span>Directory "/files/" is writable</span><br />
-                            <span>Directory "/upload/" is writable</span><br />
-                            <span>PHP extension "openssl" is loaded</span><br />
-                            <span>PHP extension "mbstring" is loaded</span><br />
-                            <span>PHP extension "bcmath" is loaded</span><br />
-                            <span>PHP extension "xml" is loaded</span><br />
-                            <span>PHP extension "curl" is loaded</span><br />
-                            <span>PHP extension "posix" is loaded (optional &mdash; required for WebSocket)</span><br />
-                            <span>PHP extension "pcntl" is loaded (optional &mdash; required for WebSocket)</span><br />
-                            <span>PHP extension "Zend OPcache" is enabled (optional &mdash; strongly recommended)</span><br />
-                            <span>PHP-FPM is the active SAPI (optional &mdash; recommended for high-load)</span><br />
-                            <span>PHP extension "APCu" is enabled (optional &mdash; recommended for settings cache)</span><br />
-                            <span>PHP extension "redis" is loaded (optional &mdash; required for Redis session storage)</span><br />
-                            <span>PHP version is greater or equal to '.MIN_PHP_VERSION.'</span><br />
-                            <span>SQL version is greater or equal to MySQL '.MIN_MYSQL_VERSION.' or MariaDB '.MIN_MARIADB_VERSION.'</span><br />
-                            <span>Tasks manager has no tasks behind</span><br />
-                            <span>All users have their passwords up to date</span><br />
+                            <div class="alert alert-info mb-3">
+                                <i class="fa-solid fa-circle-info mr-1"></i>
+                                The following items will be verified when you click <strong>Start</strong>.
+                                For detailed explanations and remediation commands, see the
+                                <a href="https://documentation.teampass.net/#/install/file-permissions" target="_blank" rel="noopener"><strong>file permissions documentation</strong></a>.
+                            </div>
+
+                            <p class="font-weight-bold mb-1">Writable directories</p>
+                            <ul class="list-unstyled mb-3">
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div class="">
+                                        <code>includes/config/settings.php</code> <span class="badge badge-secondary">required</span>
+                                        <span id="upg-chk-settings" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">Settings file storing encrypted database credentials.</div>
+                                        <div id="upg-chk-settings-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0640 includes/config/settings.php</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>includes/config/</code> <span class="badge badge-secondary">required</span>
+                                        <span id="upg-chk-config" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">Configuration directory - written during upgrades only.</div>
+                                        <div id="upg-chk-config-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 includes/config</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>includes/libraries/csrfp/libs/</code> <span class="badge badge-secondary">required</span>
+                                        <span id="upg-chk-csrfp-libs" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">Stores <code>csrfp.config.php</code> (CSRF token). May be rewritten during upgrade.</div>
+                                        <div id="upg-chk-csrfp-libs-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 includes/libraries/csrfp/libs</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>includes/libraries/csrfp/log/</code> <span class="badge badge-secondary">required</span>
+                                        <span id="upg-chk-csrfp-log" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">CSRF protection audit log written during normal operation.</div>
+                                        <div id="upg-chk-csrfp-log-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 includes/libraries/csrfp/log</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>includes/avatars/</code> <span class="badge badge-light border">optional</span>
+                                        <span id="upg-chk-avatars" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">User avatar images — only needed if avatar upload is enabled.</div>
+                                        <div id="upg-chk-avatars-hint" class="text-warning small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 includes/avatars</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>files/</code> <span class="badge badge-secondary">required</span>
+                                        <span id="upg-chk-files" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">Background task trigger/lock files, backups, restore logs.</div>
+                                        <div id="upg-chk-files-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 files</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="mb-2">
+                                <div class="d-flex align-items-start ml-3">
+                                    <div>
+                                        <code>upload/</code> <span class="badge badge-light border">optional</span>
+                                        <span id="upg-chk-upload" style="min-width:20px" class="ml-2"></span>
+                                        <div class="text-muted small">Encrypted file attachments — only needed if file upload is enabled.</div>
+                                        <div id="upg-chk-upload-hint" class="text-warning small d-none mt-1"><i class="fas fa-wrench"></i>Fix: <code>chmod 0750 upload</code></div>
+                                    </div>
+                                </div>
+                            </li>
+                            </ul>
+
+                            <p class="font-weight-bold mb-1">PHP extensions &amp; environment</p>
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>openssl</code></span> <span class="badge badge-secondary">required</span><span id="upg-chk-openssl" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"></span><span class="text-muted">PHP extension <code>mbstring</code></span> <span class="badge badge-secondary">required</span><span id="upg-chk-mbstring" style="min-width:20px" class="ml-2"></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>bcmath</code></span> <span class="badge badge-secondary">required</span><span id="upg-chk-bcmath" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"></span><span class="text-muted">PHP extension <code>xml</code></span> <span class="badge badge-secondary">required</span><span id="upg-chk-xml" style="min-width:20px" class="ml-2"></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>curl</code></span> <span class="badge badge-secondary">required</span><span id="upg-chk-curl" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"></span><span class="text-muted">PHP max_execution_time &ge; 30&thinsp;s</span> <span class="badge badge-secondary">required</span><span id="upg-chk-exec-time" style="min-width:20px" class="ml-2"></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP version &ge; '.MIN_PHP_VERSION.'</span> <span class="badge badge-secondary">required</span><span id="upg-chk-php-version" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"></span><span class="text-muted">MySQL &ge; '.MIN_MYSQL_VERSION.' / MariaDB &ge; '.MIN_MARIADB_VERSION.'</span> <span class="badge badge-secondary">required</span><span id="upg-chk-mysql-version" style="min-width:20px" class="ml-2"></li>
+                                <li class="mb-1 ml-3"></span><span class="text-muted">Encryption key (SECUREPATH)</span> <span class="badge badge-secondary">required</span><span id="upg-chk-encrypt-key" style="min-width:20px" class="ml-2"></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">Background tasks queue is empty</span> <span class="badge badge-secondary">required</span><span id="upg-chk-tasks" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">User password hashes compatibility</span> <span class="badge badge-light border">verified</span><span id="upg-chk-passwords" style="min-width:20px" class="ml-2"></span><div id="upg-chk-passwords-hint" class="text-danger small d-none mt-1"><i class="fas fa-wrench mr-1"></i><code>Some users still have their password hashed with the old algorithm. They need to log in to have their password automatically updated.</code></div></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>posix</code></span> <span class="badge badge-light border">optional &mdash; WebSocket</span><span id="upg-chk-posix" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>pcntl</code></span> <span class="badge badge-light border">optional &mdash; WebSocket</span><span id="upg-chk-pcntl" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">Zend OPcache</span> <span class="badge badge-light border">optional &mdash; strongly recommended</span><span id="upg-chk-opcache" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP-FPM (fpm-fcgi)</span> <span class="badge badge-light border">optional &mdash; high-load</span><span id="upg-chk-fpm" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>APCu</code></span> <span class="badge badge-light border">optional &mdash; settings cache</span><span id="upg-chk-apcu" style="min-width:20px" class="ml-2"></span></li>
+                                <li class="mb-1 ml-3"><span class="text-muted">PHP extension <code>redis</code></span> <span class="badge badge-light border">optional &mdash; Redis sessions</span><span id="upg-chk-redis" style="min-width:20px" class="ml-2"></span></li>
+                            </ul>
                             </div>
                         
                         </div>
@@ -701,7 +780,14 @@ $(function(){
         alertify
             .message('<i class="fas fa-cog fa-spin fa-2x"></i>', 0)
             .dismissOthers();
-        $("#res_"+currentStep).html("").addClass("hidden");
+        if (currentStep === 'step1') {
+            // For step1, keep the pre-built HTML structure; just reset icon spans and hide hints
+            $('#res_step1 [id^="upg-chk-"]').not('[id$="-hint"]').html('')
+            $('#res_step1 [id$="-hint"]').addClass('d-none')
+            $('#res_step1').addClass('hidden')
+        } else {
+            $("#res_"+currentStep).html("").addClass("hidden");
+        }
 
         // EXECUTE AJAX REQUEST
         return $.ajax({
@@ -719,13 +805,27 @@ $(function(){
                     $("#user_granted").val("0");
                     $('#but_next').attr('disabled');
 
-                    if (data.info !== "") {
+                    if (currentStep === 'step1' && data.checks) {
+                        var iconMapErr = {
+                            'ok':      '<i class="fa-solid fa-circle-check text-success"></i>',
+                            'warning': '<i class="fa-solid fa-triangle-exclamation text-warning"></i>',
+                            'error':   '<i class="fa-solid fa-circle-minus text-danger"></i>',
+                            'info':    '<i class="fa-solid fa-circle-info text-info"></i>'
+                        }
+                        $.each(data.checks, function(i, chk) {
+                            $('#' + chk.id).html(iconMapErr[chk.status] || '')
+                            if (chk.fix && chk.status !== 'ok') {
+                                $('#' + chk.id + '-hint').removeClass('d-none')
+                            }
+                        })
+                        $('#res_step1').removeClass('hidden')
+                    } else if (data.info !== "") {
                         $('#res_'+currentStep).html(data.info).removeClass("hidden");
                     }
                     alertify
                         .error('<i class="fas fa-exclamation-triangle mr-2"></i>  '+data.error, 5)
                         .dismissOthers();
-                    
+
                     if (currentStep === 'step0') {
                         $("#res_step0").html('<i class="fa-solid fa-exclamation-triangle mr-2"></i>'+data.error).removeClass("hidden");
                     }
@@ -738,7 +838,21 @@ $(function(){
                     if (currentStep === 'step0') {
                         $("#infotmp").val(data.info);
                     } else if (currentStep === 'step1') {
-                        $('#res_step1').html(data.info).removeClass('hidden');
+                        if (data.checks) {
+                            var iconMap = {
+                                'ok':      '<i class="fa-solid fa-circle-check text-success"></i>',
+                                'warning': '<i class="fa-solid fa-triangle-exclamation text-warning"></i>',
+                                'error':   '<i class="fa-solid fa-circle-minus text-danger"></i>',
+                                'info':    '<i class="fa-solid fa-circle-info text-info"></i>'
+                            }
+                            $.each(data.checks, function(i, chk) {
+                                $('#' + chk.id).html(iconMap[chk.status] || '')
+                                if (chk.fix && chk.status !== 'ok') {
+                                    $('#' + chk.id + '-hint').removeClass('d-none')
+                                }
+                            })
+                        }
+                        $('#res_step1').removeClass('hidden');
                     } else if (currentStep === 'step2') {
                         
                         $('#res_step2').html(data.info).removeClass('hidden');

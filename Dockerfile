@@ -133,7 +133,7 @@ RUN mkdir -p \
         /var/log \
         /run/nginx \
     && chmod 700 sk \
-    && chmod 755 files upload
+    && chmod 750 files upload includes/libraries/csrfp/log
 
 # Remove unnecessary files for production
 RUN rm -rf \

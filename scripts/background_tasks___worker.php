@@ -31,6 +31,7 @@ declare(strict_types=1);
 use TeampassClasses\ConfigManager\ConfigManager;
 use TeampassClasses\Language\Language;
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/backup.functions.php';
 require_once __DIR__ . '/../sources/users_purge.functions.php';
 require_once __DIR__.'/background_tasks___functions.php';
 require_once __DIR__.'/traits/ItemHandlerTrait.php';
@@ -149,9 +150,11 @@ class TaskWorker {
             throw new Exception('Backup target dir is not writable: ' . $targetDir);
         }
 
-        // Resolve backup script passkey to the clear key used to encrypt backup files.
-        $backupScriptPasskey = tpResolveBackupScriptPasskey($this->settings, true);
-        $encryptionKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
+        // Use the resolved clear backup key and self-heal empty values on impacted instances.
+        $resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($this->settings, true);
+        $encryptionKey = !empty($resolvedBackupScriptPasskey['success'])
+            ? (string) ($resolvedBackupScriptPasskey['clear_key'] ?? '')
+            : '';
         if ($encryptionKey === '') {
             throw new Exception('Missing encryption key (bck_script_passkey).');
         }

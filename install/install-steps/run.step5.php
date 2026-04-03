@@ -704,7 +704,10 @@ class DatabaseInstaller
             array('admin', 'network_security_mode', 'direct'),
             array('admin', 'network_security_header', 'x-forwarded-for'),
             array('admin', 'network_trusted_proxies', ''),
-            array('admin', 'show_online_users_list', '0')
+            array('admin', 'show_online_users_list', '0'),
+            array('admin', 'health_logs_mode', 'auto'),
+            array('admin', 'health_teampass_log_path', ''),
+            array('admin', 'health_php_fpm_log_path', '')
         );
         foreach ($aMiscVal as $elem) {
             $value = isset($elem[3]) ? $elem[3] : 0;

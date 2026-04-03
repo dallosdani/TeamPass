@@ -444,23 +444,14 @@ try {
     $log('WARN', 'Unable to decrypt stored secrets: ' . $e->getMessage());
 }
 
-// Instance key (scheduled backups)
+// Instance key candidates (scheduled backups + archived legacy values)
 try {
-    if (!empty($SETTINGS['bck_script_passkey'] ?? '') === true) {
-        $rawInstanceKey = (string) $SETTINGS['bck_script_passkey'];
-        $tmp = cryption($rawInstanceKey, '', 'decrypt', $SETTINGS);
-        $decInstanceKey = isset($tmp['string']) ? (string) $tmp['string'] : '';
-
-        if ($decInstanceKey !== '') {
-            $keysToTry[] = $decInstanceKey;
-        }
-        // Some environments may store bck_script_passkey already in clear
-        if ($rawInstanceKey !== '' && $rawInstanceKey !== $decInstanceKey) {
-            $keysToTry[] = $rawInstanceKey;
-        }
-    }
+    $keysToTry = array_merge(
+        $keysToTry,
+        tpGetBackupScriptPasskeyCandidates($SETTINGS, false)
+    );
 } catch (Throwable $e) {
-    $log('WARN', 'Unable to decrypt instance backup key: ' . $e->getMessage());
+    $log('WARN', 'Unable to load instance backup key candidates: ' . $e->getMessage());
 }
 
 $keysToTry = array_values(array_unique($keysToTry));

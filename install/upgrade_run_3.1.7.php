@@ -32,6 +32,7 @@ use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__.'/../sources/backup.functions.php';
 
 // init
 loadClasses('DB');
@@ -376,6 +377,18 @@ foreach ($healthLogsDefaults as $key => $value) {
                 '" . mysqli_real_escape_string($db_link, $value) . "',
                 UNIX_TIMESTAMP())"
     );
+}
+// --->
+
+// <---
+// ==========================================
+// Backup script passkey: repair empty values and archive legacy restore candidates
+// ==========================================
+if (function_exists('tpArchiveCurrentBackupScriptPasskeyState')) {
+    tpArchiveCurrentBackupScriptPasskeyState($SETTINGS);
+}
+if (function_exists('tpResolveBackupScriptPasskey')) {
+    tpResolveBackupScriptPasskey($SETTINGS, true);
 }
 // --->
 

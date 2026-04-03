@@ -486,6 +486,15 @@ class DatabaseInstaller
         require_once __DIR__.'/../../includes/config/include.php';
 
         // add by default settings
+        $backupScriptPasskeyClear = GenerateCryptKeyForInstall(40, false, true, true, false, true);
+        $backupScriptPasskeyStorage = $backupScriptPasskeyClear;
+        $backupScriptPasskeyIsEncrypted = 0;
+        $backupScriptPasskeyCipher = cryptionForInstall($backupScriptPasskeyClear, '', 'encrypt');
+        if (isset($backupScriptPasskeyCipher['string']) && is_string($backupScriptPasskeyCipher['string']) && $backupScriptPasskeyCipher['string'] !== '') {
+            $backupScriptPasskeyStorage = $backupScriptPasskeyCipher['string'];
+            $backupScriptPasskeyIsEncrypted = 1;
+        }
+
         $aMiscVal = array(
             array('admin', 'max_latest_items', '10'),
             array('admin', 'enable_favourites', '1'),
@@ -605,7 +614,7 @@ class DatabaseInstaller
             array('admin', 'secure_display_image', '1'),
             array('admin', 'upload_zero_byte_file', '0'),
             array('admin', 'upload_all_extensions_file', '0'),
-            array('admin', 'bck_script_passkey', '', '1'),
+            array('admin', 'bck_script_passkey', $backupScriptPasskeyStorage, $backupScriptPasskeyIsEncrypted),
             array('admin', 'admin_2fa_required', '1'),
             array('admin', 'password_overview_delay', '4'),
             array('admin', 'copy_to_clipboard_small_icons', '1'),

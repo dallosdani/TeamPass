@@ -32,6 +32,7 @@ use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__.'/../sources/backup.functions.php';
 
 // init
 loadClasses('DB');
@@ -242,92 +243,6 @@ foreach ($networkAclDefaults as $key => $value) {
 
 // <---
 // ==========================================
-// Backup script passkey: ensure an encrypted non-empty value exists
-// ==========================================
-$backupPasskeyRow = DB::queryFirstRow(
-    'SELECT increment_id, valeur FROM ' . prefixTable('misc') . ' WHERE type=%s AND intitule=%s LIMIT 1',
-    'admin',
-    'bck_script_passkey'
-);
-$backupPasskeyStoredValue = isset($backupPasskeyRow['valeur']) ? (string) $backupPasskeyRow['valeur'] : '';
-$backupPasskeyClearValue = '';
-
-if ($backupPasskeyStoredValue !== '') {
-    try {
-        $tmp = cryption($backupPasskeyStoredValue, '', 'decrypt', $SETTINGS);
-        $dec = isset($tmp['string']) ? (string) $tmp['string'] : '';
-        if (preg_match('/^[A-Za-z0-9]{40}$/', $dec) === 1) {
-            $backupPasskeyClearValue = $dec;
-        }
-    } catch (Throwable $e) {
-        // Continue below for legacy clear-text values.
-    }
-
-    if ($backupPasskeyClearValue === '' && preg_match('/^[A-Za-z0-9]{40}$/', $backupPasskeyStoredValue) === 1) {
-        $backupPasskeyClearValue = $backupPasskeyStoredValue;
-    }
-}
-
-if ($backupPasskeyClearValue === '') {
-    $backupPasskeyClearValue = GenerateCryptKey(40, false, true, true, false, true);
-}
-
-$backupPasskeyEncrypted = cryption($backupPasskeyClearValue, '', 'encrypt', $SETTINGS);
-$backupPasskeyEncryptedValue = isset($backupPasskeyEncrypted['string']) ? (string) $backupPasskeyEncrypted['string'] : '';
-if ($backupPasskeyEncryptedValue !== '') {
-    try {
-        if (!empty($backupPasskeyRow['increment_id'])) {
-            DB::update(
-                prefixTable('misc'),
-                [
-                    'valeur' => $backupPasskeyEncryptedValue,
-                    'updated_at' => time(),
-                    'is_encrypted' => 1,
-                ],
-                'increment_id=%i',
-                (int) $backupPasskeyRow['increment_id']
-            );
-        } else {
-            DB::insert(
-                prefixTable('misc'),
-                [
-                    'type' => 'admin',
-                    'intitule' => 'bck_script_passkey',
-                    'valeur' => $backupPasskeyEncryptedValue,
-                    'created_at' => time(),
-                    'is_encrypted' => 1,
-                ]
-            );
-        }
-    } catch (Throwable $e) {
-        if (!empty($backupPasskeyRow['increment_id'])) {
-            DB::update(
-                prefixTable('misc'),
-                [
-                    'valeur' => $backupPasskeyEncryptedValue,
-                    'updated_at' => time(),
-                ],
-                'increment_id=%i',
-                (int) $backupPasskeyRow['increment_id']
-            );
-        } else {
-            DB::insert(
-                prefixTable('misc'),
-                [
-                    'type' => 'admin',
-                    'intitule' => 'bck_script_passkey',
-                    'valeur' => $backupPasskeyEncryptedValue,
-                    'created_at' => time(),
-                ]
-            );
-        }
-    }
-}
-
-// --->
-
-// <---
-// ==========================================
 // roles_values: Clean up duplicates and add UNIQUE constraint
 // Ensures each (role_id, folder_id) pair exists only once
 // ==========================================
@@ -462,6 +377,18 @@ foreach ($healthLogsDefaults as $key => $value) {
                 '" . mysqli_real_escape_string($db_link, $value) . "',
                 UNIX_TIMESTAMP())"
     );
+}
+// --->
+
+// <---
+// ==========================================
+// Backup script passkey: repair empty values and archive legacy restore candidates
+// ==========================================
+if (function_exists('tpArchiveCurrentBackupScriptPasskeyState')) {
+    tpArchiveCurrentBackupScriptPasskeyState($SETTINGS);
+}
+if (function_exists('tpResolveBackupScriptPasskey')) {
+    tpResolveBackupScriptPasskey($SETTINGS, true);
 }
 // --->
 

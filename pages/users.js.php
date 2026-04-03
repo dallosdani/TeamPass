@@ -1481,7 +1481,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             // Reset state and open modal
             $('#row-folders-filter-bar').hide()
             $('#row-folders-results').html('')
-            $('.folder-type-filter').addClass('active')
+            $('.folder-type-filter').removeClass('active')
             $('#modal-folders-rights').modal('show')
 
             // Start progress bar
@@ -1558,7 +1558,13 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             $('input[type="checkbox"].flat-blue').iCheck({
                 checkboxClass: 'icheckbox_flat-blue',
             });
-            $(document).one('click', '#warningModalButtonAction', function() {                
+            // Disable Perform button by default; enable only when state differs from initial
+            const initialDisabledChecked = disabledStatus !== ''
+            $('#warningModalButtonAction').prop('disabled', true)
+            $('#user-disabled').on('ifChanged', function() {
+                $('#warningModalButtonAction').prop('disabled', $(this).prop('checked') === initialDisabledChecked)
+            })
+            $(document).one('click', '#warningModalButtonAction', function() {
 
                 // Show spinner
                 toastr.remove();
@@ -1634,11 +1640,14 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             $('input[type="checkbox"].flat-blue').iCheck({
                 checkboxClass: 'icheckbox_flat-blue',
             });
+            // Disable Perform button by default; enable only when checkbox is checked
+            $('#warningModalButtonAction').prop('disabled', true)
+            $('#user-to-delete').on('ifChecked', function() {
+                $('#warningModalButtonAction').prop('disabled', false)
+            }).on('ifUnchecked', function() {
+                $('#warningModalButtonAction').prop('disabled', true)
+            })
             $(document).one('click', '#warningModalButtonAction', function() {
-                if ($('#user-to-delete').prop('checked') === false) {
-                    $('#warningModal').modal('hide');
-                    return false;
-                }             
 
                 // Show spinner
                 toastr.remove();

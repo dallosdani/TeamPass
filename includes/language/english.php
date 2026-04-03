@@ -682,6 +682,7 @@ return array(
     'set_of_actions' => 'Set of actions',
     'uploads' => 'Uploads',
     'uploads_configuration' => 'Uploads configuration',
+    'email_smtp_server_not_configured' => 'Email is not configured — SMTP server address is missing. Click to configure.',
     'email_configuration' => 'Email configuration',
     'email_configuration_test' => 'Email configuration test',
     'send_a_test_email' => 'Send a test email',

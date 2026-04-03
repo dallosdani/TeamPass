@@ -2142,5 +2142,6 @@ Path: %s',
     'health_teampass_log_path' => 'TeamPass dedicated error log path',
     'health_teampass_log_path_tip' => 'Optional manual override for the TeamPass dedicated log path when auto-detection cannot determine the correct vhost or instance log file.',
     'health_runtime_log_empty_fmt' => 'No recent entry was found in: %s',
+    'email_smtp_server_not_configured' => 'Email is not configured — SMTP server address is missing. Click to configure.',
 
 );

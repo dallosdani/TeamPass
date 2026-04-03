@@ -2141,5 +2141,6 @@ return array(
     'health_teampass_log_path' => 'Chemin du log d’erreurs dédié à TeamPass',
     'health_teampass_log_path_tip' => 'Surcharge manuelle optionnelle du chemin du log dédié à TeamPass lorsque l’auto-détection ne permet pas d’identifier correctement le fichier du vhost ou de l’instance.',
     'health_runtime_log_empty_fmt' => 'Aucune entrée récente n’a été trouvée dans : %s',
+    'email_smtp_server_not_configured' => 'Email n’est pas configuré - l’adresse du serveur SMTP est manquant. Cliquer pour configurer.',
 
 );

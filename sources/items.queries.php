@@ -3039,21 +3039,36 @@ switch ($inputData['type']) {
                         );
                         //db::debugmode(false);
                         $fieldText = [];
-                        if (DB::count() === 0 && intval($row['encrypted_data']) === 1) {
-                            // Data should be encrypted but no key yet
-                            // System is currently creating the keys
+                        $hasSharekey = DB::count() > 0;
+                        $isDefinedAsEncrypted = intval($row['encrypted_data']) === 1;
+                        $isActuallyEncrypted = $row['encryption_type'] !== 'not_set';
+
+                        if (!$hasSharekey && $isDefinedAsEncrypted) {
+                            // Field should be encrypted but no sharekey yet (background task still running)
                             $fieldText = [
                                 'string' => '',
                                 'encrypted' => false,
                                 'error' => 'error_no_sharekey_yet',
                             ];
-                        } else if (DB::count() === 0 && intval($row['encrypted_data']) === 0) {
-                            // Data is not encrypted in DB
+                        } else if (!$hasSharekey && !$isActuallyEncrypted) {
+                            // No sharekey, data is plaintext in DB — normal unencrypted case
+                            // ($isDefinedAsEncrypted is implicitly false: the previous branch caught true)
                             $fieldText = [
-                                'string' => $row['data'],//#3945 - isBase64($row['data']) === true ? base64_decode($row['data']) :
+                                'string' => $row['data'],
                                 'encrypted' => false,
                                 'error' => false,
                             ];
+                        } else if (!$hasSharekey) {
+                            // Data is encrypted in DB but no sharekey available:
+                            // state mismatch (e.g. encrypted_data flag changed after data was stored).
+                            // ($isActuallyEncrypted is implicitly true: the previous branch caught false)
+                            // Cannot decrypt — return empty with an error to avoid displaying ciphertext.
+                            $fieldText = [
+                                'string' => '',
+                                'encrypted' => false,
+                                'error' => 'decryption_failed',
+                            ];
+                            $decryptionErrors[] = intval($row['field_id']);
                         } else {
                             // Data is encrypted in DB and we have a key
                             // Use migration-aware decryption to transparently upgrade v1→v3 sharekeys

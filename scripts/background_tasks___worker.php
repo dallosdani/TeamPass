@@ -149,8 +149,9 @@ class TaskWorker {
             throw new Exception('Backup target dir is not writable: ' . $targetDir);
         }
 
-        // Use stored encryption key (same as UI)
-        $encryptionKey = (string)($this->settings['bck_script_passkey'] ?? '');
+        // Resolve backup script passkey to the clear key used to encrypt backup files.
+        $backupScriptPasskey = tpResolveBackupScriptPasskey($this->settings, true);
+        $encryptionKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
         if ($encryptionKey === '') {
             throw new Exception('Missing encryption key (bck_script_passkey).');
         }

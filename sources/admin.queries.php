@@ -2661,6 +2661,10 @@ switch ($post_type) {
 
         // In case of key, then encrypt it
         if ($post_field === 'bck_script_passkey') {
+            if (trim((string) $post_value) === '') {
+                $post_value = GenerateCryptKey(40, false, true, true, false, true);
+            }
+
             $post_value = cryption(
                 $post_value,
                 '',

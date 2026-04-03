@@ -704,8 +704,10 @@ try {
                 break;
             }
 
-            $backupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
-            $instanceKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
+            $resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
+            $instanceKey = !empty($resolvedBackupScriptPasskey['success'])
+                ? (string) ($resolvedBackupScriptPasskey['clear_key'] ?? '')
+                : '';
             if ($instanceKey === '') {
                 echo prepareExchangedData(
                     array('error' => true, 'message' => $lang->get('bck_instance_key_not_set')),
@@ -1434,15 +1436,18 @@ try {
                     $keysToTry = [];
 
                     // Build candidate keys depending on restore source
-                    // - scheduled: uses the instance key (stored in bck_script_passkey) + optional override key
+                    // - scheduled: uses the instance key candidates + optional override key
                     // - on-the-fly: uses the key provided by the UI
-                    // - upload (serverScope empty): can be either, so also try instance key candidates
+                    // - upload (serverScope empty): can be either, so also try archived instance key candidates
                     if ($serverScope === 'scheduled') {
                         if ($overrideKey !== '') {
                             $keysToTry[] = $overrideKey;
                         }
 
-                        $keysToTry = array_merge($keysToTry, tpGetBackupScriptPasskeyCandidates($SETTINGS, false));
+                        $keysToTry = array_merge(
+                            $keysToTry,
+                            tpGetBackupScriptPasskeyCandidates($SETTINGS, false)
+                        );
                     } else {
                         if ($encryptionKey !== '') {
                             $keysToTry[] = $encryptionKey;
@@ -1451,10 +1456,11 @@ try {
                             $keysToTry[] = $overrideKey;
                         }
 
-                        // For uploaded restores (serverScope is empty), also try the instance key candidates.
-                        // This allows restoring scheduled backups uploaded manually (they are encrypted using bck_script_passkey).
                         if ($serverScope === '') {
-                            $keysToTry = array_merge($keysToTry, tpGetBackupScriptPasskeyCandidates($SETTINGS, false));
+                            $keysToTry = array_merge(
+                                $keysToTry,
+                                tpGetBackupScriptPasskeyCandidates($SETTINGS, false)
+                            );
                         }
                     }
 

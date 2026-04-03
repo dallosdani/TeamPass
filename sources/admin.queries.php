@@ -2659,18 +2659,30 @@ switch ($post_type) {
         
         require_once 'main.functions.php';
 
-        // In case of key, then encrypt it
+        // In case of backup script key, then normalize, archive the previous state and encrypt it.
         if ($post_field === 'bck_script_passkey') {
-            if (trim((string) $post_value) === '') {
-                $post_value = GenerateCryptKey(40, false, true, true, false, true);
+            require_once 'backup.functions.php';
+
+            $clearBackupScriptPasskey = trim((string) $post_value);
+            if ($clearBackupScriptPasskey === '') {
+                $clearBackupScriptPasskey = tpGenerateBackupScriptPasskey();
             }
 
-            $post_value = cryption(
-                $post_value,
-                '',
-                'encrypt',
-                $SETTINGS
-            )['string'];
+            $storedBackupScriptPasskey = tpStoreBackupScriptPasskey($clearBackupScriptPasskey, $SETTINGS, true);
+            if (!empty($storedBackupScriptPasskey['success'])) {
+                $post_value = (string) $storedBackupScriptPasskey['encrypted_key'];
+            } else {
+                $fallbackEncryptedBackupScriptPasskey = cryption(
+                    $clearBackupScriptPasskey,
+                    '',
+                    'encrypt',
+                    $SETTINGS
+                )['string'];
+
+                $post_value = $fallbackEncryptedBackupScriptPasskey !== ''
+                    ? $fallbackEncryptedBackupScriptPasskey
+                    : $clearBackupScriptPasskey;
+            }
         }
 
         $timestamp = time();

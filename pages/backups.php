@@ -38,6 +38,7 @@ use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__.'/../sources/backup.functions.php';
 
 // init
 $session = SessionManager::getSession();
@@ -82,9 +83,9 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
 // --------------------------------- //
 
-// Decrypt key
-$localEncryptionKey = isset($SETTINGS['bck_script_passkey']) === true ?
-    cryption($SETTINGS['bck_script_passkey'], '', 'decrypt', $SETTINGS)['string'] : '';
+// Resolve backup script key (self-heal empty / legacy values for this admin page)
+$backupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
+$localEncryptionKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
 ?>
 
 <!-- Content Header (Page header) -->

@@ -53,3 +53,5 @@ phpstan.neon
 .phpunit.cache/
 tests/_output/
 tests/_support/_generated/
+/webfonts
+*:Zone.Identifier

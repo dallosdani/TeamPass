@@ -704,16 +704,8 @@ try {
                 break;
             }
 
-            if (empty($SETTINGS['bck_script_passkey'] ?? '') === true) {
-                echo prepareExchangedData(
-                    array('error' => true, 'message' => $lang->get('bck_instance_key_not_set')),
-                    'encode'
-                );
-                break;
-            }
-
-            $tmp = cryption($SETTINGS['bck_script_passkey'], '', 'decrypt', $SETTINGS);
-            $instanceKey = isset($tmp['string']) ? (string) $tmp['string'] : '';
+            $backupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
+            $instanceKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
             if ($instanceKey === '') {
                 echo prepareExchangedData(
                     array('error' => true, 'message' => $lang->get('bck_instance_key_not_set')),
@@ -1450,19 +1442,7 @@ try {
                             $keysToTry[] = $overrideKey;
                         }
 
-                        if (!empty($SETTINGS['bck_script_passkey'] ?? '')) {
-                            $rawInstanceKey = (string) $SETTINGS['bck_script_passkey'];
-                            $tmp = cryption($rawInstanceKey, '', 'decrypt', $SETTINGS);
-                            $decInstanceKey = isset($tmp['string']) ? (string) $tmp['string'] : '';
-
-                            if ($decInstanceKey !== '') {
-                                $keysToTry[] = $decInstanceKey;
-                            }
-                            // Some environments store bck_script_passkey already decrypted (or in another format)
-                            if ($rawInstanceKey !== '' && $rawInstanceKey !== $decInstanceKey) {
-                                $keysToTry[] = $rawInstanceKey;
-                            }
-                        }
+                        $keysToTry = array_merge($keysToTry, tpGetBackupScriptPasskeyCandidates($SETTINGS, false));
                     } else {
                         if ($encryptionKey !== '') {
                             $keysToTry[] = $encryptionKey;
@@ -1473,17 +1453,8 @@ try {
 
                         // For uploaded restores (serverScope is empty), also try the instance key candidates.
                         // This allows restoring scheduled backups uploaded manually (they are encrypted using bck_script_passkey).
-                        if ($serverScope === '' && !empty($SETTINGS['bck_script_passkey'] ?? '')) {
-                            $rawInstanceKey = (string) $SETTINGS['bck_script_passkey'];
-                            $tmp = cryption($rawInstanceKey, '', 'decrypt', $SETTINGS);
-                            $decInstanceKey = isset($tmp['string']) ? (string) $tmp['string'] : '';
-
-                            if ($decInstanceKey !== '') {
-                                $keysToTry[] = $decInstanceKey;
-                            }
-                            if ($rawInstanceKey !== '' && $rawInstanceKey !== $decInstanceKey) {
-                                $keysToTry[] = $rawInstanceKey;
-                            }
+                        if ($serverScope === '') {
+                            $keysToTry = array_merge($keysToTry, tpGetBackupScriptPasskeyCandidates($SETTINGS, false));
                         }
                     }
 

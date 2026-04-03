@@ -1733,9 +1733,16 @@ switch ($post_type) {
         break;
 
     case 'save_api_status':
-        // Do query
-        DB::query('SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s', 'admin', 'api');
+        $timestamp = time();
+
+        // Save API status
+        DB::query(
+            'SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s',
+            'admin',
+            'api'
+        );
         $counter = DB::count();
+
         if ($counter === 0) {
             DB::insert(
                 prefixTable('misc'),
@@ -1743,7 +1750,7 @@ switch ($post_type) {
                     'type' => 'admin',
                     'intitule' => 'api',
                     'valeur' => $post_status,
-                    'created_at' => time(),
+                    'created_at' => $timestamp,
                 )
             );
         } else {
@@ -1751,14 +1758,94 @@ switch ($post_type) {
                 prefixTable('misc'),
                 array(
                     'valeur' => $post_status,
-                    'updated_at' => time(),
+                    'updated_at' => $timestamp,
                 ),
                 'type = %s AND intitule = %s',
                 'admin',
                 'api'
             );
         }
-        $SETTINGS['api'] = $post_status;
+
+        $SETTINGS['api'] = (string) $post_status;
+
+        // Silent default save of browser extension FQDN on first API activation
+        if ((int) $post_status === 1) {
+            $currentBrowserExtensionFqdn = isset($SETTINGS['browser_extension_fqdn']) === true
+                ? trim((string) $SETTINGS['browser_extension_fqdn'])
+                : '';
+
+            if ($currentBrowserExtensionFqdn === '') {
+                $cpassmanUrl = isset($SETTINGS['cpassman_url']) === true
+                    ? trim((string) $SETTINGS['cpassman_url'])
+                    : '';
+
+                if ($cpassmanUrl === '') {
+                    $detectedBrowserExtensionFqdn = 'localhost';
+                } else {
+                    if (strpos($cpassmanUrl, 'http') !== 0 && strpos($cpassmanUrl, '//') !== 0) {
+                        $cpassmanUrl = 'http://' . $cpassmanUrl;
+                    }
+
+                    $parsedUrl = parse_url($cpassmanUrl);
+                    $host = isset($parsedUrl['host']) === true
+                        ? strtolower(trim((string) $parsedUrl['host'], '.'))
+                        : 'localhost';
+
+                    // Same localhost behaviour as pages/api.php
+                    if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) === true) {
+                        $path = isset($parsedUrl['path']) === true
+                            ? trim((string) $parsedUrl['path'], '/')
+                            : '';
+
+                        if ($path !== '') {
+                            $segments = explode('/', $path);
+                            if (
+                                $segments[0] !== ''
+                                && strpos((string) $segments[0], '.php') === false
+                            ) {
+                                $host = (string) $segments[0];
+                            }
+                        }
+                    }
+
+                    $detectedBrowserExtensionFqdn = $host;
+                }
+
+                DB::query(
+                    'SELECT * FROM ' . prefixTable('misc') . ' WHERE type = %s AND intitule = %s',
+                    'admin',
+                    'browser_extension_fqdn'
+                );
+                $browserExtensionFqdnExists = DB::count();
+
+                if ($browserExtensionFqdnExists === 0) {
+                    DB::insert(
+                        prefixTable('misc'),
+                        array(
+                            'type' => 'admin',
+                            'intitule' => 'browser_extension_fqdn',
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'created_at' => $timestamp,
+                        )
+                    );
+                } else {
+                    DB::update(
+                        prefixTable('misc'),
+                        array(
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'updated_at' => $timestamp,
+                        ),
+                        'type = %s AND intitule = %s',
+                        'admin',
+                        'browser_extension_fqdn'
+                    );
+                }
+
+                $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
+            }
+        }
+
+        ConfigManager::invalidateCache();
         break;
 
     case 'run_duo_config_check':
@@ -2045,6 +2132,127 @@ switch ($post_type) {
         echo '[{"result" : "' . addslashes($lang->get('done')) . '" , "error" : ""}]';
         break;
 
+
+
+    case 'health_logs_get_settings':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'result' => [
+                    'settings' => [
+                        'health_logs_mode' => tpHealthNormalizeLogsModeForAdmin((string) ($SETTINGS['health_logs_mode'] ?? 'auto')),
+                        'health_teampass_log_path' => tpHealthSanitizeManualLogPathForAdmin((string) ($SETTINGS['health_teampass_log_path'] ?? '')),
+                        'health_php_fpm_log_path' => tpHealthSanitizeManualLogPathForAdmin((string) ($SETTINGS['health_php_fpm_log_path'] ?? '')),
+                    ],
+                ],
+            ],
+            'encode'
+        );
+        break;
+
+    case 'health_logs_save_settings':
+        if ($post_key !== $session->get('key')) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('key_is_not_correct'),
+                ],
+                'encode'
+            );
+            break;
+        }
+        if ($session->get('user-admin') !== 1) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => $lang->get('error_not_allowed_to'),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        $dataReceived = prepareExchangedData($post_data, 'decode');
+        $healthLogsMode = tpHealthNormalizeLogsModeForAdmin((string) ($dataReceived['health_logs_mode'] ?? 'auto'));
+        $healthTeampassLogPath = tpHealthSanitizeManualLogPathForAdmin((string) ($dataReceived['health_teampass_log_path'] ?? ''));
+        $healthPhpFpmLogPath = tpHealthSanitizeManualLogPathForAdmin((string) ($dataReceived['health_php_fpm_log_path'] ?? ''));
+
+        if ($healthLogsMode !== 'manual') {
+            $healthTeampassLogPath = '';
+            $healthPhpFpmLogPath = '';
+        }
+
+        if ($healthTeampassLogPath !== '' && tpHealthIsAbsolutePathForAdmin($healthTeampassLogPath) === false) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => sprintf(
+                        $lang->get('health_log_path_must_be_absolute_fmt'),
+                        $lang->get('health_teampass_log_path')
+                    ),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        if ($healthPhpFpmLogPath !== '' && tpHealthIsAbsolutePathForAdmin($healthPhpFpmLogPath) === false) {
+            echo prepareExchangedData(
+                [
+                    'error' => true,
+                    'message' => sprintf(
+                        $lang->get('health_log_path_must_be_absolute_fmt'),
+                        $lang->get('health_php_fpm_log_path')
+                    ),
+                ],
+                'encode'
+            );
+            break;
+        }
+
+        teampassSaveAdminSetting('health_logs_mode', $healthLogsMode);
+        teampassSaveAdminSetting('health_webserver_log_path', '');
+        teampassSaveAdminSetting('health_teampass_log_path', $healthTeampassLogPath);
+        teampassSaveAdminSetting('health_php_fpm_log_path', $healthPhpFpmLogPath);
+
+        ConfigManager::invalidateCache();
+
+        echo prepareExchangedData(
+            [
+                'error' => false,
+                'message' => $lang->get('done'),
+                'result' => [
+                    'settings' => [
+                        'health_logs_mode' => $healthLogsMode,
+                        'health_teampass_log_path' => $healthTeampassLogPath,
+                        'health_php_fpm_log_path' => $healthPhpFpmLogPath,
+                    ],
+                ],
+            ],
+            'encode'
+        );
+        break;
 
     case 'network_get_rules':
         if ($post_key !== $session->get('key')) {
@@ -2451,15 +2659,33 @@ switch ($post_type) {
         
         require_once 'main.functions.php';
 
-        // In case of key, then encrypt it
+        // In case of backup script key, then normalize, archive the previous state and encrypt it.
         if ($post_field === 'bck_script_passkey') {
-            $post_value = cryption(
-                $post_value,
-                '',
-                'encrypt',
-                $SETTINGS
-            )['string'];
+            require_once 'backup.functions.php';
+
+            $clearBackupScriptPasskey = trim((string) $post_value);
+            if ($clearBackupScriptPasskey === '') {
+                $clearBackupScriptPasskey = tpGenerateBackupScriptPasskey();
+            }
+
+            $storedBackupScriptPasskey = tpStoreBackupScriptPasskey($clearBackupScriptPasskey, $SETTINGS, true);
+            if (!empty($storedBackupScriptPasskey['success'])) {
+                $post_value = (string) $storedBackupScriptPasskey['encrypted_key'];
+            } else {
+                $fallbackEncryptedBackupScriptPasskey = cryption(
+                    $clearBackupScriptPasskey,
+                    '',
+                    'encrypt',
+                    $SETTINGS
+                )['string'];
+
+                $post_value = $fallbackEncryptedBackupScriptPasskey !== ''
+                    ? $fallbackEncryptedBackupScriptPasskey
+                    : $clearBackupScriptPasskey;
+            }
         }
+
+        $timestamp = time();
 
         // Check if setting is already in DB. If NO then insert, if YES then update.
         $data = DB::query(
@@ -2476,7 +2702,7 @@ switch ($post_type) {
                     'valeur' => $post_value,
                     'type' => 'admin',
                     'intitule' => $post_field,
-                    'created_at' => time(),
+                    'created_at' => $timestamp,
                 )
             );
             // in case of stats enabled, add the actual time
@@ -2484,10 +2710,10 @@ switch ($post_type) {
                 DB::insert(
                     prefixTable('misc'),
                     array(
-                        'valeur' => time(),
+                        'valeur' => $timestamp,
                         'type' => 'admin',
                         'intitule' => $post_field . '_time',
-                        'updated_at' => time(),
+                        'updated_at' => $timestamp,
                     )
                 );
             }
@@ -2497,7 +2723,7 @@ switch ($post_type) {
                 prefixTable('misc'),
                 array(
                     'valeur' => $post_value,
-                    'updated_at' => time(),
+                    'updated_at' => $timestamp,
                 ),
                 'type = %s AND intitule = %s',
                 'admin',
@@ -2521,7 +2747,7 @@ switch ($post_type) {
                             'valeur' => 0,
                             'type' => 'admin',
                             'intitule' => $post_field . '_time',
-                            'created_at' => time(),
+                            'created_at' => $timestamp,
                         )
                     );
                 } else {
@@ -2529,12 +2755,100 @@ switch ($post_type) {
                         prefixTable('misc'),
                         array(
                             'valeur' => 0,
-                            'updated_at' => time(),
+                            'updated_at' => $timestamp,
                         ),
                         'type = %s AND intitule = %s',
                         'admin',
-                        $post_field
+                        $post_field . '_time'
                     );
+                }
+            }
+        }
+
+        // Keep local settings array aligned with the saved value
+        $SETTINGS[$post_field] = $post_value;
+
+        // Silent default save of browser extension FQDN on first API activation
+        if ($post_field === 'api' && (int) $post_value === 1) {
+            $currentBrowserExtensionFqdn = isset($SETTINGS['browser_extension_fqdn']) === true
+                ? trim((string) $SETTINGS['browser_extension_fqdn'])
+                : '';
+
+            if ($currentBrowserExtensionFqdn === '') {
+                $cpassmanUrl = isset($SETTINGS['cpassman_url']) === true
+                    ? trim((string) $SETTINGS['cpassman_url'])
+                    : '';
+
+                if ($cpassmanUrl === '') {
+                    $detectedBrowserExtensionFqdn = 'localhost';
+                } else {
+                    if (strpos($cpassmanUrl, 'http') !== 0 && strpos($cpassmanUrl, '//') !== 0) {
+                        $cpassmanUrl = 'http://' . $cpassmanUrl;
+                    }
+
+                    $parsedUrl = parse_url($cpassmanUrl);
+                    $host = isset($parsedUrl['host']) === true
+                        ? strtolower(trim((string) $parsedUrl['host'], '.'))
+                        : 'localhost';
+
+                    // Same localhost behaviour as pages/api.php
+                    if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) === true) {
+                        $path = isset($parsedUrl['path']) === true
+                            ? trim((string) $parsedUrl['path'], '/')
+                            : '';
+
+                        if ($path !== '') {
+                            $segments = explode('/', $path);
+                            if (
+                                $segments[0] !== ''
+                                && strpos((string) $segments[0], '.php') === false
+                            ) {
+                                $host = (string) $segments[0];
+                            }
+                        }
+                    }
+
+                    $detectedBrowserExtensionFqdn = $host;
+                }
+
+                // Sanitize before storage
+                $detectedBrowserExtensionFqdn = htmlspecialchars(
+                    $detectedBrowserExtensionFqdn,
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                );
+
+                $fqdnRow = DB::queryFirstRow(
+                    'SELECT valeur
+                    FROM ' . prefixTable('misc') . '
+                    WHERE type = %s AND intitule = %s',
+                    'admin',
+                    'browser_extension_fqdn'
+                );
+
+                if ($fqdnRow === null) {
+                    DB::insert(
+                        prefixTable('misc'),
+                        array(
+                            'type' => 'admin',
+                            'intitule' => 'browser_extension_fqdn',
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'created_at' => $timestamp,
+                        )
+                    );
+                    $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
+                } elseif (trim((string) $fqdnRow['valeur']) === '') {
+                    DB::update(
+                        prefixTable('misc'),
+                        array(
+                            'valeur' => $detectedBrowserExtensionFqdn,
+                            'updated_at' => $timestamp,
+                        ),
+                        'type = %s AND intitule = %s',
+                        'admin',
+                        'browser_extension_fqdn'
+                    );
+                    $SETTINGS['browser_extension_fqdn'] = $detectedBrowserExtensionFqdn;
                 }
             }
         }
@@ -2555,7 +2869,7 @@ switch ($post_type) {
                 prefixTable('misc'),
                 array(
                     'valeur' => 0,
-                    'updated_at' => time(),
+                    'updated_at' => $timestamp,
                 ),
                 'type = %s AND intitule = %s',
                 'admin',
@@ -5766,4 +6080,36 @@ function wsReadFrame($socket): ?string
     }
 
     return $payload;
+}
+
+
+function tpHealthNormalizeLogsModeForAdmin(string $mode): string
+{
+    $mode = trim(strtolower($mode));
+
+    return in_array($mode, ['auto', 'manual'], true) === true ? $mode : 'auto';
+}
+
+function tpHealthSanitizeManualLogPathForAdmin(string $path): string
+{
+    return trim(str_replace("\0", '', $path));
+}
+
+function tpHealthIsAbsolutePathForAdmin(string $path): bool
+{
+    if ($path === '' || !str_starts_with($path, '/')) {
+        return false;
+    }
+
+    // Resolve symlinks and ../ sequences via the parent directory
+    // (the file itself need not exist yet).
+    $dir = realpath(dirname($path));
+    if ($dir === false) {
+        return false;
+    }
+
+    // Rebuild resolved path and verify it still points inside the filesystem root.
+    $resolved = $dir . '/' . basename($path);
+
+    return str_starts_with($resolved, '/');
 }

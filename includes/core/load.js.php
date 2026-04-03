@@ -229,57 +229,59 @@ if (
         });        
 
         // Select all objects with the class .fa-clickable-login
-        document.querySelectorAll('.clipboard-copy').forEach(element => {
-            element.addEventListener('click', async function() {
-                try {
-                    // Retrieve the target defined by clipboard-target (legacy) or data-clipboard-text
-                    const clipboardTarget = this.getAttribute('clipboard-target');
-                    const dataClipboardText = this.getAttribute('data-clipboard-text');
+        $(document).on('click', '.clipboard-copy', async function(event) {
+            event.preventDefault();
 
-                    // Prefer explicit target id (clipboard-target)
-                    let targetElement = null;
-                    if (clipboardTarget) {
-                        targetElement = document.getElementById(clipboardTarget);
-                    } else if (dataClipboardText) {
-                        // In some places, data-clipboard-text contains the target element id.
-                        targetElement = document.getElementById(dataClipboardText);
-                    }
+            try {
+                // Retrieve the target defined by clipboard-target (legacy) or data-clipboard-text
+                const clipboardTarget = this.getAttribute('clipboard-target') || this.getAttribute('data-clipboard-target');
+                const dataClipboardText = this.getAttribute('data-clipboard-text');
 
-                    // Determine what to copy
-                    let valueToCopy = '';
-                    if (targetElement) {
-                        valueToCopy = (typeof targetElement.value === 'string') ? targetElement.value : targetElement.textContent;
-                    } else if (dataClipboardText) {
-                        // Fallback: treat data-clipboard-text as the literal text to copy
-                        valueToCopy = dataClipboardText;
-                    }
-
-                    if (!valueToCopy) {
-                        return;
-                    }
-
-                    // Copy the value to the clipboard
-                    await navigator.clipboard.writeText(valueToCopy);
-// Send success message
-                    toastr.info(
-                        '<?php echo $lang->get("copy_to_clipboard"); ?>',
-                        '', {
-                            timeOut: 2000,
-                            positionClass: 'toast-bottom-right',
-                            progressBar: true
-                        }
-                    );
-                } catch (error) {
-                    toastr.error(
-                        '<?php echo $lang->get("clipboard_error"); ?>',
-                        '', {
-                            timeOut: 3000,
-                            positionClass: 'toast-bottom-right',
-                            progressBar: true
-                        }
-                    );
+                // Prefer explicit target id (clipboard-target)
+                let targetElement = null;
+                if (clipboardTarget) {
+                    targetElement = document.getElementById(clipboardTarget);
+                } else if (dataClipboardText) {
+                    // In some places, data-clipboard-text contains the target element id.
+                    targetElement = document.getElementById(dataClipboardText);
                 }
-            });
+
+                // Determine what to copy
+                let valueToCopy = '';
+                if (targetElement) {
+                    valueToCopy = (typeof targetElement.value === 'string' && targetElement.value.length > 0)
+                        ? targetElement.value
+                        : targetElement.textContent;
+                } else if (dataClipboardText) {
+                    // Fallback: treat data-clipboard-text as the literal text to copy
+                    valueToCopy = dataClipboardText;
+                }
+
+                if (!valueToCopy) {
+                    return;
+                }
+
+                // Copy the value to the clipboard
+                await navigator.clipboard.writeText(valueToCopy);
+
+                toastr.info(
+                    '<?php echo $lang->get("copy_to_clipboard"); ?>',
+                    '', {
+                        timeOut: 2000,
+                        positionClass: 'toast-bottom-right',
+                        progressBar: true
+                    }
+                );
+            } catch (error) {
+                toastr.error(
+                    '<?php echo $lang->get("clipboard_error"); ?>',
+                    '', {
+                        timeOut: 3000,
+                        positionClass: 'toast-bottom-right',
+                        progressBar: true
+                    }
+                );
+            }
         });
         
         // Show dialog to encrypt personal items after password change
@@ -1274,7 +1276,11 @@ if (
     function resetAdminChangeUserPasswordDialogContext() {
         $('#admin_change_user_password_target_user').val('');
         $('#admin_change_user_encryption_code_target_user').val('');
-        $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+        if ($.fn.iCheck && $('#dialog-admin-change-user-password-do-show-password').parent('.icheckbox_flat-blue').length > 0) {
+            $('#dialog-admin-change-user-password-do-show-password').iCheck('uncheck');
+        } else {
+            $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+        }
         $('#dialog-admin-change-user-password-show-password-div').addClass('hidden');
         $('#dialog-admin-change-user-password-info').html('');
         $('#dialog-admin-change-user-password-progress').html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
@@ -1295,6 +1301,7 @@ if (
         $('#dialog-admin-change-user-password-do, #dialog-admin-change-user-password-close').attr('disabled', 'disabled');
 
         var changeExpected = false,
+            shouldShowGeneratedPassword = $('#dialog-admin-change-user-password-do-show-password').is(':checked') === true,
             parameters = {};
         if ($('#admin_change_user_password_target_user').val() !== '') {
             changeExpected = true;
@@ -1357,17 +1364,28 @@ if (
                         }
 
                         // Show user password to admin
-                        if ($('#dialog-admin-change-user-password-do-show-password').is(':checked') === true && data_next1.user_password !== '') {
+                        if (shouldShowGeneratedPassword === true && data_next1.user_password !== '') {
                             showModalDialogBox(
                                 '#warningModal',
                                 '<i class="fas fa-user-shield fa-lg warning mr-2"></i><?php echo $lang->get('caution'); ?>',
-                                '<?php echo $lang->get('user_password'); ?>&nbsp;<code class="ml-2">'+data_next1.user_password+'</code>',
+                                '<div class="form-group mb-0">'+
+                                    '<label for="warningModal-admin-reset-user-password"><?php echo $lang->get('user_password'); ?></label>'+
+                                    '<div class="input-group">'+
+                                        '<input type="text" readonly class="form-control form-item-control" id="warningModal-admin-reset-user-password" value="">'+
+                                        '<div class="input-group-append">'+
+                                            '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-admin-reset-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
+                                                '<i class="fa-solid fa-copy"></i>'+
+                                            '</button>'+
+                                        '</div>'+
+                                    '</div>'+
+                                '</div>',
                                 '',
                                 '<?php echo $lang->get('close'); ?>',
                                 false,
                                 false,
                                 false
                             );
+                            $('#warningModal-admin-reset-user-password').val(data_next1.user_password);
                         }
 
                         $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('generate_new_keys_end'); ?>');
@@ -2441,6 +2459,379 @@ if (
             return '';
         }
     }
+
+    function tpEscapeHtml(value) {
+        return $('<div>').text((value || '').toString()).html();
+    }
+
+    window.TeamPassOnlineUsers = (function() {
+        const sessionKey = "<?php echo $session->get('key'); ?>";
+        const refreshInterval = 60000;
+        const i18n = {
+            title: <?php echo json_encode($lang->get('users_online')); ?>,
+            empty: <?php echo json_encode($lang->get('no_online_users')); ?>,
+            loading: <?php echo json_encode($lang->get('loading')); ?>,
+            close: <?php echo json_encode($lang->get('close')); ?>,
+            online: <?php echo json_encode($lang->get('online')); ?>,
+            unknown: <?php echo json_encode($lang->get('unknown')); ?>,
+            genericError: <?php echo json_encode($lang->get('an_error_occurred')); ?>
+        };
+
+        const defaultAvatarUrl = <?php echo json_encode((isset($SETTINGS['cpassman_url']) ? (string) $SETTINGS['cpassman_url'] : '') . '/includes/images/photo.jpg'); ?>;
+
+        function renderAvatar(user) {
+            const avatarUrl = user && typeof user.avatar_url === 'string' && user.avatar_url !== ''
+                ? user.avatar_url
+                : defaultAvatarUrl;
+
+            return `<img src="${tpEscapeHtml(avatarUrl)}" alt="" class="tp-online-users-avatar-img" onerror="this.onerror=null;this.src='${tpEscapeHtml(defaultAvatarUrl)}';">`;
+        }
+
+        let drawerOpen = false;
+        let summaryTimer = null;
+        let drawerPositionFrame = null;
+
+        function getIndicator() {
+            return $('#sidebar-online-users-trigger, #sidebar-online-users-indicator').first();
+        }
+
+        function getDrawer() {
+            return $('#online-users-drawer');
+        }
+
+        function getDrawerContent() {
+            return $('#online-users-drawer-content');
+        }
+
+        function normalizeCount(count) {
+            const parsedCount = parseInt(count, 10);
+            return Number.isFinite(parsedCount) ? parsedCount : 0;
+        }
+
+        function applyTooltip(count) {
+            const indicator = getIndicator();
+            if (indicator.length === 0) {
+                return;
+            }
+
+            const tooltip = `${count} ${i18n.title}`;
+            indicator
+                .attr('title', tooltip)
+                .attr('data-original-title', tooltip)
+                .attr('aria-label', tooltip)
+                .toggleClass('text-info', count > 0)
+                .toggleClass('text-muted', count === 0);
+        }
+
+        function applyCount(count) {
+            const normalizedCount = normalizeCount(count);
+            applyTooltip(normalizedCount);
+            $('#online-users-drawer-count').text(normalizedCount);
+        }
+
+        function hideIndicatorTooltip() {
+            const indicator = getIndicator();
+            if (indicator.length === 0) {
+                return;
+            }
+
+            try {
+                indicator.tooltip('hide');
+            } catch (e) {
+                // Silent.
+            }
+        }
+
+        function positionDrawer() {
+            const drawer = getDrawer();
+            const trigger = $('#sidebar-online-users-trigger');
+            if (drawer.length === 0 || trigger.length === 0) {
+                return;
+            }
+
+            const triggerElement = trigger.get(0);
+            if (!triggerElement) {
+                return;
+            }
+
+            const triggerRect = triggerElement.getBoundingClientRect();
+            const drawerWidth = Math.min(drawer.outerWidth() || 340, window.innerWidth - 16);
+            const computedLeft = Math.max(8, Math.min(triggerRect.left - 12, window.innerWidth - drawerWidth - 8));
+            const computedBottom = Math.max(8, window.innerHeight - triggerRect.top + 8);
+
+            drawer.css({
+                left: computedLeft + 'px',
+                right: 'auto',
+                top: 'auto',
+                bottom: computedBottom + 'px',
+            });
+        }
+
+        function scheduleDrawerPosition() {
+            if (drawerPositionFrame !== null) {
+                window.cancelAnimationFrame(drawerPositionFrame);
+            }
+
+            drawerPositionFrame = window.requestAnimationFrame(function() {
+                drawerPositionFrame = null;
+                positionDrawer();
+            });
+        }
+
+        function setLoadingState() {
+            const drawerContent = getDrawerContent();
+            if (drawerContent.length === 0) {
+                return;
+            }
+
+            drawerContent.html(
+                `<div class="p-3 text-center text-muted"><i class="fa-solid fa-spinner fa-spin mr-2"></i>${tpEscapeHtml(i18n.loading)}</div>`
+            );
+            scheduleDrawerPosition();
+        }
+
+        function render(users) {
+            const drawerContent = getDrawerContent();
+            if (drawerContent.length === 0) {
+                return;
+            }
+
+            const list = Array.isArray(users) ? users : [];
+            $('#online-users-drawer-count').text(list.length);
+
+            if (list.length === 0) {
+                drawerContent.html(
+                    `<div class="p-4 text-center text-muted">
+                        <i class="fa-solid fa-user-slash fa-lg mb-2"></i>
+                        <div>${tpEscapeHtml(i18n.empty)}</div>
+                    </div>`
+                );
+                return;
+            }
+
+            const html = list.map(user => {
+                const fullName = [user.name || '', user.lastname || '']
+                    .join(' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                const primaryLabel = fullName !== '' ? fullName : (user.login || i18n.unknown);
+
+                return `
+                    <div class="list-group-item tp-online-users-item">
+                        <div class="d-flex align-items-center">
+                            <span class="tp-online-users-avatar">
+                                ${renderAvatar(user)}
+                            </span>
+                            <div class="tp-online-users-meta flex-grow-1">
+                                <div class="font-weight-bold text-truncate">${tpEscapeHtml(primaryLabel)}</div>
+                            </div>
+                            <span class="badge badge-success ml-2">${tpEscapeHtml(i18n.online)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            drawerContent.html(`<div class="list-group list-group-flush">${html}</div>`);
+            scheduleDrawerPosition();
+        }
+
+        function renderError() {
+            const drawerContent = getDrawerContent();
+            if (drawerContent.length === 0) {
+                return;
+            }
+
+            drawerContent.html(
+                `<div class="p-4 text-center text-danger">
+                    <i class="fa-solid fa-circle-exclamation fa-lg mb-2"></i>
+                    <div>${tpEscapeHtml(i18n.genericError)}</div>
+                </div>`
+            );
+            scheduleDrawerPosition();
+        }
+
+        function fetchStatus(includeUsers, silentRefresh) {
+            const payload = {
+                include_users: includeUsers === true ? 1 : 0,
+            };
+
+            $.post(
+                'sources/main.queries.php',
+                {
+                    type_category: 'action_system',
+                    type: 'get_online_users_status',
+                    data: prepareExchangedData(JSON.stringify(payload), 'encode', sessionKey),
+                    key: sessionKey,
+                },
+                function(response) {
+                    let data;
+
+                    try {
+                        data = prepareExchangedData(response, 'decode', sessionKey);
+                    } catch (e) {
+                        if (includeUsers === true && silentRefresh !== true) {
+                            renderError();
+                        }
+                        return false;
+                    }
+
+                    if (data.error !== false) {
+                        if (includeUsers === true && silentRefresh !== true) {
+                            renderError();
+                        }
+                        return false;
+                    }
+
+                    applyCount(data.count);
+
+                    if (includeUsers === true) {
+                        render(data.users || []);
+                    }
+                }
+            ).fail(function() {
+                if (includeUsers === true && silentRefresh !== true) {
+                    renderError();
+                }
+            });
+        }
+
+        function openDrawer() {
+            const drawer = getDrawer();
+            if (drawer.length === 0) {
+                return;
+            }
+
+            hideIndicatorTooltip();
+            drawerOpen = true;
+            drawer.removeClass('hidden').attr('aria-hidden', 'false');
+            $('#sidebar-online-users-trigger').attr('aria-expanded', 'true');
+            scheduleDrawerPosition();
+            setLoadingState();
+            fetchStatus(true, false);
+        }
+
+        function closeDrawer() {
+            const drawer = getDrawer();
+            if (drawer.length === 0) {
+                return;
+            }
+
+            hideIndicatorTooltip();
+            drawerOpen = false;
+            drawer.addClass('hidden').attr('aria-hidden', 'true');
+            $('#sidebar-online-users-trigger').attr('aria-expanded', 'false');
+        }
+
+        function toggleDrawer() {
+            if (drawerOpen === true) {
+                closeDrawer();
+            } else {
+                openDrawer();
+            }
+        }
+
+        function startSummaryRefresh() {
+            if (summaryTimer !== null) {
+                clearInterval(summaryTimer);
+            }
+
+            summaryTimer = setInterval(function() {
+                if (document.hidden === true) {
+                    return;
+                }
+
+                fetchStatus(drawerOpen === true, true);
+            }, refreshInterval);
+        }
+
+        function init() {
+            if (getIndicator().length === 0) {
+                return;
+            }
+
+            fetchStatus(false, true);
+            startSummaryRefresh();
+        }
+
+        return {
+            init: init,
+            applyCount: applyCount,
+            reloadList: function(silentRefresh) {
+                if (getDrawer().length === 0) {
+                    return;
+                }
+                fetchStatus(true, silentRefresh === true);
+            },
+            isOpen: function() {
+                return drawerOpen === true;
+            },
+            close: closeDrawer,
+            toggle: toggleDrawer,
+        };
+    })();
+
+    $(document).on('click', '#sidebar-online-users-trigger', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+            $(this).tooltip('hide');
+        } catch (e) {
+            // Silent.
+        }
+
+        window.TeamPassOnlineUsers.toggle();
+    });
+
+
+    $(document).on('click', '#online-users-drawer', function(event) {
+        event.stopPropagation();
+    });
+
+    $(document).on('click', function(event) {
+        if (
+            typeof window.TeamPassOnlineUsers !== 'undefined'
+            && window.TeamPassOnlineUsers.isOpen() === true
+            && $(event.target).closest('#online-users-drawer, #sidebar-online-users-trigger').length === 0
+        ) {
+            window.TeamPassOnlineUsers.close();
+        }
+    });
+
+    $(document).on('keydown', function(event) {
+        if (
+            event.key === 'Escape'
+            && typeof window.TeamPassOnlineUsers !== 'undefined'
+            && window.TeamPassOnlineUsers.isOpen() === true
+        ) {
+            window.TeamPassOnlineUsers.close();
+        }
+    });
+
+    $(function() {
+        if (typeof window.TeamPassOnlineUsers !== 'undefined') {
+            window.TeamPassOnlineUsers.init();
+        }
+    });
+
+    $(window).on('resize', function() {
+        if (
+            typeof window.TeamPassOnlineUsers !== 'undefined'
+            && window.TeamPassOnlineUsers.isOpen() === true
+        ) {
+            window.TeamPassOnlineUsers.reloadList(true);
+        }
+    });
+
+    $(document).on('collapsed.lte.pushmenu shown.lte.pushmenu', function() {
+        if (
+            typeof window.TeamPassOnlineUsers !== 'undefined'
+            && window.TeamPassOnlineUsers.isOpen() === true
+        ) {
+            window.TeamPassOnlineUsers.reloadList(true);
+        }
+    });
+
 
     /**
      * Show dialog to re-encrypt personal items after password change

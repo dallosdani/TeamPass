@@ -31,6 +31,7 @@ declare(strict_types=1);
 use TeampassClasses\ConfigManager\ConfigManager;
 use TeampassClasses\Language\Language;
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__ . '/../sources/backup.functions.php';
 require_once __DIR__ . '/../sources/users_purge.functions.php';
 require_once __DIR__.'/background_tasks___functions.php';
 require_once __DIR__.'/traits/ItemHandlerTrait.php';
@@ -140,7 +141,7 @@ class TaskWorker {
 
         if (!is_dir($targetDir)) {
             // mkdir can fail if the directory was created concurrently; the second is_dir check handles that race
-            $mkdirResult = mkdir($targetDir, 0770, true);
+            $mkdirResult = mkdir($targetDir, 0750, true);
             if ($mkdirResult === false && !is_dir($targetDir)) {
                 throw new Exception('Cannot create backup target dir: ' . $targetDir);
             }
@@ -149,8 +150,11 @@ class TaskWorker {
             throw new Exception('Backup target dir is not writable: ' . $targetDir);
         }
 
-        // Use stored encryption key (same as UI)
-        $encryptionKey = (string)($this->settings['bck_script_passkey'] ?? '');
+        // Use the resolved clear backup key and self-heal empty values on impacted instances.
+        $resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($this->settings, true);
+        $encryptionKey = !empty($resolvedBackupScriptPasskey['success'])
+            ? (string) $resolvedBackupScriptPasskey['clear_key']
+            : '';
         if ($encryptionKey === '') {
             throw new Exception('Missing encryption key (bck_script_passkey).');
         }

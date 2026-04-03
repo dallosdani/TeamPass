@@ -354,278 +354,161 @@ if (isset($post_type)) {
             if (substr($abspath, strlen($abspath) - 1) == '/') {
                 $abspath = substr($abspath, 0, strlen($abspath) - 1);
             }
-            $okWritable = true;
-            $okExtensions = true;
-            $okTasksManager = true;
+            $okWritable            = true;
+            $okExtensions          = true;
+            $okTasksManager        = true;
             $okTUsersPasswordsSymfony = true;
-            $txt = '';
-            $var_x = 1;
+            $okEncryptKey          = true;
+            $checks                = [];
+
+            // ── Directories ──────────────────────────────────────────────
+            $dirChecks = [
+                '/includes/config/settings.php'   => ['id' => 'upg-chk-settings',    'optional' => false, 'fix' => 'chmod 0640 includes/config/settings.php'],
+                '/includes/config/'               => ['id' => 'upg-chk-config',       'optional' => false, 'fix' => 'chmod 0750 includes/config'],
+                '/includes/libraries/csrfp/libs/' => ['id' => 'upg-chk-csrfp-libs',  'optional' => false, 'fix' => 'chmod 0750 includes/libraries/csrfp/libs'],
+                '/includes/libraries/csrfp/log/'  => ['id' => 'upg-chk-csrfp-log',   'optional' => false, 'fix' => 'chmod 0750 includes/libraries/csrfp/log'],
+                '/includes/avatars/'              => ['id' => 'upg-chk-avatars',      'optional' => true,  'fix' => 'chmod 0750 includes/avatars'],
+                '/files/'                         => ['id' => 'upg-chk-files',        'optional' => false, 'fix' => 'chmod 0750 files'],
+                '/upload/'                        => ['id' => 'upg-chk-upload',       'optional' => true,  'fix' => 'chmod 0750 upload'],
+            ];
+
             $tab = array(
                 $abspath . '/includes/config/settings.php',
-                $abspath . '/includes/libraries/csrfp/libs/',
-                $abspath . '/install/',
-                $abspath . '/includes/',
                 $abspath . '/includes/config/',
+                $abspath . '/includes/libraries/csrfp/libs/',
+                $abspath . '/includes/libraries/csrfp/log/',
                 $abspath . '/includes/avatars/',
                 $abspath . '/files/',
                 $abspath . '/upload/',
             );
             foreach ($tab as $elem) {
-                // try to create it if not existing
                 if (substr($elem, -1) === '/' && !is_dir($elem)) {
-                    mkdir($elem);
+                    mkdir($elem, 0750, true);
                 }
-                // check if writable
-                if (is_writable($elem)) {
-                    $txt .= '<span>' .
-                        $elem . '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-                } else {
-                    $txt .= '<span>' .
-                        $elem . '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
+                $suffix = str_replace($abspath, '', $elem);
+                $meta   = $dirChecks[$suffix] ?? ['id' => 'upg-chk-unknown', 'optional' => false, 'fix' => ''];
+                $ok     = is_writable($elem);
+                if (!$ok && !$meta['optional']) {
                     $okWritable = false;
                 }
-                ++$var_x;
+                $checks[] = [
+                    'id'       => $meta['id'],
+                    'status'   => $ok ? 'ok' : ($meta['optional'] ? 'warning' : 'error'),
+                    'fix'      => $ok ? '' : $meta['fix'],
+                ];
             }
 
-            if (!extension_loaded('openssl')) {
-                $txt .= '<span>PHP extension \"openssl\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"openssl\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            // ── PHP extensions ────────────────────────────────────────────
+            foreach (['openssl', 'mbstring', 'bcmath', 'xml', 'curl'] as $ext) {
+                $ok = extension_loaded($ext);
+                if (!$ok) {
+                    $okExtensions = false;
+                }
+                $checks[] = ['id' => 'upg-chk-' . $ext, 'status' => $ok ? 'ok' : 'error', 'fix' => ''];
             }
-            if (!extension_loaded('mbstring')) {
-                $txt .= '<span>PHP extension \"mbstring\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"mbstring\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+
+            // max_execution_time
+            $ok = (int) ini_get('max_execution_time') >= 30;
+            if (!$ok) {
+                $okExtensions = false;
             }
-            if (!extension_loaded('bcmath')) {
-                $txt .= '<span>PHP extension \"bcmath\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"bcmath\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            $checks[] = ['id' => 'upg-chk-exec-time', 'status' => $ok ? 'ok' : 'error', 'fix' => ''];
+
+            // PHP version
+            $ok = version_compare(phpversion(), MIN_PHP_VERSION, '>=');
+            if (!$ok) {
+                $okExtensions = false;
             }
-            if (!extension_loaded('xml')) {
-                $txt .= '<span>PHP extension \"xml\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"xml\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            $checks[] = ['id' => 'upg-chk-php-version', 'status' => $ok ? 'ok' : 'error', 'fix' => ''];
+
+            // MySQL / MariaDB version
+            $mysqlOk   = version_compare((string) $db_link->server_version, MIN_MYSQL_VERSION, '>=');
+            $mariadbOk = version_compare((string) $db_link->server_version, MIN_MARIADB_VERSION, '>=');
+            $ok = $mysqlOk || $mariadbOk;
+            if (!$ok) {
+                $okExtensions = false;
             }
-            if (!extension_loaded('curl')) {
-                $txt .= '<span>PHP extension \"curl\"' .
-                    '<i class=\"fa-solid fa-circle-minus text-danger ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"curl\"' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+            $checks[] = ['id' => 'upg-chk-mysql-version', 'status' => $ok ? 'ok' : 'error', 'fix' => ''];
+
+            // Encryption key
+            if (defined('SECUREPATH') === true) {
+                if (@mysqli_fetch_row(
+                    mysqli_query($db_link,
+                        'SELECT valeur FROM ' . $pre . "misc WHERE type='admin' AND intitule = 'enable_tasks_manager'")
+                )) {
+                    $okEncryptKey = true;
+                } else {
+                    $defuse_file = SECUREPATH . '/teampass-seckey.txt';
+                    $okEncryptKey = file_exists($defuse_file);
+                    $superGlobal->put('tp_defuse_installed', $okEncryptKey, 'SESSION');
+                }
             }
-            // pcntl and posix are CLI-only extensions, only required for WebSocket (optional)
-            // Use shell check to verify they are installed for CLI (only when exec() is available)
+            $checks[] = ['id' => 'upg-chk-encrypt-key', 'status' => $okEncryptKey ? 'ok' : 'error', 'fix' => ''];
+
+            // Tasks manager
+            $tableProcessesExists = mysqli_query(
+                $db_link,
+                "SELECT * FROM information_schema.tables WHERE table_schema = '$database' AND table_name = '" . $pre . "processes'"
+            );
+            if ($tableProcessesExists === true) {
+                @mysqli_query($db_link, "SELECT * FROM `" . $pre . "processes` WHERE finished_at = ''");
+                $okTasksManager = @mysqli_affected_rows($db_link) === 0;
+            }
+            $checks[] = ['id' => 'upg-chk-tasks', 'status' => $okTasksManager ? 'ok' : 'error', 'fix' => ''];
+
+            // User password hashes
+            @mysqli_query($db_link, "SELECT * FROM `" . $pre . "users` WHERE pw LIKE '\$2y\$10\$%'");
+            $oldHashCount = @mysqli_affected_rows($db_link);
+            if ($oldHashCount > 0 && TP_VERSION === '3.2.0') {
+                $okTUsersPasswordsSymfony = false;
+            }
+            $checks[] = [
+                'id'     => 'upg-chk-passwords',
+                'status' => ($oldHashCount === 0) ? 'ok' : 'warning',
+                'fix'    => ($oldHashCount > 0 ? $oldHashCount : ''),
+            ];
+
+            // ── Optional extensions ───────────────────────────────────────
+            // posix / pcntl (CLI only)
             $cliModules = [];
             if (function_exists('exec')) {
                 exec('php -m 2>/dev/null', $cliModules);
             }
             foreach (['posix', 'pcntl'] as $cliExt) {
-                if (!in_array($cliExt, $cliModules, true)) {
-                    $txt .= '<span>PHP extension \"' . $cliExt . '\" not found' .
-                        ' &mdash; optional, required for WebSocket' .
-                        '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
-                } else {
-                    $txt .= '<span>PHP extension \"' . $cliExt . '\"' .
-                        '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-                }
+                $ok = in_array($cliExt, $cliModules, true);
+                $checks[] = ['id' => 'upg-chk-' . $cliExt, 'status' => $ok ? 'ok' : 'warning', 'fix' => ''];
             }
-            // OPcache — optional, strongly recommended
-            $opcacheLoaded  = extension_loaded('Zend OPcache');
-            $opcacheEnabled = $opcacheLoaded && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
-            if ($opcacheEnabled === false) {
-                $txt .= '<span>PHP extension \"Zend OPcache\" is not enabled' .
-                    ' &mdash; strongly recommended for performance' .
-                    '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
-            } else {
+
+            // OPcache
+            $opcacheEnabled = extension_loaded('Zend OPcache') && filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN);
+            if ($opcacheEnabled) {
                 $opcacheMemMb = (int) ini_get('opcache.memory_consumption');
-                if ($opcacheMemMb > 0 && $opcacheMemMb < 128) {
-                    $txt .= '<span>PHP extension \"Zend OPcache\" is enabled but memory is low (' .
-                        $opcacheMemMb . ' MB, 128 MB recommended)' .
-                        '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
-                } else {
-                    $txt .= '<span>PHP extension \"Zend OPcache\" is enabled' .
-                        '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-                }
-            }
-
-            // PHP-FPM — optional, recommended for high-concurrency deployments
-            if (PHP_SAPI === 'fpm-fcgi') {
-                $txt .= '<span>PHP-FPM detected (SAPI: fpm-fcgi)' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
+                $opcacheStatus = ($opcacheMemMb > 0 && $opcacheMemMb < 128) ? 'warning' : 'ok';
             } else {
-                $txt .= '<span>PHP is running under SAPI \"' . PHP_SAPI . '\"' .
-                    ' &mdash; PHP-FPM recommended for high-load deployments' .
-                    '<i class=\"fa-solid fa-circle-info text-info ml-2\"></i></span><br />';
+                $opcacheStatus = 'warning';
             }
+            $checks[] = ['id' => 'upg-chk-opcache', 'status' => $opcacheStatus, 'fix' => ''];
 
-            // APCu — optional, recommended for settings cache
+            // PHP-FPM
+            $checks[] = ['id' => 'upg-chk-fpm', 'status' => PHP_SAPI === 'fpm-fcgi' ? 'ok' : 'info', 'fix' => ''];
+
+            // APCu
             $apcuEnabled = extension_loaded('apcu') && filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN);
-            if ($apcuEnabled === false) {
-                $txt .= '<span>PHP extension \"APCu\" is not enabled' .
-                    ' &mdash; recommended to cache settings and reduce DB queries' .
-                    '<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"APCu\" is enabled' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-            }
+            $checks[] = ['id' => 'upg-chk-apcu', 'status' => $apcuEnabled ? 'ok' : 'warning', 'fix' => ''];
 
-            // ext-redis — optional, required only if Redis session storage is desired
-            if (extension_loaded('redis')) {
-                $txt .= '<span>PHP extension \"redis\" is loaded' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-            } else {
-                $txt .= '<span>PHP extension \"redis\" is not loaded' .
-                    ' &mdash; optional, required only for Redis session storage' .
-                    '<i class=\"fa-solid fa-circle-info text-info ml-2\"></i></span><br />';
-            }
+            // redis
+            $checks[] = ['id' => 'upg-chk-redis', 'status' => extension_loaded('redis') ? 'ok' : 'info', 'fix' => ''];
 
-            if (ini_get('max_execution_time') < 30) {
-                $txt .= '<span>PHP \"Maximum ' .
-                    'execution time\" is set to ' . ini_get('max_execution_time') . ' seconds.' .
-                    ' Please try to set to 60s at least until Upgrade is finished.&nbsp;' .
-                    '&nbsp;<img src=\"images/minus-circle.png\"></span> <br />';
-            } else {
-                $txt .= '<span>PHP \"Maximum ' .
-                    'execution time\" is set to ' . ini_get('max_execution_time') . ' seconds' .
-                    '<i class=\"fa-solid fa-circle-check text-success ml-2\"></i></span><br />';
-            }
-            if (version_compare(phpversion(), MIN_PHP_VERSION, '<')) {
-                $txt .= '<span>PHP version ' .
-                    phpversion() . ' is not OK (minimum is '.MIN_PHP_VERSION.') &nbsp;&nbsp;' .
-                    '<img src=\"images/minus-circle.png\"></span><br />';
-            } else {
-                $txt .= '<span>PHP version ' .
-                    phpversion() . ' is OK<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                    '</span><br />';
-            }
-            $mysqlVersion = version_compare((string) $db_link -> server_version, MIN_MYSQL_VERSION, '<') ;
-            $mariadbVersion = version_compare((string) $db_link -> server_version, MIN_MARIADB_VERSION, '<') ;
-            if ($mysqlVersion && $mariadbVersion) {
-                $txt .= '<span>MySQL version ' .
-                    $db_link -> server_version . ' is not OK (minimum is '.MIN_MARIADB_VERSION.') &nbsp;&nbsp;' .
-                    '<img src=\"images/minus-circle.png\"></span><br />';
-            } else {
-                $txt .= '<span>MySQL version ' .
-                    $db_link -> server_info . ' is OK<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                    '</span><br />';
-            }
-            
-
-            // check if 2.1.27 already installed
-            // Test non necessaire si on a deja fait l'upgrade
-            if (defined(SECUREPATH) === true) {
-                // Check if we are in version 3
-                if (@mysqli_fetch_row(
-                    mysqli_query(
-                        $db_link,
-                        'SELECT valeur FROM ' . $pre . "misc
-                        WHERE type='admin' AND intitule = 'enable_tasks_manager'"
-                    )
-                )) {
-                    $okEncryptKey = true;
-                } else {
-                    // We are not in version 3
-                    $okEncryptKey = false;
-                    $defuse_file = SECUREPATH . '/teampass-seckey.txt';
-                    if (file_exists($defuse_file)) {
-                        $okEncryptKey = true;
-                        $superGlobal->put('tp_defuse_installed', true, 'SESSION');
-                        $txt .= '<span>Defuse encryption key is defined<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                            '</span><br />';
-                    }
-
-                    if ($okEncryptKey === false) {
-                        $superGlobal->put('tp_defuse_installed', false, 'SESSION');
-                        $txt .= '<span>Encryption Key (SALT) ' .
-                            ' could not be recovered from ' . $defuse_file . '&nbsp;&nbsp;' .
-                            '<img src=\"images/minus-circle.png\"></span><br />';
-                            $okEncryptKey = false;
-                    } else {
-                        $okEncryptKey = true;
-                        $txt .= '<span>Encryption Key (SALT) is available<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                            '</span><br />';
-                    }
-                }                
-                
-            } else {
-                $okEncryptKey = true;
-            }
-
-            // @phpstan-ignore identical.alwaysTrue
-            if ($okWritable === true && $okExtensions === true && $okEncryptKey === true) {
-                $error = "";
+            // ── Final error state ─────────────────────────────────────────
+            if ($okWritable && $okExtensions && $okEncryptKey && $okTasksManager && $okTUsersPasswordsSymfony) {
+                $error    = '';
                 $nextStep = 2;
             } else {
-                $error = "Something went wrong. Please check messages.";
+                $error    = 'Some requirements are not met. Please check the list above.';
                 $nextStep = 1;
             }
 
-            // Is tasks manager empty?
-            $tableProcessesExists = mysqli_query(
-                $db_link,
-                "SELECT * FROM information_schema.tables
-                WHERE table_schema = '$database'
-                AND table_name = '" . $pre . "processes'"
-            );
-            if ($tableProcessesExists === true) {
-                @mysqli_query(
-                    $db_link,
-                    "SELECT * FROM `" . $pre . "processes`
-                    WHERE finished_at = ''"
-                );
-                if (@mysqli_affected_rows($db_link) > 0) {
-                    $txt .= '<span>Tasks manager is not empty. Please empty it before starting next step.&nbsp;&nbsp;' .
-                            '<img src=\"images/minus-circle.png\"></span><br />';
-                    $okTasksManager = false;
-                } else {
-                    $okTasksManager = true;
-                    $txt .= '<span>Tasks manager is empty<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                        '</span><br />';
-                }
-            } else {
-                $okTasksManager = true;
-                $txt .= '<span>Tasks manager is empty<i class=\"fa-solid fa-circle-check text-success ml-2\"></i>' .
-                        '</span><br />';
-            }
-
-            // are users passwords encrypted with new Symfony library?
-            @mysqli_query(
-                $db_link,
-                "SELECT * FROM `" . $pre . "users`
-                WHERE pw LIKE '$2y$10$%'"
-            );
-            if (@mysqli_affected_rows($db_link) > 0) {
-                $txt .= '<span>Users password not encrypted with new library. Is a blocker to upgrade to 3.2.0' .
-                '&nbsp;<a target=\"_blank\" href=\"https://github.com/nilsteampassnet/TeamPass/discussions/4020\">[Read more]</a>'.
-                '&nbsp;&nbsp;<i class=\"fa-solid fa-triangle-exclamation text-warning ml-2\"></i>'.
-                '</span><br />';
-                if (TP_VERSION === '3.2.0') $okTUsersPasswordsSymfony = false;
-            }
-
-            // @phpstan-ignore identical.alwaysTrue
-            if ($okWritable === true && $okExtensions === true && $okEncryptKey === true && $okTasksManager === true && $okTUsersPasswordsSymfony === true) {
-                $error = "";
-                $nextStep = 2;
-            } else {
-                $error = "Something went wrong. Please check messages.";
-                $nextStep = 1;
-            }
-
-            echo '[{'.
-                '"error" : "' . $error . '",'.
-                '"info" : "' . $txt . '",'.
-                '"index" : "'.($error === "" ? "" : $nextStep).'",'.
-                '"infos" : "' . $okWritable." ; ".$okExtensions." ; ".$okEncryptKey." ; ".$okTasksManager." ; " . '"'.
-            '}]';
+            echo '[{"error":"' . $error . '","index":"' . ($error === '' ? '' : $nextStep) . '","checks":' . json_encode($checks) . ',"infos":"' . $okWritable . ';' . $okExtensions . ';' . $okEncryptKey . ';' . $okTasksManager . '"}]';
             break;
 
             //==========================

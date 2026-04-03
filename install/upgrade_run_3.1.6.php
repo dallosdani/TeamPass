@@ -371,8 +371,7 @@ $triggerFile = __DIR__ . '/../files/teampass_background_tasks.trigger';
 if (!file_exists($triggerFile)) {
     // Create the file with current timestamp
     if (@file_put_contents($triggerFile, (string) time()) !== false) {
-        // Set permissions to allow web server and cron to read/write
-        @chmod($triggerFile, 0664);
+        @chmod($triggerFile, 0640); // owner=rw, group=r, world=none
     }
 }
 
@@ -384,8 +383,7 @@ $lockFile = __DIR__ . '/../files/teampass_background_tasks.lock';
 if (!file_exists($lockFile)) {
     // Create the file with current timestamp
     if (@file_put_contents($lockFile, (string) time()) !== false) {
-        // Set permissions to allow web server and cron to read/write
-        @chmod($lockFile, 0664);
+        @chmod($lockFile, 0640); // owner=rw, group=r, world=none
     }
 }
 

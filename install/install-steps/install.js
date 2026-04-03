@@ -497,15 +497,12 @@ function performStep3() {
 function performStep2() {
     // List of checks to perform
     const checks = [
-        { id: 'check0', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'install/' },
-        { id: 'check1', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/' },
         { id: 'check2', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/config/' },
-        { id: 'check3', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/avatars/' },
+        { id: 'check3', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/avatars/', optional: true },
         { id: 'check4', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/libraries/csrfp/libs/' },
-        { id: 'check5', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/libraries/csrfp/js/' },
         { id: 'check6', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'includes/libraries/csrfp/log/' },
         { id: 'check7', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'files/' },
-        { id: 'check8', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'upload/' },
+        { id: 'check8', type: 'directory', path: store.get('TeamPassInstallation').teampassAbsolutePath+'upload/', optional: true },
         { id: 'check9', type: 'extension', name: 'mbstring' },
         { id: 'check10', type: 'extension', name: 'openssl' },
         { id: 'check11', type: 'extension', name: 'bcmath' },
@@ -521,22 +518,28 @@ function performStep2() {
         { id: 'check24', type: 'redis', optional: true }
     ];
 
+    // Reset icon spans and hints from a previous run before starting fresh
+    checks.forEach(function(check) {
+        $('#' + check.id).html('')
+    })
+    $('[id$="-hint"]').addClass('d-none')
+
     let errorOccurred = false; // Variable to track errors
 
     // Function to perform a check
     function performCheck(index) {
         if (index >= checks.length) {
             if (errorOccurred) {
-                show_loader('error', '<i class="fa-regular fa-circle-xmark text-alert"></i> Errors occurred. Please fix the issues before continuing.');
+                show_loader('error', '<i class="fa-regular fa-circle-xmark text-alert"></i> Some requirements are not met. Fix the issues shown above, then click <strong>Start</strong> again.')
             } else {
-                show_loader('success', '<i class="fas fa-check text-success"></i> All checks succeeded!', 2);
+                show_loader('success', '<i class="fas fa-check text-success"></i> All checks passed — click <strong>Continue</strong> to proceed.', 0)
 
                 // Update the next step
-                $('#installStep').val('3');
+                $('#installStep').val('3')
 
-                // Handle the buttons
-                $('#button_next').prop('disabled', false);
-                $('#button_start').prop('disabled', true);
+                // Enable Continue, disable Start (no point re-running when all pass)
+                $('#button_next').prop('disabled', false)
+                $('#button_start').prop('disabled', true)
             }
             return;
         }
@@ -556,17 +559,27 @@ function performStep2() {
             data: check,
             success: function(response) {
                 if (response.success) {
-                    $(`#${check.id}`).html('<i class="fas fa-check text-success"></i>'); // Green checkmark
+                    $(`#${check.id}`).html('<i class="fas fa-check text-success"></i>')
                 } else if (check.optional) {
-                    $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>'); // Warning — optional
+                    $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>')
+                    // Show the fix hint for optional directories so the admin can still act
+                    const $hint = $(`#${check.id}-hint`)
+                    if ($hint.length) {
+                        $hint.removeClass('d-none')
+                    }
                 } else {
-                    errorOccurred = true; // An error occurred
-                    $(`#${check.id}`).html('<i class="fas fa-times text-danger"></i>'); // Red cross
+                    errorOccurred = true
+                    $(`#${check.id}`).html('<i class="fas fa-times text-danger"></i>')
+                    // Reveal the inline fix command so the admin knows exactly what to run
+                    const $hint = $(`#${check.id}-hint`)
+                    if ($hint.length) {
+                        $hint.removeClass('d-none')
+                    }
                 }
             },
             error: function() {
-                errorOccurred = true; // An error occurred
-                $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>'); // Warning icon
+                errorOccurred = true
+                $(`#${check.id}`).html('<i class="fas fa-exclamation-triangle text-warning"></i>')
             },
             complete: function() {
                 // Move to the next check

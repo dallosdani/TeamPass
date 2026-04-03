@@ -728,9 +728,24 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 '<i class="fa-solid fa-info-circle mr-2"></i><?php echo $lang->get('send_user_password_by_email'); ?>'+
                 '<div class="row">'+
                     (store.get('teampassApplication').formUserAction === "add_new_user" ?
-                    '<div class="col-lg-2"><button type="button" class="btn btn-block btn-secondary mr-2"  id="warningModal-button-user-pwd"><?php echo $lang->get('show_user_password'); ?></button></div>'+
-                    '<div class="col-lg-4 hidden" id="warningModal-user-pwd"><div><?php echo $lang->get('user_password'); ?><input class="form-control form-item-control" value="'+store.get('teampassUser').admin_new_user_password+'"></div>'+
-                    '<div><?php echo $lang->get('user_temporary_encryption_code'); ?><input class="form-control form-item-control" value="'+store.get('teampassUser').admin_new_user_temporary_encryption_code+'"></div></div>'
+                    '<div class="col-lg-2"><button type="button" class="btn btn-block btn-secondary mr-2" id="warningModal-button-user-pwd"><?php echo $lang->get('show_user_password'); ?></button></div>'+
+                    '<div class="col-lg-4 hidden" id="warningModal-user-pwd">'+
+                        '<div class="form-group">'+
+                            '<label for="warningModal-generated-user-password"><?php echo $lang->get('user_password'); ?></label>'+
+                            '<div class="input-group">'+
+                                '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-password" value="">'+
+                                '<div class="input-group-append">'+
+                                    '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-generated-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
+                                        '<i class="fa-solid fa-copy"></i>'+
+                                    '</button>'+
+                                '</div>'+
+                            '</div>'+
+                        '</div>'+
+                        '<div class="form-group mb-0">'+
+                            '<label for="warningModal-generated-user-otc"><?php echo $lang->get('user_temporary_encryption_code'); ?></label>'+
+                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-generated-user-otc" value="">'+
+                        '</div>'+
+                    '</div>'
                     :
                     '<div class="col-lg-2"><button type="button" class="btn btn-block btn-secondary mr-2"  id="warningModal-button-user-pwd"><?php echo $lang->get('show_user_temporary_encryption_code'); ?></button></div>'+
                     '<div class="col-lg-4 hidden" id="warningModal-user-pwd"><input class="form-control form-item-control" value="'+store.get('teampassUser').admin_new_user_temporary_encryption_code+'"></div></div>'
@@ -742,6 +757,8 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 false,
                 false
             );
+            $('#warningModal-generated-user-password').val(store.get('teampassUser').admin_new_user_password);
+            $('#warningModal-generated-user-otc').val(store.get('teampassUser').admin_new_user_temporary_encryption_code);
             $('#warningModal').modal('show');
 
             $(document).on('click', '#warningModal-button-user-pwd', function() {
@@ -1149,13 +1166,24 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                                 showModalDialogBox(
                                     '#warningModal',
                                     '<i class="fas fa-user-shield fa-lg warning mr-2"></i><?php echo $lang->get('caution'); ?>',
-                                    '<?php echo $lang->get('user_password'); ?>&nbsp;<code class="ml-2">' + data.user_password + '</code>',
+                                    '<div class="form-group mb-0">'+
+                                        '<label for="warningModal-created-user-password"><?php echo $lang->get('user_password'); ?></label>'+
+                                        '<div class="input-group">'+
+                                            '<input type="text" readonly class="form-control form-item-control" id="warningModal-created-user-password" value="">'+
+                                            '<div class="input-group-append">'+
+                                                '<button type="button" class="btn btn-secondary clipboard-copy" clipboard-target="warningModal-created-user-password" title="<?php echo $lang->get('copy_to_clipboard'); ?>">'+
+                                                    '<i class="fa-solid fa-copy"></i>'+
+                                                '</button>'+
+                                            '</div>'+
+                                        '</div>'+
+                                    '</div>',
                                     '',
                                     '<?php echo $lang->get('close'); ?>',
                                     false,
                                     false,
                                     false
                                 );
+                                $('#warningModal-created-user-password').val(data.user_password);
                             }
                             // ---
                         } else {
@@ -1316,7 +1344,11 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                                 .html('<i class="icon fas fa-info mr-2"></i><?php echo $lang->get('admin_change_user_password_info'); ?>');
                             $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
                             $('#dialog-admin-change-user-password-show-password-div').removeClass('hidden');
-                            $('#dialog-admin-change-user-password-do-show-password').prop('checked', true);
+                            if ($.fn.iCheck && $('#dialog-admin-change-user-password-do-show-password').parent('.icheckbox_flat-blue').length > 0) {
+                                $('#dialog-admin-change-user-password-do-show-password').iCheck('uncheck');
+                            } else {
+                                $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+                            }
 
                             // SHow form
                             $('#dialog-admin-change-user-password').removeClass('hidden');
@@ -1366,7 +1398,11 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                 .html('<i class="icon fas fa-info mr-2"></i><?php echo $lang->get('admin_change_user_encryption_code_info'); ?>');
             $("#dialog-admin-change-user-password-progress").html('<?php echo $lang->get('provide_current_psk_and_click_launch'); ?>');
             $('#dialog-admin-change-user-password-show-password-div').addClass('hidden');
-            $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+            if ($.fn.iCheck && $('#dialog-admin-change-user-password-do-show-password').parent('.icheckbox_flat-blue').length > 0) {
+                $('#dialog-admin-change-user-password-do-show-password').iCheck('uncheck');
+            } else {
+                $('#dialog-admin-change-user-password-do-show-password').prop('checked', false);
+            }
 
             // SHow form
             $('#dialog-admin-change-user-password').removeClass('hidden');
@@ -1445,7 +1481,7 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             // Reset state and open modal
             $('#row-folders-filter-bar').hide()
             $('#row-folders-results').html('')
-            $('.folder-type-filter').addClass('active')
+            $('.folder-type-filter').removeClass('active')
             $('#modal-folders-rights').modal('show')
 
             // Start progress bar
@@ -1522,7 +1558,13 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             $('input[type="checkbox"].flat-blue').iCheck({
                 checkboxClass: 'icheckbox_flat-blue',
             });
-            $(document).one('click', '#warningModalButtonAction', function() {                
+            // Disable Perform button by default; enable only when state differs from initial
+            const initialDisabledChecked = disabledStatus !== ''
+            $('#warningModalButtonAction').prop('disabled', true)
+            $('#user-disabled').on('ifChanged', function() {
+                $('#warningModalButtonAction').prop('disabled', $(this).prop('checked') === initialDisabledChecked)
+            })
+            $(document).one('click', '#warningModalButtonAction', function() {
 
                 // Show spinner
                 toastr.remove();
@@ -1598,11 +1640,14 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
             $('input[type="checkbox"].flat-blue').iCheck({
                 checkboxClass: 'icheckbox_flat-blue',
             });
+            // Disable Perform button by default; enable only when checkbox is checked
+            $('#warningModalButtonAction').prop('disabled', true)
+            $('#user-to-delete').on('ifChecked', function() {
+                $('#warningModalButtonAction').prop('disabled', false)
+            }).on('ifUnchecked', function() {
+                $('#warningModalButtonAction').prop('disabled', true)
+            })
             $(document).one('click', '#warningModalButtonAction', function() {
-                if ($('#user-to-delete').prop('checked') === false) {
-                    $('#warningModal').modal('hide');
-                    return false;
-                }             
 
                 // Show spinner
                 toastr.remove();

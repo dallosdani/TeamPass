@@ -486,6 +486,15 @@ class DatabaseInstaller
         require_once __DIR__.'/../../includes/config/include.php';
 
         // add by default settings
+        $backupScriptPasskeyClear = GenerateCryptKeyForInstall(40, false, true, true, false, true);
+        $backupScriptPasskeyStorage = $backupScriptPasskeyClear;
+        $backupScriptPasskeyIsEncrypted = 0;
+        $backupScriptPasskeyCipher = cryptionForInstall($backupScriptPasskeyClear, '', 'encrypt');
+        if (isset($backupScriptPasskeyCipher['string']) && is_string($backupScriptPasskeyCipher['string']) && $backupScriptPasskeyCipher['string'] !== '') {
+            $backupScriptPasskeyStorage = $backupScriptPasskeyCipher['string'];
+            $backupScriptPasskeyIsEncrypted = 1;
+        }
+
         $aMiscVal = array(
             array('admin', 'max_latest_items', '10'),
             array('admin', 'enable_favourites', '1'),
@@ -562,7 +571,7 @@ class DatabaseInstaller
             array('admin', 'allow_import', '0'),
             array('admin', 'proxy_ip', ''),
             array('admin', 'proxy_port', ''),
-            array('admin', 'upload_maxfilesize', '10mb'),
+            array('admin', 'upload_maxfilesize', '100mb'),
             array('admin', 'upload_docext', 'doc,docx,dotx,xls,xlsx,xltx,rtf,csv,txt,pdf,ppt,pptx,pot,dotx,xltx'),
             array('admin', 'upload_imagesext', 'jpg,jpeg,gif,png'),
             array('admin', 'upload_pkgext', '7z,rar,tar,zip'),
@@ -605,7 +614,7 @@ class DatabaseInstaller
             array('admin', 'secure_display_image', '1'),
             array('admin', 'upload_zero_byte_file', '0'),
             array('admin', 'upload_all_extensions_file', '0'),
-            array('admin', 'bck_script_passkey', '', '1'),
+            array('admin', 'bck_script_passkey', $backupScriptPasskeyStorage, $backupScriptPasskeyIsEncrypted),
             array('admin', 'admin_2fa_required', '1'),
             array('admin', 'password_overview_delay', '4'),
             array('admin', 'copy_to_clipboard_small_icons', '1'),
@@ -703,7 +712,11 @@ class DatabaseInstaller
             array('admin', 'network_whitelist_enabled', '0'),
             array('admin', 'network_security_mode', 'direct'),
             array('admin', 'network_security_header', 'x-forwarded-for'),
-            array('admin', 'network_trusted_proxies', '')
+            array('admin', 'network_trusted_proxies', ''),
+            array('admin', 'show_online_users_list', '0'),
+            array('admin', 'health_logs_mode', 'auto'),
+            array('admin', 'health_teampass_log_path', ''),
+            array('admin', 'health_php_fpm_log_path', '')
         );
         foreach ($aMiscVal as $elem) {
             $value = isset($elem[3]) ? $elem[3] : 0;

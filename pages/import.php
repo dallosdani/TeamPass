@@ -64,10 +64,12 @@ $checkUserAccess = new PerformChecks(
     ]
 );
 
-// Check user access and import enabled
+// Check user access and import enabled (admin can always access)
 echo $checkUserAccess->caseHandler();
-if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPage('import') === false
-    || isset($SETTINGS['allow_import']) === false || (int) $SETTINGS['allow_import'] !== 1) {
+if ((int) $session->get('user-admin') === 0
+    && ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPage('import') === false
+    || isset($SETTINGS['allow_import']) === false || (int) $SETTINGS['allow_import'] !== 1)
+) {
     // Not allowed page
     $session->set('system-error_code', ERR_NOT_ALLOWED);
     include $SETTINGS['cpassman_dir'] . '/error.php';

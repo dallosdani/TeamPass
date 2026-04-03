@@ -804,7 +804,7 @@ declare(strict_types=1);
         // Base64 encode sensitive data
         const sharedData = {
             ...data,
-            pw: btoa(data.pw),
+            pw: btoa(unescape(encodeURIComponent(data.pw))),
             ...oauth2Info
         };
         

@@ -192,6 +192,10 @@ if ($deleted_users_count > 0) {
 
 $inactive_never_connected_count = $canAccessInactiveAndDeletedUsers === true ? count_never_connected_active_users() : 0;
 $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
+
+// Warn admin if SMTP server address is not configured
+$emailNotConfigured = $canAccessInactiveAndDeletedUsers === true
+    && empty(trim($SETTINGS['email_smtp_server'] ?? ''));
 ?>
 
 <!-- Content Header (Page header) -->
@@ -244,6 +248,13 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                         }
                         ?>
                     </h3>
+                    <?php if ($emailNotConfigured === true): ?>
+                    <div class="card-tools">
+                        <a href="index.php?page=emails" class="text-error infotip" title="<?php echo $lang->get('email_smtp_server_not_configured'); ?>">
+                            <i class="fa-solid fa-envelope blink_me fa-lg"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- /.card-header -->
@@ -442,11 +453,11 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label for="form-name"><?php echo $lang->get('name'); ?></label>
-                                    <input type="text" class="form-control clear-me required track-change purify" id="form-name" data-field="name">
+                                    <input type="text" class="form-control clear-me required track-change purify" id="form-name" data-field="name" tabindex="1">
                                 </div>
                                 <div class="form-group">
                                     <label for="form-login"><?php echo $lang->get('login'); ?></label>
-                                    <input type="text" class="form-control clear-me required build-login track-change purify" id="form-login" data-field="login">
+                                    <input type="text" class="form-control clear-me required build-login track-change purify" id="form-login" data-field="login"  tabindex="3">
                                     <input type="hidden" id="form-login-conform" value="0">
                                 </div>
                             </div>
@@ -454,11 +465,11 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label for="form-lastname"><?php echo $lang->get('lastname'); ?></label>
-                                    <input type="text" class="form-control clear-me required track-change purify" id="form-lastname" data-field="lastname">
+                                    <input type="text" class="form-control clear-me required track-change purify" id="form-lastname" data-field="lastname" tabindex="2">
                                 </div>
                                 <div class="form-group">
                                     <label for="form-login"><?php echo $lang->get('email'); ?></label>
-                                    <input type="email" class="form-control clear-me required track-change validate-email purify" id="form-email" data-field="email">
+                                    <input type="email" class="form-control clear-me required track-change validate-email purify" id="form-email" data-field="email" tabindex="4">
                                 </div>
                             </div>
                         </div>
@@ -588,19 +599,19 @@ $inactive_blink_class = $inactive_never_connected_count > 0 ? 'blink_me' : '';
                     <div id="row-folders-filter-bar" class="border-bottom px-3 py-2" style="display:none">
                         <small class="text-muted mr-2"><?php echo $lang->get('filter'); ?> :</small>
                         <div class="btn-group btn-group-sm" role="group">
-                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="W">
+                            <button type="button" class="btn btn-outline-secondary folder-type-filter" data-type="W">
                                 W &mdash; <?php echo $lang->get('write'); ?>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="ND">
+                            <button type="button" class="btn btn-outline-secondary folder-type-filter" data-type="ND">
                                 ND &mdash; <?php echo $lang->get('no_delete'); ?>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NE">
+                            <button type="button" class="btn btn-outline-secondary folder-type-filter" data-type="NE">
                                 NE &mdash; <?php echo $lang->get('no_edit'); ?>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="NDNE">
+                            <button type="button" class="btn btn-outline-secondary folder-type-filter" data-type="NDNE">
                                 NDNE
                             </button>
-                            <button type="button" class="btn btn-outline-secondary active folder-type-filter" data-type="R">
+                            <button type="button" class="btn btn-outline-secondary folder-type-filter" data-type="R">
                                 R &mdash; <?php echo $lang->get('read'); ?>
                             </button>
                         </div>

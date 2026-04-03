@@ -372,6 +372,501 @@ $filename = $prefix . time() . '-' . $token . $schemaSuffix . '.sql';
 }
 
 
+if (function_exists('tpBackupScriptPasskeyIsClear') === false) {
+    /**
+     * Check whether the provided value matches the clear backup passkey format.
+     */
+    function tpBackupScriptPasskeyIsClear(string $value): bool
+    {
+        return $value !== '' && preg_match('/^[A-Za-z0-9]{40}$/', $value) === 1;
+    }
+}
+
+if (function_exists('tpGenerateBackupScriptPasskey') === false) {
+    /**
+     * Generate a clear backup script passkey.
+     */
+    function tpGenerateBackupScriptPasskey(): string
+    {
+        if (function_exists('GenerateCryptKey')) {
+            return GenerateCryptKey(40, false, true, true, false, true);
+        }
+
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        $maxIndex = strlen($alphabet) - 1;
+        $key = '';
+
+        for ($i = 0; $i < 40; $i++) {
+            try {
+                $key .= $alphabet[random_int(0, $maxIndex)];
+            } catch (Throwable $e) {
+                $key .= $alphabet[mt_rand(0, $maxIndex)];
+            }
+        }
+
+        return $key;
+    }
+}
+
+if (function_exists('tpGetBackupScriptPasskeyArchiveSettingName') === false) {
+    function tpGetBackupScriptPasskeyArchiveSettingName(): string
+    {
+        return 'bck_script_passkey_restore_candidates';
+    }
+}
+
+if (function_exists('tpNormalizeBackupScriptPasskeyCandidates') === false) {
+    /**
+     * @param array<int|string, mixed> $candidates
+     * @return array<int, string>
+     */
+    function tpNormalizeBackupScriptPasskeyCandidates(array $candidates): array
+    {
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            if (!is_scalar($candidate)) {
+                continue;
+            }
+
+            $value = trim((string) $candidate);
+            if ($value === '') {
+                continue;
+            }
+
+            if (!in_array($value, $normalized, true)) {
+                $normalized[] = $value;
+            }
+        }
+
+        return $normalized;
+    }
+}
+
+if (function_exists('tpLoadBackupScriptPasskeyRestoreCandidates') === false) {
+    /**
+     * Load archived restore candidates for backward compatibility with historical backups.
+     *
+     * @return array<int, string>
+     */
+    function tpLoadBackupScriptPasskeyRestoreCandidates(array &$SETTINGS): array
+    {
+        $settingName = tpGetBackupScriptPasskeyArchiveSettingName();
+        $storedPayload = isset($SETTINGS[$settingName]) ? (string) $SETTINGS[$settingName] : '';
+
+        if ($storedPayload === '') {
+            $row = DB::queryFirstRow(
+                'SELECT valeur FROM ' . prefixTable('misc') . ' WHERE type=%s AND intitule=%s LIMIT 1',
+                'admin',
+                $settingName
+            );
+            $storedPayload = isset($row['valeur']) ? (string) $row['valeur'] : '';
+            if ($storedPayload !== '') {
+                $SETTINGS[$settingName] = $storedPayload;
+            }
+        }
+
+        if ($storedPayload === '') {
+            return [];
+        }
+
+        $decodedPayload = '';
+        try {
+            $tmp = cryption($storedPayload, '', 'decrypt', $SETTINGS);
+            $decodedPayload = isset($tmp['string']) ? (string) $tmp['string'] : '';
+        } catch (Throwable $e) {
+            $decodedPayload = '';
+        }
+
+        if ($decodedPayload === '') {
+            $decodedPayload = $storedPayload;
+        }
+
+        $data = json_decode($decodedPayload, true);
+        if (is_array($data)) {
+            return tpNormalizeBackupScriptPasskeyCandidates($data);
+        }
+
+        return tpNormalizeBackupScriptPasskeyCandidates([$decodedPayload]);
+    }
+}
+
+if (function_exists('tpStoreBackupScriptPasskeyRestoreCandidates') === false) {
+    /**
+     * Persist archived restore candidates as an encrypted JSON payload.
+     */
+    function tpStoreBackupScriptPasskeyRestoreCandidates(array $candidates, array &$SETTINGS): bool
+    {
+        $settingName = tpGetBackupScriptPasskeyArchiveSettingName();
+        $normalized = tpNormalizeBackupScriptPasskeyCandidates($candidates);
+
+        $json = json_encode($normalized, JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            return false;
+        }
+
+        $enc = cryption($json, '', 'encrypt', $SETTINGS);
+        $storedPayload = isset($enc['string']) ? (string) $enc['string'] : '';
+        if ($storedPayload === '') {
+            return false;
+        }
+
+        $row = DB::queryFirstRow(
+            'SELECT increment_id FROM ' . prefixTable('misc') . ' WHERE type=%s AND intitule=%s LIMIT 1',
+            'admin',
+            $settingName
+        );
+
+        try {
+            if (!empty($row['increment_id'])) {
+                DB::update(
+                    prefixTable('misc'),
+                    [
+                        'valeur' => $storedPayload,
+                        'updated_at' => time(),
+                        'is_encrypted' => 1,
+                    ],
+                    'increment_id=%i',
+                    (int) $row['increment_id']
+                );
+            } else {
+                DB::insert(
+                    prefixTable('misc'),
+                    [
+                        'type' => 'admin',
+                        'intitule' => $settingName,
+                        'valeur' => $storedPayload,
+                        'created_at' => time(),
+                        'is_encrypted' => 1,
+                    ]
+                );
+            }
+        } catch (Throwable $e) {
+            try {
+                if (!empty($row['increment_id'])) {
+                    DB::update(
+                        prefixTable('misc'),
+                        [
+                            'valeur' => $storedPayload,
+                            'updated_at' => time(),
+                        ],
+                        'increment_id=%i',
+                        (int) $row['increment_id']
+                    );
+                } else {
+                    DB::insert(
+                        prefixTable('misc'),
+                        [
+                            'type' => 'admin',
+                            'intitule' => $settingName,
+                            'valeur' => $storedPayload,
+                            'created_at' => time(),
+                        ]
+                    );
+                }
+            } catch (Throwable $e2) {
+                return false;
+            }
+        }
+
+        $SETTINGS[$settingName] = $storedPayload;
+
+        if (class_exists('\TeampassClasses\ConfigManager\ConfigManager')) {
+            \TeampassClasses\ConfigManager\ConfigManager::invalidateCache();
+        }
+
+        return true;
+    }
+}
+
+if (function_exists('tpArchiveBackupScriptPasskeyCandidate') === false) {
+    /**
+     * Store a restore candidate if it is not already archived.
+     */
+    function tpArchiveBackupScriptPasskeyCandidate(string $candidate, array &$SETTINGS): bool
+    {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            return false;
+        }
+
+        $candidates = tpLoadBackupScriptPasskeyRestoreCandidates($SETTINGS);
+        if (in_array($candidate, $candidates, true)) {
+            return true;
+        }
+
+        $candidates[] = $candidate;
+        return tpStoreBackupScriptPasskeyRestoreCandidates($candidates, $SETTINGS);
+    }
+}
+
+if (function_exists('tpArchiveCurrentBackupScriptPasskeyState') === false) {
+    /**
+     * Archive the current backup passkey state so historical scheduled backups remain restorable.
+     */
+    function tpArchiveCurrentBackupScriptPasskeyState(array &$SETTINGS): void
+    {
+        $storedValue = isset($SETTINGS['bck_script_passkey']) ? (string) $SETTINGS['bck_script_passkey'] : '';
+        if ($storedValue !== '') {
+            tpArchiveBackupScriptPasskeyCandidate($storedValue, $SETTINGS);
+        }
+
+        $resolved = tpResolveBackupScriptPasskey($SETTINGS, false);
+        if (!empty($resolved['success']) && !empty($resolved['clear_key'])) {
+            tpArchiveBackupScriptPasskeyCandidate((string) $resolved['clear_key'], $SETTINGS);
+        }
+    }
+}
+
+if (function_exists('tpStoreBackupScriptPasskey') === false) {
+    /**
+     * Store the backup script passkey in teampass_misc as an encrypted admin setting.
+     *
+     * @return array{success: bool, clear_key: string, encrypted_key: string, message_code: string}
+     */
+    function tpStoreBackupScriptPasskey(string $clearKey, array &$SETTINGS, bool $archiveCurrent = true): array
+    {
+        if (!tpBackupScriptPasskeyIsClear($clearKey)) {
+            return [
+                'success' => false,
+                'clear_key' => '',
+                'encrypted_key' => '',
+                'message_code' => 'invalid_format',
+            ];
+        }
+
+        $enc = cryption($clearKey, '', 'encrypt', $SETTINGS);
+        $encryptedKey = isset($enc['string']) ? (string) $enc['string'] : '';
+        if ($encryptedKey === '') {
+            return [
+                'success' => false,
+                'clear_key' => '',
+                'encrypted_key' => '',
+                'message_code' => 'encrypt_failed',
+            ];
+        }
+
+        if ($archiveCurrent === true) {
+            $currentStoredValue = isset($SETTINGS['bck_script_passkey']) ? (string) $SETTINGS['bck_script_passkey'] : '';
+            if ($currentStoredValue !== '' && $currentStoredValue !== $encryptedKey) {
+                tpArchiveBackupScriptPasskeyCandidate($currentStoredValue, $SETTINGS);
+            }
+
+            $currentResolved = tpResolveBackupScriptPasskey($SETTINGS, false);
+            if (!empty($currentResolved['success']) && !empty($currentResolved['clear_key'])) {
+                $currentClearKey = (string) $currentResolved['clear_key'];
+                if ($currentClearKey !== $clearKey) {
+                    tpArchiveBackupScriptPasskeyCandidate($currentClearKey, $SETTINGS);
+                }
+            }
+        }
+
+        $row = DB::queryFirstRow(
+            'SELECT increment_id FROM ' . prefixTable('misc') . ' WHERE type=%s AND intitule=%s LIMIT 1',
+            'admin',
+            'bck_script_passkey'
+        );
+
+        try {
+            if (!empty($row['increment_id'])) {
+                DB::update(
+                    prefixTable('misc'),
+                    [
+                        'valeur' => $encryptedKey,
+                        'updated_at' => time(),
+                        'is_encrypted' => 1,
+                    ],
+                    'increment_id=%i',
+                    (int) $row['increment_id']
+                );
+            } else {
+                DB::insert(
+                    prefixTable('misc'),
+                    [
+                        'type' => 'admin',
+                        'intitule' => 'bck_script_passkey',
+                        'valeur' => $encryptedKey,
+                        'created_at' => time(),
+                        'is_encrypted' => 1,
+                    ]
+                );
+            }
+        } catch (Throwable $e) {
+            try {
+                if (!empty($row['increment_id'])) {
+                    DB::update(
+                        prefixTable('misc'),
+                        [
+                            'valeur' => $encryptedKey,
+                            'updated_at' => time(),
+                        ],
+                        'increment_id=%i',
+                        (int) $row['increment_id']
+                    );
+                } else {
+                    DB::insert(
+                        prefixTable('misc'),
+                        [
+                            'type' => 'admin',
+                            'intitule' => 'bck_script_passkey',
+                            'valeur' => $encryptedKey,
+                            'created_at' => time(),
+                        ]
+                    );
+                }
+            } catch (Throwable $e2) {
+                return [
+                    'success' => false,
+                    'clear_key' => '',
+                    'encrypted_key' => '',
+                    'message_code' => 'db_write_failed',
+                ];
+            }
+        }
+
+        $SETTINGS['bck_script_passkey'] = $encryptedKey;
+
+        if (class_exists('\TeampassClasses\ConfigManager\ConfigManager')) {
+            \TeampassClasses\ConfigManager\ConfigManager::invalidateCache();
+        }
+
+        return [
+            'success' => true,
+            'clear_key' => $clearKey,
+            'encrypted_key' => $encryptedKey,
+            'message_code' => '',
+        ];
+    }
+}
+
+if (function_exists('tpResolveBackupScriptPasskey') === false) {
+    /**
+     * Resolve the backup script passkey to a clear key.
+     *
+     * Supported cases:
+     * - encrypted value stored in misc/config (expected format)
+     * - legacy clear-text 40 chars value
+     * - empty value (optionally self-healed)
+     *
+     * Corrupted non-empty values are never overwritten automatically.
+     *
+     * @return array{success: bool, clear_key: string, stored_value: string, source: string, message_code: string}
+     */
+    function tpResolveBackupScriptPasskey(array &$SETTINGS, bool $autoHeal = false): array
+    {
+        $storedValue = isset($SETTINGS['bck_script_passkey']) ? (string) $SETTINGS['bck_script_passkey'] : '';
+
+        if ($storedValue !== '') {
+            if (tpBackupScriptPasskeyIsClear($storedValue)) {
+                if ($autoHeal === true) {
+                    tpArchiveBackupScriptPasskeyCandidate($storedValue, $SETTINGS);
+
+                    $stored = tpStoreBackupScriptPasskey($storedValue, $SETTINGS, false);
+                    if (!empty($stored['success'])) {
+                        tpArchiveBackupScriptPasskeyCandidate((string) $stored['encrypted_key'], $SETTINGS);
+                        return [
+                            'success' => true,
+                            'clear_key' => $storedValue,
+                            'stored_value' => (string) $stored['encrypted_key'],
+                            'source' => 'legacy_clear_migrated',
+                            'message_code' => '',
+                        ];
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'clear_key' => $storedValue,
+                    'stored_value' => $storedValue,
+                    'source' => 'legacy_clear',
+                    'message_code' => '',
+                ];
+            }
+
+            try {
+                $tmp = cryption($storedValue, '', 'decrypt', $SETTINGS);
+                $decryptedValue = isset($tmp['string']) ? (string) $tmp['string'] : '';
+                if (tpBackupScriptPasskeyIsClear($decryptedValue)) {
+                    if ($autoHeal === true) {
+                        tpArchiveBackupScriptPasskeyCandidate($storedValue, $SETTINGS);
+                        tpArchiveBackupScriptPasskeyCandidate($decryptedValue, $SETTINGS);
+                    }
+
+                    return [
+                        'success' => true,
+                        'clear_key' => $decryptedValue,
+                        'stored_value' => $storedValue,
+                        'source' => 'encrypted',
+                        'message_code' => '',
+                    ];
+                }
+            } catch (Throwable $e) {
+                // Continue below for invalid non-empty values.
+            }
+
+            return [
+                'success' => false,
+                'clear_key' => '',
+                'stored_value' => $storedValue,
+                'source' => 'invalid',
+                'message_code' => 'invalid_format',
+            ];
+        }
+
+        if ($autoHeal === true) {
+            $generatedKey = tpGenerateBackupScriptPasskey();
+            $stored = tpStoreBackupScriptPasskey($generatedKey, $SETTINGS, false);
+            if (!empty($stored['success'])) {
+                return [
+                    'success' => true,
+                    'clear_key' => $generatedKey,
+                    'stored_value' => (string) $stored['encrypted_key'],
+                    'source' => 'generated',
+                    'message_code' => '',
+                ];
+            }
+        }
+
+        return [
+            'success' => false,
+            'clear_key' => '',
+            'stored_value' => '',
+            'source' => 'empty',
+            'message_code' => 'not_set',
+        ];
+    }
+}
+
+if (function_exists('tpGetBackupScriptPasskeyCandidates') === false) {
+    /**
+     * Return candidate backup script passkeys for backward-compatible restore operations.
+     *
+     * @return array<int, string>
+     */
+    function tpGetBackupScriptPasskeyCandidates(array &$SETTINGS, bool $autoHeal = false): array
+    {
+        $keys = [];
+
+        $resolved = tpResolveBackupScriptPasskey($SETTINGS, $autoHeal);
+        if (!empty($resolved['success']) && !empty($resolved['clear_key'])) {
+            $keys[] = (string) $resolved['clear_key'];
+        }
+
+        $storedValue = (string) $resolved['stored_value'];
+        if ($storedValue === '') {
+            $storedValue = isset($SETTINGS['bck_script_passkey']) ? (string) $SETTINGS['bck_script_passkey'] : '';
+        }
+        if ($storedValue !== '') {
+            $keys[] = $storedValue;
+        }
+
+        $keys = array_merge($keys, tpLoadBackupScriptPasskeyRestoreCandidates($SETTINGS));
+
+        return tpNormalizeBackupScriptPasskeyCandidates($keys);
+    }
+}
+
+
+
 // -----------------------------------------------------------------------------
 // Helpers for restore logic (used by backups.queries.php)
 // -----------------------------------------------------------------------------

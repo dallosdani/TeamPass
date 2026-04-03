@@ -164,9 +164,10 @@ while ($data = mysqli_fetch_array($rows)) {
         );
 
         // Insert in DB the new object key for this item by user
+        // Use INSERT IGNORE to avoid duplicate key errors on re-run
         mysqli_query(
             $db_link,
-            'INSERT INTO `'.$pre."sharekeys_fields` (`increment_id`, `object_id`, `user_id`, `share_key`) 
+            'INSERT IGNORE INTO `'.$pre."sharekeys_fields` (`increment_id`, `object_id`, `user_id`, `share_key`)
             VALUES (NULL, '".$data['id']."', '".$userId."', '".encryptUserObjectKey($cryptedStuff['objectKey'], $userPublicKey)."');"
         );
     }

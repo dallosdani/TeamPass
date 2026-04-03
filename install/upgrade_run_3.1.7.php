@@ -32,6 +32,7 @@ use TeampassClasses\ConfigManager\ConfigManager;
 
 // Load functions
 require_once __DIR__.'/../sources/main.functions.php';
+require_once __DIR__.'/../sources/backup.functions.php';
 
 // init
 loadClasses('DB');
@@ -345,6 +346,49 @@ foreach ($redisDefaults as $key => $value) {
                 '" . mysqli_real_escape_string($db_link, $value) . "',
                 UNIX_TIMESTAMP())"
     );
+}
+// --->
+
+// <---
+// ==========================================
+// Footer online users panel setting (disabled by default)
+// ==========================================
+mysqli_query(
+    $db_link,
+    "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+    VALUES ('admin', 'show_online_users_list', '0', UNIX_TIMESTAMP())"
+);
+// --->
+
+// <---
+// ==========================================
+// Health logs settings (auto-detect by default, no manual paths set)
+// ==========================================
+$healthLogsDefaults = [
+    'health_logs_mode'          => 'auto',
+    'health_teampass_log_path'  => '',
+    'health_php_fpm_log_path'   => '',
+];
+foreach ($healthLogsDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
+
+// <---
+// ==========================================
+// Backup script passkey: repair empty values and archive legacy restore candidates
+// ==========================================
+if (function_exists('tpArchiveCurrentBackupScriptPasskeyState')) {
+    tpArchiveCurrentBackupScriptPasskeyState($SETTINGS);
+}
+if (function_exists('tpResolveBackupScriptPasskey')) {
+    tpResolveBackupScriptPasskey($SETTINGS, true);
 }
 // --->
 

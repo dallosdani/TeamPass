@@ -92,10 +92,25 @@ set_permissions() {
     chown -R nginx:nginx /var/www/html/includes/libraries/csrfp/log
 
     chmod 700 /var/www/html/sk
-    chmod 755 /var/www/html/files
-    chmod 755 /var/www/html/upload
+    chmod 750 /var/www/html/files
+    chmod 750 /var/www/html/upload
+    chmod 750 /var/www/html/includes/libraries/csrfp/log
 
     echo -e "${GREEN}✅ Permissions set${NC}"
+}
+
+# Function to apply dynamic PHP configuration from environment variables.
+# Writes a conf.d override file so that values set in .env are actually used
+# at runtime instead of being silently discarded.
+configure_php() {
+    PHP_INI_OVERRIDE=/usr/local/etc/php/conf.d/teampass-env.ini
+    {
+        echo "memory_limit = ${PHP_MEMORY_LIMIT:-512M}"
+        echo "upload_max_filesize = ${PHP_UPLOAD_MAX_FILESIZE:-100M}"
+        echo "post_max_size = ${PHP_POST_MAX_SIZE:-${PHP_UPLOAD_MAX_FILESIZE:-100M}}"
+        echo "max_execution_time = ${PHP_MAX_EXECUTION_TIME:-120}"
+    } > "$PHP_INI_OVERRIDE"
+    echo -e "${GREEN}✅ PHP configuration applied (memory=${PHP_MEMORY_LIMIT:-512M}, upload=${PHP_UPLOAD_MAX_FILESIZE:-100M})${NC}"
 }
 
 # Function to perform automatic installation
@@ -138,6 +153,57 @@ auto_install() {
     fi
 }
 
+# Function to run pending database migrations when the container image is
+# newer than the version recorded in teampass_misc.  The upgrade scripts are
+# idempotent (CREATE TABLE IF NOT EXISTS / ALTER ... IF NOT EXISTS), so it is
+# safe to re-run them on an already up-to-date database.
+auto_upgrade() {
+    if [ -z "$DB_PASSWORD" ]; then
+        echo -e "${YELLOW}⚠️  DB_PASSWORD not set, skipping auto-upgrade check${NC}"
+        return 0
+    fi
+
+    # Read the version stored in the database
+    DB_VERSION=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
+        "$DB_NAME" --skip-column-names --silent \
+        -e "SELECT valeur FROM ${DB_PREFIX}misc WHERE type='admin' AND intitule='teampass_version' LIMIT 1" 2>/dev/null || true)
+
+    if [ -z "$DB_VERSION" ]; then
+        echo -e "${YELLOW}⚠️  Could not read DB version, skipping auto-upgrade${NC}"
+        return 0
+    fi
+
+    # TP_VERSION is already extracted at the top of this script into TEAMPASS_VERSION
+    IMAGE_VERSION="${TP_VERSION:-${TEAMPASS_VERSION}}"
+
+    if [ "$DB_VERSION" = "$IMAGE_VERSION" ]; then
+        echo -e "${GREEN}✅ Database is up to date (${DB_VERSION})${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}🔄 Upgrading database from ${DB_VERSION} to ${IMAGE_VERSION}...${NC}"
+
+    UPGRADE_SCRIPT="/var/www/html/install/upgrade_run_${IMAGE_VERSION}.php"
+    if [ ! -f "$UPGRADE_SCRIPT" ]; then
+        echo -e "${YELLOW}⚠️  No upgrade script found for ${IMAGE_VERSION}, skipping${NC}"
+        return 0
+    fi
+
+    php "$UPGRADE_SCRIPT" \
+        --db-host="$DB_HOST" \
+        --db-port="$DB_PORT" \
+        --db-name="$DB_NAME" \
+        --db-user="$DB_USER" \
+        --db-password="$DB_PASSWORD" \
+        --db-prefix="$DB_PREFIX"
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Database upgrade to ${IMAGE_VERSION} completed${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Database upgrade script returned an error — check logs${NC}"
+    fi
+}
+
 # Function to show manual installation instructions
 manual_install_instructions() {
     echo ""
@@ -163,6 +229,9 @@ manual_install_instructions() {
 
 # Main execution flow
 main() {
+    # Apply dynamic PHP configuration from environment variables
+    configure_php
+
     # Wait for database
     wait_for_database
 
@@ -186,11 +255,16 @@ main() {
     if is_installed; then
         echo -e "${GREEN}✅ TeamPass is already configured${NC}"
 
-        # Remove install directory if it exists
+        # Remove install directory if it exists (keep it during upgrades so
+        # upgrade.php is accessible, then remove once complete)
         if [ -d "/var/www/html/install" ]; then
             echo -e "${BLUE}🗑️  Removing install directory...${NC}"
             rm -rf /var/www/html/install
         fi
+
+        # Auto-upgrade: apply pending database migrations when the image
+        # version is newer than the version recorded in teampass_misc.
+        auto_upgrade
     else
         echo -e "${YELLOW}⚙️  TeamPass is not configured yet${NC}"
 

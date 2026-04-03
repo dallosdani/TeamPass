@@ -4281,60 +4281,56 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                             '</div>');
                     } else {
                         refreshFoldersInfo(data.html_json.folders, 'clear');
-                    }
 
-                    // Shall we show the root folder
-                    if (data.html_json.can_create_root_folder === 1) {
-                        html_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
-                        html_full_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
-                        html_active_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
-                    }
-
-                    //
-                    if (data.extra === "to_be_parsed") {
-                        //data.html_json.folders = JSON.parse(data.html_json.folders);
-                    }
-                    let foldersArray = Array.isArray(data.html_json.folders) ? data.html_json.folders : [data.html_json.folders];
-
-                    $.each(foldersArray, function(i, value) {
-                        // Prepare options lists
-                        html_visible += '<option value="' + value.id + '"' +
-                            ((value.disabled === 1) ? ' disabled="disabled"' : '') +
-                            ' data-parent-id="' + value.parent_id + '">' +
-                            '&nbsp;'.repeat(value.level) +
-                            value.title + (value.path !== '' ? ' [' + value.path + ']' : '') + '</option>';
-                    });
-                    
-                    // Append new list
-                    $('#form-item-folder, #form-item-copy-destination, #form-folder-add-parent,' +
-                            '#form-folder-delete-selection, #form-folder-copy-source, #form-folder-copy-destination')
-                        .find('option')
-                        .remove()
-                        .end()
-                        .append(html_visible);
-
-                    if (debugJavascript === true) {
-                        console.info('HTML VISIBLE:')
-                        console.log(html_visible);
-                    }
-
-                    // Store in teampassUser
-                    store.update(
-                        'teampassUser',
-                        function(teampassUser) {
-                            teampassUser.folders = html_visible;
+                        // Shall we show the root folder
+                        if (data.html_json.can_create_root_folder === 1) {
+                            html_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
+                            html_full_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
+                            html_active_visible = '<option value="0"><?php echo $lang->get('root'); ?></option>';
                         }
-                    );
 
-                    // Store version for client-side caching
-                    try {
-                        if (data.folders_version) {
-                            localStorage.setItem('tp_folders_version', data.folders_version)
+                        let foldersArray = Array.isArray(data.html_json.folders) ? data.html_json.folders : [data.html_json.folders];
+
+                        $.each(foldersArray, function(i, value) {
+                            // Prepare options lists
+                            html_visible += '<option value="' + value.id + '"' +
+                                ((value.disabled === 1) ? ' disabled="disabled"' : '') +
+                                ' data-parent-id="' + value.parent_id + '">' +
+                                '&nbsp;'.repeat(value.level) +
+                                value.title + (value.path !== '' ? ' [' + value.path + ']' : '') + '</option>';
+                        });
+
+                        // Append new list
+                        $('#form-item-folder, #form-item-copy-destination, #form-folder-add-parent,' +
+                                '#form-folder-delete-selection, #form-folder-copy-source, #form-folder-copy-destination')
+                            .find('option')
+                            .remove()
+                            .end()
+                            .append(html_visible);
+
+                        if (debugJavascript === true) {
+                            console.info('HTML VISIBLE:')
+                            console.log(html_visible);
                         }
-                    } catch(e) {}
 
-                    // remove ROOT option if exists
-                    $('#form-item-copy-destination option[value="0"]').remove();
+                        // Store in teampassUser
+                        store.update(
+                            'teampassUser',
+                            function(teampassUser) {
+                                teampassUser.folders = html_visible;
+                            }
+                        );
+
+                        // Store version for client-side caching
+                        try {
+                            if (data.folders_version) {
+                                localStorage.setItem('tp_folders_version', data.folders_version)
+                            }
+                        } catch(e) {}
+
+                        // remove ROOT option if exists
+                        $('#form-item-copy-destination option[value="0"]').remove();
+                    }
                 } else {
                     toastr.remove();
                     toastr.error(
@@ -5715,19 +5711,38 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
                         // show split mode or not
                         if (store.get('teampassUser').split_view_mode === 1) {
-                            // Optionnal splited item view
-                            $('#folder-tree-container').removeClass('col-md-5').addClass('col-md-3');
-                            $('#items-list-container').removeClass('col-md-7').addClass('col-md-4');
-                            $('#items-details-container').removeClass('col-md-12').addClass('col-md-5');
+                            // Optional split item view
+                            $('#folders-tree-card').removeClass('hidden');
+
+                            $('#folder-tree-container')
+                                .removeClass('hidden col-md-5')
+                                .addClass('col-md-3');
+
+                            $('#items-list-container')
+                                .removeClass('hidden col-md-7')
+                                .addClass('col-md-4');
+
+                            $('#items-details-container')
+                                .removeClass('hidden col-md-12')
+                                .addClass('col-md-5');
+
                             // Reduce menu size and trigger event listener
                             if ($('body').hasClass('sidebar-collapse') === false) {
                                 $('a[data-widget="pushmenu"]').click();
                             }
                         } else {
-                            // Defaut = full screen item view
-                            $('#folder-tree-container').removeClass('col-md-5').addClass('hidden');
-                            $('#items-list-container').removeClass('col-md-7').addClass('hidden');
-                            $('#items-details-container').removeClass('col-md-5').addClass('col-md-12');
+                            // Default = full screen item view
+                            $('#folder-tree-container')
+                                .removeClass('col-md-3')
+                                .addClass('col-md-5 hidden');
+
+                            $('#items-list-container')
+                                .removeClass('col-md-4')
+                                .addClass('col-md-7 hidden');
+
+                            $('#items-details-container')
+                                .removeClass('col-md-5')
+                                .addClass('col-md-12');
                         }
                         
                         // Show item details

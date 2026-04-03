@@ -183,7 +183,7 @@ class FolderManager
         }
 
         return [
-            'isPersonal' => null !== $data['personal_folder'] ? $data['personal_folder'] : 0,
+            'isPersonal' => null !== $data ? (int) $data['personal_folder'] : 0,
             'parentBloquerCreation' => $parentBloquerCreation,
             'parentBloquerModification' => $parentBloquerModification,
         ];

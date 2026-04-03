@@ -5,6 +5,7 @@
 - [Installation](install/installation.md)
 - [Upgrade](install/upgrade.md)
 - [Docker](install/docker.md)
+- [File permissions](install/file-permissions.md)
 - [Information](install/encryption.md)
 - [Extra](install/extra-settings.md)
 - [Performance](install/performance.md)

@@ -444,11 +444,14 @@ try {
     $log('WARN', 'Unable to decrypt stored secrets: ' . $e->getMessage());
 }
 
-// Instance key (scheduled backups)
+// Instance key candidates (scheduled backups + archived legacy values)
 try {
-    $keysToTry = array_merge($keysToTry, tpGetBackupScriptPasskeyCandidates($SETTINGS, false));
+    $keysToTry = array_merge(
+        $keysToTry,
+        tpGetBackupScriptPasskeyCandidates($SETTINGS, false)
+    );
 } catch (Throwable $e) {
-    $log('WARN', 'Unable to resolve instance backup key: ' . $e->getMessage());
+    $log('WARN', 'Unable to load instance backup key candidates: ' . $e->getMessage());
 }
 
 $keysToTry = array_values(array_unique($keysToTry));

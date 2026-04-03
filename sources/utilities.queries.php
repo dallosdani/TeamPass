@@ -4201,7 +4201,7 @@ function tpHealthGetHostHints(array $SETTINGS): array
     $firstLabel = '';
     if ($host !== '') {
         $parts = explode('.', $host);
-        $firstLabel = trim((string) ($parts[0] ?? ''));
+        $firstLabel = trim($parts[0]);
     }
 
     $dirSlug = '';
@@ -4332,7 +4332,7 @@ function tpHealthGetApacheConfigPaths(): array
         '/usr/local/apache2/conf/httpd.conf',
     ) as $pattern) {
         foreach (glob($pattern) ?: array() as $path) {
-            if (is_string($path) === true && $path !== '' && is_file($path) === true && is_readable($path) === true) {
+            if ($path !== '' && is_file($path) === true && is_readable($path) === true) {
                 $paths[$path] = $path;
             }
         }
@@ -4353,7 +4353,7 @@ function tpHealthGetNginxConfigPaths(): array
         '/usr/local/openresty/nginx/conf/conf.d/*.conf',
     ) as $pattern) {
         foreach (glob($pattern) ?: array() as $path) {
-            if (is_string($path) === true && $path !== '' && is_file($path) === true && is_readable($path) === true) {
+            if ($path !== '' && is_file($path) === true && is_readable($path) === true) {
                 $paths[$path] = $path;
             }
         }
@@ -4370,7 +4370,7 @@ function tpHealthGetApacheLogDirCandidates(): array
     if (is_file($envvarsPath) === true && is_readable($envvarsPath) === true) {
         $envvars = file_get_contents($envvarsPath);
         if (is_string($envvars) === true && preg_match('/^\s*(?:export\s+)?APACHE_LOG_DIR=(["\']?)([^\r\n"\']+)\1/m', $envvars, $matches) === 1) {
-            $candidates[] = trim((string) ($matches[2] ?? ''));
+            $candidates[] = trim($matches[2]);
         }
     }
 

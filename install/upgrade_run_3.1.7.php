@@ -359,6 +359,26 @@ mysqli_query(
 );
 // --->
 
+// <---
+// ==========================================
+// Health logs settings (auto-detect by default, no manual paths set)
+// ==========================================
+$healthLogsDefaults = [
+    'health_logs_mode'          => 'auto',
+    'health_teampass_log_path'  => '',
+    'health_php_fpm_log_path'   => '',
+];
+foreach ($healthLogsDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
+
 // Close connection
 mysqli_close($db_link);
 

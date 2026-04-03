@@ -1800,8 +1800,7 @@ switch ($post_type) {
                         if ($path !== '') {
                             $segments = explode('/', $path);
                             if (
-                                isset($segments[0]) === true
-                                && $segments[0] !== ''
+                                $segments[0] !== ''
                                 && strpos((string) $segments[0], '.php') === false
                             ) {
                                 $host = (string) $segments[0];
@@ -2785,8 +2784,7 @@ switch ($post_type) {
                         if ($path !== '') {
                             $segments = explode('/', $path);
                             if (
-                                isset($segments[0]) === true
-                                && $segments[0] !== ''
+                                $segments[0] !== ''
                                 && strpos((string) $segments[0], '.php') === false
                             ) {
                                 $host = (string) $segments[0];
@@ -6083,5 +6081,19 @@ function tpHealthSanitizeManualLogPathForAdmin(string $path): string
 
 function tpHealthIsAbsolutePathForAdmin(string $path): bool
 {
-    return $path !== '' && str_starts_with($path, '/');
+    if ($path === '' || !str_starts_with($path, '/')) {
+        return false;
+    }
+
+    // Resolve symlinks and ../ sequences via the parent directory
+    // (the file itself need not exist yet).
+    $dir = realpath(dirname($path));
+    if ($dir === false) {
+        return false;
+    }
+
+    // Rebuild resolved path and verify it still points inside the filesystem root.
+    $resolved = $dir . '/' . basename($path);
+
+    return str_starts_with($resolved, '/');
 }

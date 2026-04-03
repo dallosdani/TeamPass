@@ -83,9 +83,12 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
 // --------------------------------- //
 
-// Resolve backup script key (self-heal empty / legacy values for this admin page)
-$backupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
-$localEncryptionKey = !empty($backupScriptPasskey['success']) ? (string) $backupScriptPasskey['clear_key'] : '';
+// Resolve backup script key (self-heal empty values on impacted instances)
+$localEncryptionKey = '';
+$resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
+if (!empty($resolvedBackupScriptPasskey['success']) && !empty($resolvedBackupScriptPasskey['clear_key'])) {
+    $localEncryptionKey = (string) $resolvedBackupScriptPasskey['clear_key'];
+}
 ?>
 
 <!-- Content Header (Page header) -->

@@ -554,9 +554,6 @@ function tpCheckRestoreCompatibility(array $SETTINGS, string $serverScope = '', 
                 break;
             }
 
-        
-            require_once __DIR__ . '/backup.functions.php';
-
             $backupResult = tpCreateDatabaseBackup($SETTINGS, $encryptionKey);
 
             if ($backupResult['success'] !== true) {
@@ -706,7 +703,7 @@ try {
 
             $resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($SETTINGS, true);
             $instanceKey = !empty($resolvedBackupScriptPasskey['success'])
-                ? (string) ($resolvedBackupScriptPasskey['clear_key'] ?? '')
+                ? (string) $resolvedBackupScriptPasskey['clear_key']
                 : '';
             if ($instanceKey === '') {
                 echo prepareExchangedData(

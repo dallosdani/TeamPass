@@ -153,7 +153,7 @@ class TaskWorker {
         // Use the resolved clear backup key and self-heal empty values on impacted instances.
         $resolvedBackupScriptPasskey = tpResolveBackupScriptPasskey($this->settings, true);
         $encryptionKey = !empty($resolvedBackupScriptPasskey['success'])
-            ? (string) ($resolvedBackupScriptPasskey['clear_key'] ?? '')
+            ? (string) $resolvedBackupScriptPasskey['clear_key']
             : '';
         if ($encryptionKey === '') {
             throw new Exception('Missing encryption key (bck_script_passkey).');

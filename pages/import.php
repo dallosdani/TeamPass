@@ -66,7 +66,7 @@ $checkUserAccess = new PerformChecks(
 
 // Check user access and import enabled (admin can always access)
 echo $checkUserAccess->caseHandler();
-if ((int) $session_user_admin === 0
+if ((int) $session->get('user-admin') === 0
     && ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPage('import') === false
     || isset($SETTINGS['allow_import']) === false || (int) $SETTINGS['allow_import'] !== 1)
 ) {

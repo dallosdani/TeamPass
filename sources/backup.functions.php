@@ -570,10 +570,7 @@ if (function_exists('tpStoreBackupScriptPasskeyRestoreCandidates') === false) {
 
         $SETTINGS[$settingName] = $storedPayload;
 
-        if (
-            class_exists('\TeampassClasses\ConfigManager\ConfigManager')
-            && method_exists('\TeampassClasses\ConfigManager\ConfigManager', 'invalidateCache')
-        ) {
+        if (class_exists('\TeampassClasses\ConfigManager\ConfigManager')) {
             \TeampassClasses\ConfigManager\ConfigManager::invalidateCache();
         }
 
@@ -657,7 +654,7 @@ if (function_exists('tpStoreBackupScriptPasskey') === false) {
             $currentResolved = tpResolveBackupScriptPasskey($SETTINGS, false);
             if (!empty($currentResolved['success']) && !empty($currentResolved['clear_key'])) {
                 $currentClearKey = (string) $currentResolved['clear_key'];
-                if ($currentClearKey !== '' && $currentClearKey !== $clearKey) {
+                if ($currentClearKey !== $clearKey) {
                     tpArchiveBackupScriptPasskeyCandidate($currentClearKey, $SETTINGS);
                 }
             }
@@ -728,10 +725,7 @@ if (function_exists('tpStoreBackupScriptPasskey') === false) {
 
         $SETTINGS['bck_script_passkey'] = $encryptedKey;
 
-        if (
-            class_exists('\TeampassClasses\ConfigManager\ConfigManager')
-            && method_exists('\TeampassClasses\ConfigManager\ConfigManager', 'invalidateCache')
-        ) {
+        if (class_exists('\TeampassClasses\ConfigManager\ConfigManager')) {
             \TeampassClasses\ConfigManager\ConfigManager::invalidateCache();
         }
 
@@ -857,7 +851,7 @@ if (function_exists('tpGetBackupScriptPasskeyCandidates') === false) {
             $keys[] = (string) $resolved['clear_key'];
         }
 
-        $storedValue = isset($resolved['stored_value']) ? (string) $resolved['stored_value'] : '';
+        $storedValue = (string) $resolved['stored_value'];
         if ($storedValue === '') {
             $storedValue = isset($SETTINGS['bck_script_passkey']) ? (string) $SETTINGS['bck_script_passkey'] : '';
         }

@@ -2009,6 +2009,7 @@ if (null !== $post_type) {
                     ),
                     'encode'
                 );
+                break;
             }
 
             // Encrypt data to return

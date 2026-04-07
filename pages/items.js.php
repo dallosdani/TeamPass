@@ -1396,8 +1396,30 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             //
             // > END <
             //
-        } else if ($(this).data('folder-action') === 'subfolders-show-hide') {            
-            $('#table_teampass_subfolders_list').toggle();
+        } else if ($(this).data('folder-action') === 'subfolders-show-hide') {
+            store.update(
+                'teampassUser',
+                function(teampassUser) {
+                    teampassUser.show_subfolders = teampassUser.show_subfolders === 1 ? 0 : 1;
+                }
+            );
+
+            $('#table_teampass_subfolders_list').toggleClass(
+                'hidden',
+                store.get('teampassUser').show_subfolders !== 1
+            );
+
+            if (store.get('teampassUser').show_subfolders === 1) {
+                const currentFolder = parseInt(
+                    store.get('teampassApplication').itemsListFolderId ||
+                    store.get('teampassApplication').selectedFolder
+                );
+
+                if (!isNaN(currentFolder) && store.get('teampassApplication').foldersList !== undefined) {
+                    displaySubfolders(store.get('teampassApplication').foldersList, currentFolder);
+                }
+            }
+
             toastr.remove();
         }
 

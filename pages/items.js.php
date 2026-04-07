@@ -4468,9 +4468,6 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 // Show success toastr only when this response is still for the currently selected folder.
                 // If the user has already navigated to another folder, this is a stale response:
                 // do NOT call toastr.remove() so we don't wipe out the loading toastr of the new folder.
-                // Show success toastr only when this response is still for the currently selected folder.
-                // If the user has already navigated to another folder, this is a stale response:
-                // do NOT call toastr.remove() so we don't wipe out the loading toastr of the new folder.
                 if (action === 'update') {
                     if (parseInt(folders) === store.get('teampassApplication').selectedFolder) {
                         toastr.remove();

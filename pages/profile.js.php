@@ -313,11 +313,9 @@ if ($checkUserAccess->checkSession() === false || $checkUserAccess->userAccessPa
                             ? 'index.php?page=items'
                             : 'index.php?page=profile';
 
-                        $(this).delay(3000).queue(function() {
+                        setTimeout(function() {
                             document.location.href = reloadTarget;
-
-                            $(this).dequeue();
-                        });
+                        }, 3000);
 
                         toastr.remove();
                         toastr.info(

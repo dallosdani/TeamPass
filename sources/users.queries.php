@@ -1898,7 +1898,7 @@ if (null !== $post_type) {
                     'email' => isset($dataReceived['email']) === true ? $dataReceived['email'] : '',
                     'timezone' => isset($dataReceived['timezone']) === true ? $dataReceived['timezone'] : '',
                     'language' => isset($dataReceived['language']) === true ? $dataReceived['language'] : '',
-                    'treeloadstrategy' => isset($dataReceived['treeloadstrategy']) === true ? $dataReceived['treeloadstrategy'] : '',
+                    'treeloadstrategy' => isset($dataReceived['treeloadstrategy']) === true ? $dataReceived['treeloadstrategy'] : null,
                     'agsescardid' => isset($dataReceived['agsescardid']) === true ? $dataReceived['agsescardid'] : '',
                     'name' => isset($dataReceived['name']) === true ? $dataReceived['name'] : '',
                     'lastname' => isset($dataReceived['lastname']) === true ? $dataReceived['lastname'] : '',
@@ -1929,6 +1929,21 @@ if (null !== $post_type) {
                 // Force english if non-existent language.
                 if (!file_exists(__DIR__."/../includes/language/".$inputData['language'].".php")) {
                     $inputData['language'] = 'english';
+                }
+
+                $currentTreeLoadStrategy = (string) ($session->get('user-tree_load_strategy') ?? 'full');
+                if ($currentTreeLoadStrategy === '') {
+                    $currentTreeLoadStrategy = 'full';
+                }
+
+                $requestedTreeLoadStrategy = isset($inputData['treeloadstrategy']) === true
+                    ? trim((string) $inputData['treeloadstrategy'])
+                    : '';
+                if ($requestedTreeLoadStrategy === '') {
+                    $requestedTreeLoadStrategy = $currentTreeLoadStrategy;
+                }
+                if (in_array($requestedTreeLoadStrategy, ['full', 'sequential'], true) === false) {
+                    $requestedTreeLoadStrategy = $currentTreeLoadStrategy;
                 }
 
                 // Data to update
@@ -1972,9 +1987,9 @@ if (null !== $post_type) {
                 // User can edit tree load strategy
                 if (($SETTINGS['disable_user_edit_tree_load_strategy'] ?? '0') === '0') {
                     // Update database
-                    $update_fields['treeloadstrategy'] = $inputData['treeloadstrategy'];
+                    $update_fields['treeloadstrategy'] = $requestedTreeLoadStrategy;
                     // Update session
-                    $session->set('user-tree_load_strategy', $inputData['treeloadstrategy']);
+                    $session->set('user-tree_load_strategy', $requestedTreeLoadStrategy);
                 }
 
                 // update user
@@ -1994,6 +2009,7 @@ if (null !== $post_type) {
                     ),
                     'encode'
                 );
+                break;
             }
 
             // Encrypt data to return
@@ -2004,6 +2020,9 @@ if (null !== $post_type) {
                     'name' => $session->get('user-name'),
                     'lastname' => $session->get('user-lastname'),
                     'email' => $session->get('user-email'),
+                    'language' => $session->get('user-language'),
+                    'timezone' => $session->get('user-timezone'),
+                    'treeloadstrategy' => $session->get('user-tree_load_strategy'),
                     'split_view_mode' => $session->get('user-split_view_mode'),
                     'show_subfolders' => $session->get('user-show_subfolders'),
                 ),

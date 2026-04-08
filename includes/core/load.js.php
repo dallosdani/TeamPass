@@ -1930,6 +1930,11 @@ if (
                             teampassUser['login'] = "<?php echo strval(returnIfSet($session->get('user-login'), '')); ?>";
                             teampassUser['lastname'] = "<?php echo strval(returnIfSet($session->get('user-lastname'), '')); ?>";
                             teampassUser['name'] = "<?php echo strval(returnIfSet($session->get('user-name'), '')); ?>";
+                            teampassUser['user_language'] = "<?php echo strval(returnIfSet($session->get('user-language'), 'english')); ?>";
+                            teampassUser['user_timezone'] = "<?php echo strval(returnIfSet($session->get('user-timezone'), '')); ?>";
+                            teampassUser['user_treeloadstrategy'] = "<?php echo strval(returnIfSet($session->get('user-tree_load_strategy'), 'full')); ?>";
+                            teampassUser['split_view_mode'] = <?php echo intval(returnIfSet($session->get('user-split_view_mode'), 0)); ?>;
+                            teampassUser['show_subfolders'] = <?php echo intval(returnIfSet($session->get('user-show_subfolders'), 0)); ?>;
                             teampassUser['pskDefinedInDatabase'] = <?php echo intval(returnIfSet($session->get('user-encrypted_psk'), 0, 1)); ?>;
                             teampassUser['can_create_root_folder'] = <?php echo intval(returnIfSet($session->get('user-can_create_root_folder'), 0)); ?>;
                             teampassUser['special'] = '<?php echo strval(returnIfSet($session->get('user-special'), '')); ?>';

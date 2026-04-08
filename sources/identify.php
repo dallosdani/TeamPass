@@ -1319,6 +1319,16 @@ function prepareUserEncryptionKeys($userInfo, $passwordClear, array $SETTINGS = 
         ];
     }
 
+    // User must provide their old LDAP password via the re-encryption modal.
+    // Allow login to proceed with an empty private key so the modal is displayed.
+    if ($userInfo['special'] === 'recrypt-private-key') {
+        return [
+            'public_key' => $userInfo['public_key'],
+            'private_key_clear' => '',
+            'update_keys_in_db' => [],
+        ];
+    }
+
     // Don't perform this in case of special login action
     if ($userInfo['special'] === 'otc_is_required_on_next_login' || $userInfo['special'] === 'user_added_from_ad') {
         return [
@@ -1848,16 +1858,18 @@ function finalizeAuthentication(
 
     if ($passwordNeedsSync) {
         // Try transparent recovery to re-encrypt private key with new password
-        $recoverySuccess = handleExternalPasswordChange(
+        $recoveryResult = handleExternalPasswordChange(
             (int) $userInfo['id'],
             $passwordClear,
             $userInfo,
             $SETTINGS
         );
 
-        // Only update pw hash if private key was successfully re-encrypted
-        // This ensures the mismatch remains detectable on next login if recovery failed
-        if ($recoverySuccess) {
+        // Update pw hash only on full success.
+        // For 'no_recovery_data': pw was already updated inside handleExternalPasswordChange()
+        //   so the re-encryption modal can verify the new LDAP password against the stored hash.
+        // For 'recovery_failed': leave pw unchanged so the mismatch stays detectable.
+        if ($recoveryResult['success'] === true) {
             DB::update(
                 prefixTable('users'),
                 [

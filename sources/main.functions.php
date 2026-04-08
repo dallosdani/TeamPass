@@ -3353,24 +3353,29 @@ function attemptTransparentRecovery(array $userInfo, string $newPassword, array 
 /**
  * Handles external password change (LDAP/OAuth2) with automatic re-encryption.
  *
- * @param int $userId User ID
- * @param string $newPassword New password (clear)
- * @param array $userInfo User information from database
- * @param array $SETTINGS Teampass settings
+ * Returns an array with:
+ * - 'success' (bool): true if the private key was transparently re-encrypted
+ * - 'reason' (string): '' on success, 'no_recovery_data' for legacy users without
+ *   a backup seed, 'recovery_failed' when recovery data exists but decryption failed
  *
- * @return bool True if  handled successfully
+ * @param int    $userId      User ID
+ * @param string $newPassword New password (clear)
+ * @param array  $userInfo    User information from database
+ * @param array  $SETTINGS    Teampass settings
+ *
+ * @return array{success: bool, reason: string}
  */
-function handleExternalPasswordChange(int $userId, string $newPassword, array $userInfo, array $SETTINGS): bool
+function handleExternalPasswordChange(int $userId, string $newPassword, array $userInfo, array $SETTINGS): array
 {
     // Check if password was changed recently (< 20s) to avoid duplicate processing
     if (!empty($userInfo['last_pw_change'])) {
         $timeSinceChange = time() - (int) $userInfo['last_pw_change'];
-        if ($timeSinceChange < 20) { // 20 seconds
-            return true; // Already processed
+        if ($timeSinceChange < 20) {
+            return ['success' => true, 'reason' => ''];
         }
     }
 
-    // Try to decrypt with new password first (maybe already updated)
+    // Try to decrypt with new password first (maybe already synced)
     try {
         $testDecrypt = decryptPrivateKey($newPassword, $userInfo['private_key']);
         if (!empty($testDecrypt)) {
@@ -3385,31 +3390,60 @@ function handleExternalPasswordChange(int $userId, string $newPassword, array $u
                 'id = %i',
                 $userId
             );
-            return true;
+            return ['success' => true, 'reason' => ''];
         }
     } catch (Exception $e) {
-        // Expected - old password doesn't work, continue with recovery
+        // Expected - old password doesn't match, continue with recovery
     }
 
-    // Attempt transparent recovery
+    // Attempt transparent recovery using the backup seed
     $result = attemptTransparentRecovery($userInfo, $newPassword, $SETTINGS);
 
     if ($result['success']) {
-        return true;
+        return ['success' => true, 'reason' => ''];
     }
 
-    // Recovery failed - disable user and alert admins
+    // Legacy user: no backup seed/recovery data available.
+    // Do NOT disable the account — the LDAP password change is legitimate and
+    // was already verified by the LDAP bind. Update the pw hash to the new LDAP
+    // password and flag the account so the UI shows the re-encryption modal, where
+    // the user can provide their old password to decrypt the stored private key.
+    if ($result['error'] === 'no_recovery_data') {
+        $passwordManager = new PasswordManager();
+        DB::update(
+            prefixTable('users'),
+            [
+                'pw'             => $passwordManager->hashPassword($newPassword),
+                'special'        => 'recrypt-private-key',
+                'last_pw_change' => time(),
+            ],
+            'id = %i',
+            $userId
+        );
+
+        logEvents(
+            $SETTINGS,
+            'user_connection',
+            'ldap_password_changed_no_recovery_data',
+            (string) $userId,
+            'User: ' . $userInfo['login'] . ' - manual re-encryption required via modal'
+        );
+
+        return ['success' => false, 'reason' => 'no_recovery_data'];
+    }
+
+    // Recovery data exists but decryption failed — potential integrity violation.
+    // Disable the account as a security measure.
     DB::update(
         prefixTable('users'),
         [
             'disabled' => 1,
-            'special' => 'recrypt-private-key',
+            'special'  => 'recrypt-private-key',
         ],
         'id = %i',
         $userId
     );
 
-    // Log critical event
     logEvents(
         $SETTINGS,
         'security_alert',
@@ -3418,7 +3452,7 @@ function handleExternalPasswordChange(int $userId, string $newPassword, array $u
         'User: ' . $userInfo['login'] . ' - disabled due to key recovery failure'
     );
 
-    return false;
+    return ['success' => false, 'reason' => 'recovery_failed'];
 }
 
 /**

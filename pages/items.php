@@ -107,6 +107,28 @@ if ((int) $session_user_admin === 1) {
 
 
 <!-- Main content -->
+<style>
+    #table_teampass_items_list.tp-show-corrupted-items .tp-item-corrupted-marker {
+        display: inline-block;
+    }
+    #table_teampass_items_list .tp-item-corrupted-marker {
+        display: none;
+    }
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-warning .list-item-row-description,
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-warning .list-item-row-description-extend {
+        color: #b26a00;
+    }
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-warning .list-item-description {
+        background-color: rgba(255, 193, 7, 0.08);
+    }
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-danger .list-item-row-description,
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-danger .list-item-row-description-extend {
+        color: #b91c1c;
+    }
+    #table_teampass_items_list.tp-show-corrupted-items tr.tp-item-corrupted-danger .list-item-description {
+        background-color: rgba(220, 53, 69, 0.08);
+    }
+</style>
 <section class="content">
 
     <!-- EXPIRED ITEM -->
@@ -1229,6 +1251,7 @@ if ((int) $session_user_admin === 1) {
                                     <span id="card-item-url-text" class="float-right ml-1"></span>
                                 </li>
                             </ul>
+                            <div id="card-item-corrupted-warning" class="alert mt-3 mb-0 hidden"></div>
                         </div>
                     </div>
                 </div>

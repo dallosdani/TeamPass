@@ -925,7 +925,7 @@ return array(
     'in_minutes' => 'en minutes',
     'hourly' => 'Toutes les heures',
     'daily' => 'Tous les jours',
-    'clean_orphan_objects' => 'Nettoyer les objets orphelins',
+    'clean_orphan_objects' => 'Scan d’intégrité des éléments',
     'run_once' => 'Exécuter une fois',
     'run_weekday' => 'Exécuter un jour de semaine',
     'monday' => 'Lundi',
@@ -2142,5 +2142,13 @@ return array(
     'health_teampass_log_path_tip' => 'Surcharge manuelle optionnelle du chemin du log dédié à TeamPass lorsque l’auto-détection ne permet pas d’identifier correctement le fichier du vhost ou de l’instance.',
     'health_runtime_log_empty_fmt' => 'Aucune entrée récente n’a été trouvée dans : %s',
     'email_smtp_server_not_configured' => 'Email n’est pas configuré - l’adresse du serveur SMTP est manquant. Cliquer pour configurer.',
-
+    'health_corrupted_items_remaining' => 'Objets corrompus restants',
+    'health_corrupted_items_by_reason' => 'Objets par catégorie',
+    'health_corrupted_items_by_scope' => 'Objets par portée',
+    'health_corrupted_items_export_csv' => 'Exporter en CSV',
+    'health_corrupted_items_csv_filename' => 'objets_corrompus',
+    'items_corrupted_notice_update' => 'Le mot de passe de cet élément doit être vérifié puis mis à jour.',
+    'items_corrupted_notice_unreadable' => 'Le mot de passe de cet élément n\'a pas pu être relu correctement. Veuillez le mettre à jour.',
+    'settings_show_corrupted_items_in_list' => 'Mettre en évidence les items corrompus dans la liste',
+    'settings_show_corrupted_items_in_list_tip' => 'Lorsque cette option est activée, les utilisateurs voient les items corrompus mis en évidence dans la liste des items.',
 );

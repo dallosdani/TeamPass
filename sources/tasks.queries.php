@@ -230,6 +230,10 @@ function loadLastTasksExec_getBadge(string $processLabel): string
             'db' => 'do_maintenance - clean-orphan-objects',
             'task' => 'clean_orphan_objects_task',
         ],
+        'do_maintenance - items-integrity-scan' => [
+            'db' => 'do_maintenance - items-integrity-scan',
+            'task' => 'clean_orphan_objects_task',
+        ],
         'do_maintenance - purge-old-files' => [
             'db' => 'do_maintenance - purge-old-files',
             'task' => 'purge_temporary_files_task',

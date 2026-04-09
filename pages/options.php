@@ -1682,6 +1682,18 @@ if (isset($SETTINGS['show_description']) === true && (int) $SETTINGS['show_descr
                                 <div class='toggle toggle-modern' id='enable_suggestion' data-toggle-on='<?php echo isset($SETTINGS['enable_suggestion']) === true && (int) $SETTINGS['enable_suggestion'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='enable_suggestion_input' value='<?php echo isset($SETTINGS['enable_suggestion']) && (int) $SETTINGS['enable_suggestion'] === 1 ? 1 : 0; ?>' />
                             </div>
                         </div>
+
+                        <div class='row mb-2 option' data-keywords="items corrupted highlight warning list display">
+                            <div class='col-10'>
+                                <?php echo $lang->get('settings_show_corrupted_items_in_list'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('settings_show_corrupted_items_in_list_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <div class='toggle toggle-modern' id='show_corrupted_items_in_list' data-toggle-on='<?php echo isset($SETTINGS['show_corrupted_items_in_list']) === true && (int) $SETTINGS['show_corrupted_items_in_list'] === 1 ? 'true' : 'false'; ?>'></div><input type='hidden' id='show_corrupted_items_in_list_input' value='<?php echo isset($SETTINGS['show_corrupted_items_in_list']) && (int) $SETTINGS['show_corrupted_items_in_list'] === 1 ? 1 : 0; ?>' />
+                            </div>
+                        </div>
                         
                     </div>
                 </div>

@@ -661,6 +661,7 @@ class DatabaseInstaller
             array('admin', 'purge_temporary_files_task', ''),
             array('admin', 'rebuild_config_file', ''),
             array('admin', 'reload_cache_table_task', ''),
+            array('admin', 'show_corrupted_items_in_list', '0'),
             array('admin', 'maximum_session_expiration_time', '60'),
             array('admin', 'items_ops_job_frequency', '1'),
             array('admin', 'enable_refresh_task_last_execution', '1'),
@@ -1516,6 +1517,39 @@ class DatabaseInstaller
             `treated_objects` varchar(20) DEFAULT NULL,
             PRIMARY KEY (`increment_id`),
             INDEX idx_created_at (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+        );
+    }
+
+    // Create table items_corruption
+    private function items_corruption()
+    {
+        DB::query(
+            "CREATE TABLE IF NOT EXISTS `" . $this->inputData['tablePrefix'] . "items_corruption` (
+            `increment_id` INT(12) NOT NULL AUTO_INCREMENT,
+            `item_id` INT(12) NOT NULL,
+            `reason_code` VARCHAR(50) NOT NULL,
+            `severity` VARCHAR(20) NOT NULL,
+            `status` VARCHAR(50) NOT NULL,
+            `action_recommendation` VARCHAR(50) NOT NULL,
+            `user_notice_mode` VARCHAR(20) NOT NULL DEFAULT 'none',
+            `is_personal` TINYINT(1) NOT NULL DEFAULT 0,
+            `len_stored` INT(12) NOT NULL DEFAULT 0,
+            `len_actual` INT(12) NOT NULL DEFAULT 0,
+            `exception_message` TEXT NULL,
+            `first_detected_at` INT(12) NOT NULL,
+            `last_detected_at` INT(12) NOT NULL,
+            `last_scan_at` INT(12) NOT NULL,
+            `confirmed_at` INT(12) NULL DEFAULT NULL,
+            `resolved_at` INT(12) NULL DEFAULT NULL,
+            `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+            `updated_at` INT(12) NOT NULL,
+            PRIMARY KEY (`increment_id`),
+            UNIQUE KEY `uk_item_id` (`item_id`),
+            KEY `idx_reason_status` (`reason_code`, `status`),
+            KEY `idx_is_active` (`is_active`),
+            KEY `idx_last_detected_at` (`last_detected_at`),
+            KEY `idx_is_personal` (`is_personal`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
         );
     }

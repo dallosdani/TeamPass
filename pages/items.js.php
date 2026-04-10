@@ -126,7 +126,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
         websocketEnabledForItems = <?php echo isset($SETTINGS['websocket_enabled']) === true ? (int) $SETTINGS['websocket_enabled'] : 0; ?>,
         itemDetailsFallbackDelay = 2500,
         pendingItemDetailsFallback = null,
-        loadingToast = '';
+        loadingToast = '',
+        showCorruptedItemsInList = <?php echo ((int) ($session->get('user-admin') ?? 0) !== 1 && isset($SETTINGS['show_corrupted_items_in_list']) === true && (int) $SETTINGS['show_corrupted_items_in_list'] === 1) ? 'true' : 'false'; ?>;
 
     /**
      * Start edition lock heartbeat via AJAX.
@@ -485,6 +486,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
 
     // Prepare some UI elements
     $('#limited-search').prop('checked', <?php echo (int) $SETTINGS['limited_search_default'] === 1 ? true : false; ?>);
+    $('#table_teampass_items_list').toggleClass('tp-show-corrupted-items', showCorruptedItemsInList === true);
 
     $(document).on('blur', '#form-item-icon', function() {
         $('#form-item-icon-show').html('<i class="fas '+$(this).val()+'"></i>');
@@ -4933,6 +4935,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 icon_favorite = '',
                 item_flag = '',
                 item_grippy = '',
+                corruption_marker = '',
+                corruption_row_class = '',
                 visible_by_user = '';
 
             counter += 1;
@@ -4944,6 +4948,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
             value.is_favorite = parseInt(value.is_favorite);
             value.is_result_of_search = parseInt(value.is_result_of_search);
             value.item_id = parseInt(value.item_id);
+            value.is_corrupted = parseInt(value.is_corrupted || 0);
             value.open_edit = parseInt(value.open_edit);
             value.rights = parseInt(value.rights);
             value.tree_id = parseInt(value.tree_id);
@@ -5038,21 +5043,27 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     description = '<span class="text-secondary small d-inline-block text-truncate">' + description + '</span>';
                 }
 
+                if (showCorruptedItemsInList === true && value.is_corrupted === 1) {
+                    corruption_row_class = ' tp-item-corrupted-danger';
+                    corruption_marker = '<i class="fa-solid fa-triangle-exclamation mr-1 infotip tp-item-corrupted-marker text-danger" title="<?php echo $lang->get('items_corrupted_marker_unreadable'); ?>"></i>';
+                }
+
                 $('#teampass_items_list').append(
-                    '<tr class="list-item-row' + (value.canMove === 1 ? ' is-draggable' : '') + ((store.get('teampassApplication').highlightFavorites === 1 && value.is_favourited === 1) ? ' bg-yellow' : '') + '" id="list-item-row_' + value.item_id + '" data-item-key="' + value.item_key + '" data-item-edition="' + value.open_edit + '" data-item-id="' + value.item_id + '" data-item-sk="' + value.sk + '" data-item-expired="' + value.expired + '" data-item-rights="' + value.rights + '" data-item-display="' + value.display + '" data-item-open-edit="' + value.open_edit + '" data-item-tree-id="' + value.tree_id + '" data-is-search-result="' + value.is_result_of_search + '" data-label="' + escape(value.label) + '">' +
+                    '<tr class="list-item-row' + corruption_row_class + (value.canMove === 1 ? ' is-draggable' : '') + ((store.get('teampassApplication').highlightFavorites === 1 && value.is_favourited === 1) ? ' bg-yellow' : '') + '" id="list-item-row_' + value.item_id + '" data-item-key="' + value.item_key + '" data-item-edition="' + value.open_edit + '" data-item-id="' + value.item_id + '" data-item-sk="' + value.sk + '" data-item-expired="' + value.expired + '" data-item-rights="' + value.rights + '" data-item-display="' + value.display + '" data-item-open-edit="' + value.open_edit + '" data-item-tree-id="' + value.tree_id + '" data-is-search-result="' + value.is_result_of_search + '" data-label="' + escape(value.label) + '">' +
                     '<td class="list-item-description px-3 py-0 align-middle d-flex">' +
                     '<span class="icon-container">' +
                     // Show user a grippy bar to move item
-                    (value.canMove === 1  ? '<i class="fa-solid fa-ellipsis-v mr-2 dragndrop"></i>' : '') + //&& value.is_result_of_search === 0
+                    (value.canMove === 1  ? '<i class="fa-solid fa-ellipsis-v mr-1 dragndrop"></i>' : '') + //&& value.is_result_of_search === 0
                     // Show user a ban icon if expired
-                    (value.expired === 1 ? '<i class="fa-regular fa-calendar-times mr-2 text-warning infotip" title="<?php echo $lang->get('not_allowed_to_see_pw_is_expired'); ?>"></i>' : '') +
+                    (value.expired === 1 ? '<i class="fa-regular fa-calendar-times mr-1 text-warning infotip" title="<?php echo $lang->get('not_allowed_to_see_pw_is_expired'); ?>"></i>' : '') +
                     // Show user that Item is not accessible
-                    (value.rights === 10 ? '<i class="fa-regular fa-eye-slash fa-xs mr-2 text-primary infotip" title="<?php echo $lang->get('item_with_restricted_access'); ?>"></i>' : '') +
+                    (value.rights === 10 ? '<i class="fa-regular fa-eye-slash fa-xs mr-1 text-primary infotip" title="<?php echo $lang->get('item_with_restricted_access'); ?>"></i>' : '') +
                     // Show user that password is badly encrypted
                     (value.pw_status === 'encryption_error' ? '<i class="fa-solid fa-exclamation-triangle fa-xs text-danger infotip mr-1" title="<?php echo $lang->get('pw_encryption_error'); ?>"></i>' : '') +
                     // Prepare item info
                     '</span>' +
-                    '<span class="list-item-clicktoshow d-inline-flex' + (value.rights === 10 ? '' : ' pointer') + '" data-item-id="' + value.item_id + '" data-item-key="' + value.item_key + '">' +
+                    '<span class="list-item-clicktoshow d-inline-flex align-items-center' + (value.rights === 10 ? '' : ' pointer') + '" data-item-id="' + value.item_id + '" data-item-key="' + value.item_key + '">' +
+                    corruption_marker +
                     // Show item fa_icon if set
                     (value.fa_icon !== '' ? '<i class="'+value.fa_icon+' mr-1 user-fa-icon"></i>' : '') +
                     '<span class="list-item-row-description d-inline-block' + (value.rights === 10 ? ' font-weight-light' : '') + '"><i class="item-favorite-star fa-solid' + ((store.get('teampassApplication').highlightFavorites === 1 && value.is_favourited === 1) ? ' fa-star mr-1' : '') + '"></i>' + value.label + '</span>' + (value.rights === 10 ? '' : description) +
@@ -5060,7 +5071,7 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     '</span>' +
                     '<span class="list-item-actions hidden">' +
                     (value.rights === 10 ?
-                        '<span class="fa-stack fa-clickable fa-clickable-access-request pointer infotip mr-2" title="<?php echo $lang->get('need_access'); ?>"><i class="fa-solid fa-circle fa-stack-2x text-danger"></i><i class="fa-regular fa-handshake fa-stack-1x fa-inverse"></i></span>' :
+                        '<span class="fa-stack fa-clickable fa-clickable-access-request pointer infotip mr-1" title="<?php echo $lang->get('need_access'); ?>"><i class="fa-solid fa-circle fa-stack-2x text-danger"></i><i class="fa-regular fa-handshake fa-stack-1x fa-inverse"></i></span>' :
                         pwd_error + icon_open + icon_all_can_modify + icon_login + icon_pwd + icon_link + icon_favorite + trash_link) +
                     '</span>' +
                     (value.folder !== undefined ?
@@ -5679,6 +5690,18 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                     // we have an error in the password : pwd_encryption_error
                     if (data.pwd_encryption_error === 'inconsistent_password') {
                         $('#card-item-pwd').after('<i class="fa-solid fa-bell text-orange fa-shake ml-3 delete-after-usage infotip" title="'+data.pwd_encryption_error_message+'"></i>');
+                    }
+
+                    $('#card-item-corrupted-warning')
+                        .addClass('hidden')
+                        .removeClass('alert-warning alert-danger')
+                        .html('');
+
+                    if (data.corruption_notice !== undefined && data.corruption_notice.display === true) {
+                        $('#card-item-corrupted-warning')
+                            .removeClass('hidden')
+                            .addClass(data.corruption_notice.severity === 'danger' ? 'alert-danger' : 'alert-warning')
+                            .html('<i class="fa-solid fa-triangle-exclamation mr-2"></i>' + data.corruption_notice.message);
                     }
 
                     // Show decryption errors for custom fields

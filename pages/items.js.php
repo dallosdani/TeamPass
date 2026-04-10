@@ -416,12 +416,12 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
     // Load list of visible folders once jstree data is ready
     // Uses loaded.jstree event instead of arbitrary 500ms delay
     $('#jstree').one('loaded.jstree', function() {
-        // Recalculate visible folders / session rights first, then rebuild the tree
-        // from fresh server-side data and finally reselect the current folder.
+        // Refresh visible folders / session rights, then select the current folder.
+        // do_refresh=false: the tree just loaded, no second rebuild needed.
         let groupe_id = store.get('teampassApplication').itemsListFolderId ||
                         store.get('teampassApplication').selectedFolder || '';
 
-        refreshTree(groupe_id, true, true);
+        refreshTree(groupe_id, false, true);
     });
 
     // What do we do if a folder is selected?

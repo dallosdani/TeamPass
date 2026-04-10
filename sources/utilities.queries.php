@@ -1584,6 +1584,10 @@ logItems(
                 break;
             }
 
+            // RSA decryption of every item sharekey can exceed the default execution limit.
+            // This pattern is consistent with items.queries.php, ldap.queries.php, etc.
+            set_time_limit(0);
+
             $limit = 2000;
             try {
                 $scanPayload = teampassCorruptedItemsRunScan($limit);

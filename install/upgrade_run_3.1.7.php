@@ -428,24 +428,6 @@ mysqli_query(
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
 );
 
-addColumnIfNotExist(
-    $pre . 'items_corruption',
-    'is_personal',
-    'TINYINT(1) NOT NULL DEFAULT 0'
-);
-
-$result = mysqli_query(
-    $db_link,
-    "SHOW INDEX FROM `{$pre}items_corruption` WHERE Key_name = 'idx_is_personal';"
-);
-if ($result !== false && mysqli_num_rows($result) === 0) {
-    mysqli_query(
-        $db_link,
-        "ALTER TABLE `{$pre}items_corruption`
-        ADD INDEX `idx_is_personal` (`is_personal`);"
-    );
-}
-
 $corruptedItemsDefaults = [
     'show_corrupted_items_in_list' => '0',
 ];

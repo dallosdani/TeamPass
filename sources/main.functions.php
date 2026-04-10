@@ -7632,11 +7632,10 @@ function teampassCorruptedItemsTableExists(): bool
 }
 
 /**
- * Default summary payload for corrupted items scan.
+ * Checks whether the is_personal scope column exists in the items_corruption table.
  *
- * @return array<string, mixed>
+ * @return bool
  */
-
 function teampassCorruptedItemsScopeColumnExists(): bool
 {
     return teampassCorruptedItemsTableExists() === true
@@ -7822,15 +7821,17 @@ function teampassCorruptedItemsBuildActiveMetrics(): array
         return $metrics;
     }
 
+    // %l is MeekroDB's literal placeholder — safe for hardcoded column expressions
     $scopeField = teampassCorruptedItemsScopeColumnExists() === true
-        ? 'c.is_personal AS is_personal'
-        : 'i.perso AS is_personal';
+        ? 'c.is_personal'
+        : 'i.perso';
 
     $rows = DB::query(
-        'SELECT c.reason_code, ' . $scopeField . '
+        'SELECT c.reason_code, %l AS is_personal
         FROM ' . prefixTable('items_corruption') . ' AS c
         LEFT JOIN ' . prefixTable('items') . ' AS i ON (i.id = c.item_id)
         WHERE c.is_active = %i',
+        $scopeField,
         1
     );
 
@@ -8032,6 +8033,8 @@ function teampassCorruptedItemsPersistScan(array $scanResult, int $scanAt): arra
  * @param int $limit Maximum number of corrupted items to keep in result list
  *
  * @return array<string, mixed>
+ *
+ * @throws \RuntimeException If the scan script is missing or invalid
  */
 function teampassCorruptedItemsRunScan(int $limit = 2000): array
 {
@@ -8070,19 +8073,32 @@ function teampassCorruptedItemsGetItems(bool $onlyActive = true, int $limit = 0)
         return [];
     }
 
-    $where = $onlyActive === true ? 'WHERE c.is_active = 1' : '';
-    $limitSql = $limit > 0 ? ' LIMIT ' . (int) $limit : '';
+    // %l is MeekroDB's literal placeholder — safe for hardcoded column expressions.
+    // $limit is typed int (strict_types) so the cast concatenation is safe.
     $scopeField = teampassCorruptedItemsScopeColumnExists() === true
         ? 'c.is_personal'
         : 'i.perso';
+    $limitSql = $limit > 0 ? ' LIMIT ' . $limit : '';
 
-    $rows = DB::query(
-        'SELECT c.*, i.label, i.updated_at AS item_updated_at, ' . $scopeField . ' AS scope_is_personal
-        FROM ' . prefixTable('items_corruption') . ' AS c
-        LEFT JOIN ' . prefixTable('items') . ' AS i ON (i.id = c.item_id)
-        ' . $where . '
-        ORDER BY i.label ASC' . $limitSql
-    );
+    if ($onlyActive === true) {
+        $rows = DB::query(
+            'SELECT c.*, i.label, i.updated_at AS item_updated_at, %l AS scope_is_personal
+            FROM ' . prefixTable('items_corruption') . ' AS c
+            LEFT JOIN ' . prefixTable('items') . ' AS i ON (i.id = c.item_id)
+            WHERE c.is_active = %i
+            ORDER BY i.label ASC' . $limitSql,
+            $scopeField,
+            1
+        );
+    } else {
+        $rows = DB::query(
+            'SELECT c.*, i.label, i.updated_at AS item_updated_at, %l AS scope_is_personal
+            FROM ' . prefixTable('items_corruption') . ' AS c
+            LEFT JOIN ' . prefixTable('items') . ' AS i ON (i.id = c.item_id)
+            ORDER BY i.label ASC' . $limitSql,
+            $scopeField
+        );
+    }
 
     $items = [];
     foreach ($rows as $row) {
@@ -8190,7 +8206,17 @@ function teampassCorruptedItemsBuildNotice(
 
     $reason = (string) ($state['reason_code'] ?? '');
 
-    if (in_array($reason, ['empty_key', 'len_mismatch', 'decrypt_failed', 'binary_bytes', 'exception'], true) === true) {
+    // warning-severity: password may be outdated or length mismatch — user should update it
+    if (in_array($reason, ['empty_key', 'len_mismatch'], true) === true) {
+        return [
+            'display' => true,
+            'severity' => 'warning',
+            'message' => $lang->get('items_corrupted_notice_update'),
+        ];
+    }
+
+    // danger-severity: password could not be decrypted — immediate re-entry required
+    if (in_array($reason, ['decrypt_failed', 'binary_bytes', 'exception'], true) === true) {
         return [
             'display' => true,
             'severity' => 'danger',

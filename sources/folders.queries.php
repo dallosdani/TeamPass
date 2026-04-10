@@ -173,10 +173,13 @@ if (null !== $post_type) {
                 // $treeDesc is indexed by node id — reuse as in-memory node map for path traversal
                 foreach ($accessibleFolders as $t) {
                     // Build ancestor path by traversing parent_id chain (no DB query)
+                    // $visited guards against circular references in corrupted data
                     $arrayPath = [];
                     $arrayParents = [];
+                    $visited = [];
                     $currentId = (int) $t->parent_id;
-                    while ($currentId > 0 && isset($treeDesc[$currentId])) {
+                    while ($currentId > 0 && isset($treeDesc[$currentId]) && !isset($visited[$currentId])) {
+                        $visited[$currentId] = true;
                         array_unshift($arrayPath, $treeDesc[$currentId]->title);
                         array_unshift($arrayParents, $currentId);
                         $currentId = (int) $treeDesc[$currentId]->parent_id;
@@ -349,6 +352,18 @@ if (null !== $post_type) {
             // Init
             $error = false;
             $errorMessage = '';
+
+            // Prevent circular reference: a folder cannot be its own parent
+            if ((int) $inputData['parentId'] === (int) $inputData['id']) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
 
             // Deny edit if this specific folder is read-only for the current user (per-folder role restriction)
             if (

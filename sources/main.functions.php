@@ -3278,12 +3278,32 @@ function attemptTransparentRecovery(array $userInfo, string $newPassword, array 
 
         // Decrypt private key using derived key (using CryptoManager - phpseclib v3)
         // Use version detection since backup may be encrypted with SHA-1 (v1) or SHA-256 (v3)
+        $backupCiphertext = base64_decode($userInfo['private_key_backup']);
         $decryptResult = \TeampassClasses\CryptoManager\CryptoManager::aesDecryptWithVersionDetection(
-            base64_decode($userInfo['private_key_backup']),
+            $backupCiphertext,
             $derivedKey,
             'cbc'
         );
-        $privateKeyClear = base64_encode($decryptResult['data']);
+        $recoveredPem = $decryptResult['data'];
+
+        // Guard against SHA-256 false-positive: AES-CBC with wrong key can silently produce
+        // valid-UTF-8 garbage (~0.4% probability). RSA private keys always start with '-----BEGIN'.
+        // If version detection returned a SHA-256 result that does not look like a PEM key,
+        // explicitly retry with SHA-1 (which is how the backup was originally encrypted for
+        // non-migrated legacy users).
+        if (strpos($recoveredPem, '-----BEGIN') === false) {
+            $recoveredPem = \TeampassClasses\CryptoManager\CryptoManager::aesDecrypt(
+                $backupCiphertext,
+                $derivedKey,
+                'cbc',
+                'sha1'
+            );
+            if (strpos($recoveredPem, '-----BEGIN') === false) {
+                throw new Exception('Recovered data is not a valid RSA private key (both SHA-256 and SHA-1 produced non-PEM output)');
+            }
+        }
+
+        $privateKeyClear = base64_encode($recoveredPem);
 
         // Re-encrypt with new password
         $newPrivateKeyEncrypted = encryptPrivateKey($newPassword, $privateKeyClear);
@@ -3355,8 +3375,10 @@ function attemptTransparentRecovery(array $userInfo, string $newPassword, array 
  *
  * Returns an array with:
  * - 'success' (bool): true if the private key was transparently re-encrypted
- * - 'reason' (string): '' on success, 'no_recovery_data' for legacy users without
- *   a backup seed, 'recovery_failed' when recovery data exists but decryption failed
+ * - 'reason' (string): '' on success, 'no_recovery_data' for legacy users without a backup
+ *   seed or backup ciphertext, 'integrity_check_failed' when the stored integrity hash
+ *   does not match (non-disabling: modal shown), 'recovery_failed' when decryption
+ *   genuinely fails with valid recovery data (account disabled as security measure)
  *
  * @param int    $userId      User ID
  * @param string $newPassword New password (clear)
@@ -3432,7 +3454,35 @@ function handleExternalPasswordChange(int $userId, string $newPassword, array $u
         return ['success' => false, 'reason' => 'no_recovery_data'];
     }
 
-    // Recovery data exists but decryption failed — potential integrity violation.
+    // integrity_check_failed: the stored integrity hash does not match.
+    // This can happen legitimately when the server key file was restored from backup or
+    // the public key was updated separately. Treat like no_recovery_data: update the
+    // password hash (LDAP bind already verified it) and display the re-encryption modal.
+    if ($result['error'] === 'integrity_check_failed') {
+        $passwordManager = new PasswordManager();
+        DB::update(
+            prefixTable('users'),
+            [
+                'pw'             => $passwordManager->hashPassword($newPassword),
+                'special'        => 'recrypt-private-key',
+                'last_pw_change' => time(),
+            ],
+            'id = %i',
+            $userId
+        );
+
+        logEvents(
+            $SETTINGS,
+            'security_alert',
+            'ldap_password_changed_integrity_check_failed',
+            (string) $userId,
+            'User: ' . $userInfo['login'] . ' - integrity check failed, manual re-encryption required via modal'
+        );
+
+        return ['success' => false, 'reason' => 'integrity_check_failed'];
+    }
+
+    // Recovery data exists but decryption failed — genuine crypto failure.
     // Disable the account as a security measure.
     DB::update(
         prefixTable('users'),

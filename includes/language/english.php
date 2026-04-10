@@ -2144,6 +2144,7 @@ return array(
     'health_corrupted_items_csv_filename' => 'corrupted_items',
     'items_corrupted_notice_update' => 'The password for this item should be checked and updated.',
     'items_corrupted_notice_unreadable' => 'The password for this item could not be read correctly. Please update it.',
+    'items_corrupted_marker_unreadable' => 'Unreadable password',
     'settings_show_corrupted_items_in_list' => 'Highlight corrupted items in items list',
     'settings_show_corrupted_items_in_list_tip' => 'When enabled, users will see corrupted items highlighted in the items list.',
     );

@@ -5044,12 +5044,8 @@ $bip39Wordlist = loadBip39Wordlist($session->get('user-language') ?? 'english');
                 }
 
                 if (showCorruptedItemsInList === true && value.is_corrupted === 1) {
-                    corruption_row_class = String(value.corruption_severity || '') === 'danger'
-                        ? ' tp-item-corrupted-danger'
-                        : ' tp-item-corrupted-warning';
-                    corruption_marker = '<i class="fa-solid fa-triangle-exclamation mr-2 infotip tp-item-corrupted-marker ' +
-                        (String(value.corruption_severity || '') === 'danger' ? 'text-danger' : 'text-warning') +
-                        '" title="' + sanitizeString(value.corruption_reason_label || '') + '"></i>';
+                    corruption_row_class = ' tp-item-corrupted-danger';
+                    corruption_marker = '<i class="fa-solid fa-triangle-exclamation mr-2 infotip tp-item-corrupted-marker text-danger" title="<?php echo $lang->get('items_corrupted_marker_unreadable'); ?>"></i>';
                 }
 
                 $('#teampass_items_list').append(

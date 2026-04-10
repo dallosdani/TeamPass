@@ -8190,15 +8190,7 @@ function teampassCorruptedItemsBuildNotice(
 
     $reason = (string) ($state['reason_code'] ?? '');
 
-    if ($reason === 'empty_key' || $reason === 'len_mismatch') {
-        return [
-            'display' => true,
-            'severity' => 'warning',
-            'message' => $lang->get('items_corrupted_notice_update'),
-        ];
-    }
-
-    if ($reason === 'decrypt_failed' || $reason === 'binary_bytes' || $reason === 'exception') {
+    if (in_array($reason, ['empty_key', 'len_mismatch', 'decrypt_failed', 'binary_bytes', 'exception'], true) === true) {
         return [
             'display' => true,
             'severity' => 'danger',

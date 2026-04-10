@@ -392,6 +392,25 @@ if (function_exists('tpResolveBackupScriptPasskey')) {
 }
 // --->
 
+// <---
+// ==========================================
+// Anti-bruteforce configurable settings defaults
+// ==========================================
+$bruteforceDefaults = [
+    'nb_bad_authentication_by_ip' => '30',
+    'bruteforce_lock_duration'    => '10',
+];
+foreach ($bruteforceDefaults as $key => $value) {
+    mysqli_query(
+        $db_link,
+        "INSERT IGNORE INTO `{$pre}misc` (type, intitule, valeur, created_at)
+        VALUES ('admin', '" . mysqli_real_escape_string($db_link, $key) . "',
+                '" . mysqli_real_escape_string($db_link, $value) . "',
+                UNIX_TIMESTAMP())"
+    );
+}
+// --->
+
 // Close connection
 mysqli_close($db_link);
 

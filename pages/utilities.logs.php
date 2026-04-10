@@ -97,23 +97,6 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 <!-- /.content-header -->
 
 
-<style>
-    #table-failed th:last-child,
-    #table-failed td:last-child {
-        white-space: nowrap;
-        width: 1%;
-        min-width: 96px;
-        text-align: center;
-    }
-
-    #table-failed .failed-auth-add-blacklist {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 2rem;
-    }
-</style>
-
 <!-- Main content -->
 <div class="content">
     <div class="container-fluid">

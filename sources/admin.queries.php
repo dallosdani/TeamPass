@@ -2644,7 +2644,7 @@ switch ($post_type) {
             );
             break;
         }
-        if ($session->get('user-admin') !== 1) {
+        if ((int) $session->get('user-admin') !== 1) {
             echo prepareExchangedData(
                 [
                     'error' => true,
@@ -2712,7 +2712,8 @@ switch ($post_type) {
             $post_value = (string) max(0, (int) $post_value);
         }
         if ($post_field === 'bruteforce_lock_duration') {
-            $post_value = (string) max(1, (int) $post_value === 0 && trim((string) $post_value) === '' ? 10 : (int) $post_value);
+            $intValue = (int) $post_value;
+            $post_value = (string) max(1, $intValue === 0 ? 10 : $intValue);
         }
         
         require_once 'main.functions.php';

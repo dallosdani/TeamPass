@@ -3390,6 +3390,11 @@ function identifyDoAzureChecks(
  * Return an integer admin setting while preserving backward-compatible defaults.
  *
  * @param array<string, mixed> $settings Settings array.
+ * @param string               $key      Setting key to look up.
+ * @param int                  $default  Value returned when key is missing or empty.
+ * @param int                  $minimum  Minimum accepted value (clamped via max()).
+ *
+ * @return int
  */
 function getBruteforceIntegerSetting(array $settings, string $key, int $default, int $minimum = 0): int
 {

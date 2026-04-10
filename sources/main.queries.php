@@ -3552,11 +3552,13 @@ function changeUserLDAPAuthenticationPassword(
 
         // Generate transparent recovery data so future LDAP password changes
         // are handled automatically without requiring the modal again.
+        // NOTE: $privateKey is base64_encode(PEM) — we must decode it to raw PEM bytes
+        // before encrypting, consistent with how backups are created everywhere else.
         $userSeed        = bin2hex(openssl_random_pseudo_bytes(32));
         $derivedKey      = deriveBackupKey($userSeed, $userData['public_key']);
         $privateKeyBackup = base64_encode(
             \TeampassClasses\CryptoManager\CryptoManager::aesEncrypt(
-                $privateKey,
+                base64_decode($privateKey),
                 $derivedKey,
                 'cbc',
                 'sha256'

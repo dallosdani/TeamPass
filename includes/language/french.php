@@ -2151,6 +2151,14 @@ return array(
     'items_corrupted_marker_unreadable' => 'Mot de passe illisible',
     'settings_show_corrupted_items_in_list' => 'Mettre en évidence les items corrompus dans la liste',
     'settings_show_corrupted_items_in_list_tip' => 'Lorsque cette option est activée, les utilisateurs voient les items corrompus mis en évidence dans la liste des items.',
-    'items_corrupted_notice_update' => 'Le mot de passe de cet objet n’a pas pu être lu. Merci de le mettre à jour.',
+    'items_corrupted_notice_update' => 'Le mot de passe de cet élément doit être vérifié puis mis à jour.',
+    'nb_bad_authentication_by_ip' => 'Nombre de tentatives de connexion erronées par IP avant blocage (0 pour désactiver)',
+    'nb_bad_authentication_by_ip_tip' => 'S’applique à l’adresse IP cliente détectée utilisée par le mécanisme anti brute force.',
+    'bruteforce_lock_duration' => 'Durée de verrouillage après atteinte du seuil',
+    'bruteforce_lock_duration_tip' => 'Durée fixe de verrouillage en minutes appliquée une fois le seuil anti brute force atteint.',
+    'bruteforce_account_locked' => 'Compte temporairement verrouillé par l’anti brute force',
+    'network_security_auto_comment_failed_login_ip' => 'IP ajoutée automatiquement depuis l’écran des connexions échouées',
+    'network_security_add_ip_to_blacklist' => 'Ajouter cette IP à la blacklist',
+    'network_security_add_ip_to_blacklist_success' => 'IP ajoutée à la blacklist',
 
 );

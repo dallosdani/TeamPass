@@ -581,12 +581,36 @@ $zones = timezone_list();
                             </div>
                         </div>
 
-                        <div class='row mb-2 option' data-keywords="log user login password security">
+                        <div class='row mb-2 option' data-keywords="log user login password security anti bruteforce account lockout">
                             <div class='col-10'>
                                 <?php echo $lang->get('nb_false_login_attempts'); ?>
                             </div>
                             <div class='col-2'>
-                                <input type='number' class='form-control form-control-sm' id='nb_bad_authentication' value='<?php echo htmlspecialchars($SETTINGS['nb_bad_authentication'] ?? '0'); ?>'>
+                                <input type='number' min='0' step='1' class='form-control form-control-sm' id='nb_bad_authentication' value='<?php echo htmlspecialchars($SETTINGS['nb_bad_authentication'] ?? '0'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="log user login password security anti bruteforce ip address blacklist acl">
+                            <div class='col-10'>
+                                <?php echo $lang->get('nb_bad_authentication_by_ip'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('nb_bad_authentication_by_ip_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' min='0' step='1' class='form-control form-control-sm' id='nb_bad_authentication_by_ip' value='<?php echo htmlspecialchars($SETTINGS['nb_bad_authentication_by_ip'] ?? '30'); ?>'>
+                            </div>
+                        </div>
+
+                        <div class='row mb-2 option' data-keywords="log user login password security anti bruteforce lock duration minutes">
+                            <div class='col-10'>
+                                <?php echo $lang->get('bruteforce_lock_duration'); ?>
+                                <small class='form-text text-muted'>
+                                    <?php echo $lang->get('bruteforce_lock_duration_tip'); ?>
+                                </small>
+                            </div>
+                            <div class='col-2'>
+                                <input type='number' min='1' step='1' class='form-control form-control-sm' id='bruteforce_lock_duration' value='<?php echo htmlspecialchars($SETTINGS['bruteforce_lock_duration'] ?? '10'); ?>'>
                             </div>
                         </div>
 

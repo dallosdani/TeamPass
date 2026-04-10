@@ -350,6 +350,22 @@ if (null !== $post_type) {
             $error = false;
             $errorMessage = '';
 
+            // Deny edit if this specific folder is read-only for the current user (per-folder role restriction)
+            if (
+                (int) $session->get('user-admin') !== 1
+                && is_array($session->get('user-read_only_folders'))
+                && in_array($inputData['id'], $session->get('user-read_only_folders'), true)
+            ) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
+
             // check if title is numeric
             if (is_numeric($inputData['title']) === true) {
                 echo prepareExchangedData(
@@ -837,6 +853,25 @@ if (null !== $post_type) {
                 break;
             }
             
+            // Deny deletion if any of the target folders is read-only for this user (per-folder role restriction)
+            $userReadOnlyFolders = $session->get('user-read_only_folders') ?? [];
+            if (!empty($userReadOnlyFolders)) {
+                $readOnlyViolations = array_intersect(
+                    array_map('intval', $post_folders),
+                    array_map('intval', $userReadOnlyFolders)
+                );
+                if (!empty($readOnlyViolations)) {
+                    echo prepareExchangedData(
+                        array(
+                            'error' => true,
+                            'message' => $lang->get('error_not_allowed_to'),
+                        ),
+                        'encode'
+                    );
+                    break;
+                }
+            }
+
             // Ensure that user has access to all folders
             $foldersAccessible = DB::query(
                 'SELECT id
@@ -927,6 +962,8 @@ if (null !== $post_type) {
                                 'personal_folder' => (int) ($thisSubFolders->personal_folder ?? 0),
                                 'renewal_period' => (int) ($thisSubFolders->renewal_period ?? 0),
                                 'categories' => (string) ($thisSubFolders->categories ?? ''),
+                                'deleted_by' => (int) $session->get('user-id'),
+                                'deleted_by_login' => (string) ($session->get('user-login') ?? ''),
                             );
                             if (isset($thisSubFolders->fa_icon) === true) {
                                 $folderDeletedData['fa_icon'] = (string) $thisSubFolders->fa_icon;
@@ -1084,6 +1121,18 @@ if (null !== $post_type) {
             $post_folder_label = filter_var($dataReceived['folder_label'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             $post_copy_subdirectories = filter_var($dataReceived['copy_subdirectories'], FILTER_SANITIZE_NUMBER_INT);
             $post_copy_items = filter_var($dataReceived['copy_items'], FILTER_SANITIZE_NUMBER_INT);
+
+            // Test if source folder is Read-only — user cannot move a folder they can only read
+            if (in_array((int) $post_source_folder_id, $session->get('user-read_only_folders')) === true) {
+                echo prepareExchangedData(
+                    array(
+                        'error' => true,
+                        'message' => $lang->get('error_not_allowed_to'),
+                    ),
+                    'encode'
+                );
+                break;
+            }
 
             // Test if target folder is Read-only
             // If it is then stop

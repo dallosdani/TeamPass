@@ -3278,12 +3278,32 @@ function attemptTransparentRecovery(array $userInfo, string $newPassword, array 
 
         // Decrypt private key using derived key (using CryptoManager - phpseclib v3)
         // Use version detection since backup may be encrypted with SHA-1 (v1) or SHA-256 (v3)
+        $backupCiphertext = base64_decode($userInfo['private_key_backup']);
         $decryptResult = \TeampassClasses\CryptoManager\CryptoManager::aesDecryptWithVersionDetection(
-            base64_decode($userInfo['private_key_backup']),
+            $backupCiphertext,
             $derivedKey,
             'cbc'
         );
-        $privateKeyClear = base64_encode($decryptResult['data']);
+        $recoveredPem = $decryptResult['data'];
+
+        // Guard against SHA-256 false-positive: AES-CBC with wrong key can silently produce
+        // valid-UTF-8 garbage (~0.4% probability). RSA private keys always start with '-----BEGIN'.
+        // If version detection returned a SHA-256 result that does not look like a PEM key,
+        // explicitly retry with SHA-1 (which is how the backup was originally encrypted for
+        // non-migrated legacy users).
+        if (strpos($recoveredPem, '-----BEGIN') === false) {
+            $recoveredPem = \TeampassClasses\CryptoManager\CryptoManager::aesDecrypt(
+                $backupCiphertext,
+                $derivedKey,
+                'cbc',
+                'sha1'
+            );
+            if (strpos($recoveredPem, '-----BEGIN') === false) {
+                throw new Exception('Recovered data is not a valid RSA private key (both SHA-256 and SHA-1 produced non-PEM output)');
+            }
+        }
+
+        $privateKeyClear = base64_encode($recoveredPem);
 
         // Re-encrypt with new password
         $newPrivateKeyEncrypted = encryptPrivateKey($newPassword, $privateKeyClear);
@@ -3353,24 +3373,31 @@ function attemptTransparentRecovery(array $userInfo, string $newPassword, array 
 /**
  * Handles external password change (LDAP/OAuth2) with automatic re-encryption.
  *
- * @param int $userId User ID
- * @param string $newPassword New password (clear)
- * @param array $userInfo User information from database
- * @param array $SETTINGS Teampass settings
+ * Returns an array with:
+ * - 'success' (bool): true if the private key was transparently re-encrypted
+ * - 'reason' (string): '' on success, 'no_recovery_data' for legacy users without a backup
+ *   seed or backup ciphertext, 'integrity_check_failed' when the stored integrity hash
+ *   does not match (non-disabling: modal shown), 'recovery_failed' when decryption
+ *   genuinely fails with valid recovery data (account disabled as security measure)
  *
- * @return bool True if  handled successfully
+ * @param int    $userId      User ID
+ * @param string $newPassword New password (clear)
+ * @param array  $userInfo    User information from database
+ * @param array  $SETTINGS    Teampass settings
+ *
+ * @return array{success: bool, reason: string}
  */
-function handleExternalPasswordChange(int $userId, string $newPassword, array $userInfo, array $SETTINGS): bool
+function handleExternalPasswordChange(int $userId, string $newPassword, array $userInfo, array $SETTINGS): array
 {
     // Check if password was changed recently (< 20s) to avoid duplicate processing
     if (!empty($userInfo['last_pw_change'])) {
         $timeSinceChange = time() - (int) $userInfo['last_pw_change'];
-        if ($timeSinceChange < 20) { // 20 seconds
-            return true; // Already processed
+        if ($timeSinceChange < 20) {
+            return ['success' => true, 'reason' => ''];
         }
     }
 
-    // Try to decrypt with new password first (maybe already updated)
+    // Try to decrypt with new password first (maybe already synced)
     try {
         $testDecrypt = decryptPrivateKey($newPassword, $userInfo['private_key']);
         if (!empty($testDecrypt)) {
@@ -3385,31 +3412,88 @@ function handleExternalPasswordChange(int $userId, string $newPassword, array $u
                 'id = %i',
                 $userId
             );
-            return true;
+            return ['success' => true, 'reason' => ''];
         }
     } catch (Exception $e) {
-        // Expected - old password doesn't work, continue with recovery
+        // Expected - old password doesn't match, continue with recovery
     }
 
-    // Attempt transparent recovery
+    // Attempt transparent recovery using the backup seed
     $result = attemptTransparentRecovery($userInfo, $newPassword, $SETTINGS);
 
     if ($result['success']) {
-        return true;
+        return ['success' => true, 'reason' => ''];
     }
 
-    // Recovery failed - disable user and alert admins
+    // Legacy user: no backup seed/recovery data available.
+    // Do NOT disable the account — the LDAP password change is legitimate and
+    // was already verified by the LDAP bind. Update the pw hash to the new LDAP
+    // password and flag the account so the UI shows the re-encryption modal, where
+    // the user can provide their old password to decrypt the stored private key.
+    if ($result['error'] === 'no_recovery_data') {
+        $passwordManager = new PasswordManager();
+        DB::update(
+            prefixTable('users'),
+            [
+                'pw'             => $passwordManager->hashPassword($newPassword),
+                'special'        => 'recrypt-private-key',
+                'last_pw_change' => time(),
+            ],
+            'id = %i',
+            $userId
+        );
+
+        logEvents(
+            $SETTINGS,
+            'user_connection',
+            'ldap_password_changed_no_recovery_data',
+            (string) $userId,
+            'User: ' . $userInfo['login'] . ' - manual re-encryption required via modal'
+        );
+
+        return ['success' => false, 'reason' => 'no_recovery_data'];
+    }
+
+    // integrity_check_failed: the stored integrity hash does not match.
+    // This can happen legitimately when the server key file was restored from backup or
+    // the public key was updated separately. Treat like no_recovery_data: update the
+    // password hash (LDAP bind already verified it) and display the re-encryption modal.
+    if ($result['error'] === 'integrity_check_failed') {
+        $passwordManager = new PasswordManager();
+        DB::update(
+            prefixTable('users'),
+            [
+                'pw'             => $passwordManager->hashPassword($newPassword),
+                'special'        => 'recrypt-private-key',
+                'last_pw_change' => time(),
+            ],
+            'id = %i',
+            $userId
+        );
+
+        logEvents(
+            $SETTINGS,
+            'security_alert',
+            'ldap_password_changed_integrity_check_failed',
+            (string) $userId,
+            'User: ' . $userInfo['login'] . ' - integrity check failed, manual re-encryption required via modal'
+        );
+
+        return ['success' => false, 'reason' => 'integrity_check_failed'];
+    }
+
+    // Recovery data exists but decryption failed — genuine crypto failure.
+    // Disable the account as a security measure.
     DB::update(
         prefixTable('users'),
         [
             'disabled' => 1,
-            'special' => 'recrypt-private-key',
+            'special'  => 'recrypt-private-key',
         ],
         'id = %i',
         $userId
     );
 
-    // Log critical event
     logEvents(
         $SETTINGS,
         'security_alert',
@@ -3418,7 +3502,7 @@ function handleExternalPasswordChange(int $userId, string $newPassword, array $u
         'User: ' . $userInfo['login'] . ' - disabled due to key recovery failure'
     );
 
-    return false;
+    return ['success' => false, 'reason' => 'recovery_failed'];
 }
 
 /**

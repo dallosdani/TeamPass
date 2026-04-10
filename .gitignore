@@ -58,3 +58,4 @@ tests/_support/_generated/
 .venv/
 mempalace.yaml
 entities.json
+/readmeFiles/*

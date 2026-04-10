@@ -1816,17 +1816,18 @@ if (
                         // Enable buttons
                         $('#dialog-ldap-user-change-password-do, #dialog-ldap-user-change-password-close').removeAttr('disabled');
                     } else {
-                        // SUCCESS
-                        $('#dialog-ldap-user-change-password-close').removeAttr('disabled');
+                        // SUCCESS — private key re-encrypted; reload the page so the
+                        // full session state (private key, accessible items) is refreshed.
                         toastr.remove();
                         toastr.success(
                             data.message,
                             '<?php echo $lang->get('success'); ?>', {
-                                timeOut: 5000,
+                                timeOut: 4000,
                                 progressBar: true
                             }
                         );
-                        $("#dialog-ldap-user-change-password-progress").html('');
+                        $("#dialog-ldap-user-change-password-progress").html('<?php echo $lang->get('please_wait'); ?>');
+                        setTimeout(function() { location.reload(); }, 3000);
                     }
                 }
             );

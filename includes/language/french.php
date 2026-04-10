@@ -2149,6 +2149,7 @@ return array(
     'health_corrupted_items_csv_filename' => 'objets_corrompus',
     'items_corrupted_notice_update' => 'Le mot de passe de cet élément doit être vérifié puis mis à jour.',
     'items_corrupted_notice_unreadable' => 'Le mot de passe de cet élément n\'a pas pu être relu correctement. Veuillez le mettre à jour.',
+    'items_corrupted_marker_unreadable' => 'Mot de passe illisible',
     'settings_show_corrupted_items_in_list' => 'Mettre en évidence les items corrompus dans la liste',
     'settings_show_corrupted_items_in_list_tip' => 'Lorsque cette option est activée, les utilisateurs voient les items corrompus mis en évidence dans la liste des items.',
 );

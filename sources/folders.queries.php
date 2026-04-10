@@ -401,16 +401,19 @@ if (null !== $post_type) {
                 $inputData['id']
             );
             
-            //Check if duplicate folders name are allowed
+            // Check if duplicate folder names are allowed (rename case)
             if (
                 isset($SETTINGS['duplicate_folder']) === true
                 && (int) $SETTINGS['duplicate_folder'] === 0
+                && $inputData['title'] !== $dataFolder['title']
             ) {
-                if (
-                    empty($dataFolder['id']) === false
-                    && intval($dataReceived['id']) !== intval($dataFolder['id'])
-                    && $inputData['title'] !== $dataFolder['title']
-                ) {
+                DB::query(
+                    'SELECT id FROM ' . prefixTable('nested_tree') . '
+                    WHERE title = %s AND personal_folder = 0 AND id != %i',
+                    $inputData['title'],
+                    $inputData['id']
+                );
+                if (DB::count() !== 0) {
                     echo prepareExchangedData(
                         array(
                             'error' => true,

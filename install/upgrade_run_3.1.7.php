@@ -320,6 +320,15 @@ addColumnIfNotExist(
     'invalidated_at',
     "INT UNSIGNED DEFAULT 0"
 );
+
+// Add show_subfolders column to users table if missing.
+// Was introduced in upgrade_run_3.1.php but absent from the fresh-install schema,
+// so instances installed at 3.1.x without going through that upgrade path are affected.
+addColumnIfNotExist(
+    $pre . 'users',
+    'show_subfolders',
+    "TINYINT(1) NOT NULL DEFAULT 0"
+);
 // --->
 
 

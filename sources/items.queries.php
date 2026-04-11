@@ -4421,7 +4421,7 @@ switch ($inputData['type']) {
                     $html_json[$record['id']]['corruption_reason_label'] = $corruptedState !== null
                         ? teampassCorruptedItemsReasonToLabel(
                             $lang,
-                            (string) ($corruptedState['reason'] ?? '')
+                            $corruptedState['reason']
                         )
                         : '';
 

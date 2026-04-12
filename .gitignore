@@ -55,3 +55,10 @@ tests/_output/
 tests/_support/_generated/
 /webfonts
 *:Zone.Identifier
+.venv/
+mempalace.yaml
+entities.json
+/readmeFiles/*
+# Master encryption key — never commit the secrets directory content
+/secrets/*
+!/secrets/.gitkeep

@@ -244,7 +244,7 @@ class teampassInstaller
 
             // Apply permissions
             foreach ($directories as $path => $permissions) {
-                $result = recursiveChmodForInstall($path, $permissions['dir'], $permissions['file']);
+                $result = recursiveChmodForInstall($path, $permissions['file'], $permissions['dir']);
                 if (!$result) {
                     return [
                         'success' => false,

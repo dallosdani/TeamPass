@@ -1,50 +1,57 @@
-version: "3"
 services:
-  nginx:
-    image: jwilder/nginx-proxy:alpine
-    restart: unless-stopped
-    networks:
-      - frontend
-      - backend
-    ports:
-      - "443:443"
-    volumes:
-      - ./ssl:/etc/nginx/certs
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-
   teampass-web:
-    image: dormancygrace/teampass:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: teampass-local:latest
+    container_name: teampass-app
     restart: unless-stopped
     environment:
-      VIRTUAL_HOST: YOUR_HOSTNAME
-      VIRTUAL_PORT: 80
-      # uncomment if certificate's file name doesn't match VIRTUAL_HOST
-      #CERT_NAME: YOUR_CERTIFICATE
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: teampass
+      DB_USER: teampass
+      DB_PASSWORD: change_me_teampass_db_password
+      INSTALL_MODE: manual
+      TEAMPASS_URL: http://localhost:8080
     volumes:
-      - ./teampass-html:/var/www/html
-    # uncomment ports to use without proxy
-    #ports:
-    #  - 80:80
+      - teampass-sk:/var/www/html/sk
+      - teampass-files:/var/www/html/files
+      - teampass-upload:/var/www/html/upload
+    ports:
+      - 8080:80
     networks:
-      - teampass-internal
-      - backend
+      - teampass-network
     depends_on:
       - db
+
   db:
+    image: mariadb:11.2
+    container_name: teampass-db
     restart: unless-stopped
-    image: yobasystems/alpine-mariadb:latest
     environment:
-      MYSQL_ROOT_PASSWORD: YOUR_SUPERSECRET_PASSWORD
-      MYSQL_DATABASE: teampass
-      MYSQL_PASSWORD: YOUR_SECRET_PASSWORD
-      MYSQL_USER: teampass
+      MARIADB_ROOT_PASSWORD: change_me_root_password
+      MARIADB_DATABASE: teampass
+      MARIADB_USER: teampass
+      MARIADB_PASSWORD: change_me_teampass_db_password
+      MARIADB_AUTO_UPGRADE: "1"
+      MARIADB_INITDB_SKIP_TZINFO: "1"
     volumes:
-      - ./teampass-db:/var/lib/mysql
+      - teampass-db:/var/lib/mysql
+      - ./docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
     networks:
-      - teampass-internal
+      - teampass-network
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_allowed_packet=64M
 
 networks:
-  frontend:
-  backend:
-    external: true
-  teampass-internal:
+  teampass-network:
+
+
+volumes:
+  teampass-sk:
+  teampass-files:
+  teampass-upload:
+  teampass-db:

@@ -30,13 +30,13 @@ FROM php:8.3-fpm-alpine3.19
 
 # Metadata labels
 LABEL maintainer="TeamPass <nils@teampass.net>" \
-      org.opencontainers.image.title="TeamPass" \
-      org.opencontainers.image.description="Collaborative Passwords Manager" \
-      org.opencontainers.image.url="https://teampass.net" \
-      org.opencontainers.image.source="https://github.com/nilsteampassnet/TeamPass" \
-      org.opencontainers.image.documentation="https://teampass.readthedocs.io" \
-      org.opencontainers.image.licenses="GPL-3.0" \
-      org.opencontainers.image.vendor="TeamPass"
+    org.opencontainers.image.title="TeamPass" \
+    org.opencontainers.image.description="Collaborative Passwords Manager" \
+    org.opencontainers.image.url="https://teampass.net" \
+    org.opencontainers.image.source="https://github.com/nilsteampassnet/TeamPass" \
+    org.opencontainers.image.documentation="https://teampass.readthedocs.io" \
+    org.opencontainers.image.licenses="GPL-3.0" \
+    org.opencontainers.image.vendor="TeamPass"
 
 # Build arguments
 ARG TEAMPASS_VERSION=3.1.5.2
@@ -74,21 +74,21 @@ RUN apk add --no-cache \
     oniguruma-dev \
     # Configure and install PHP extensions
     && docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg \
+    --with-freetype \
+    --with-jpeg \
     && docker-php-ext-configure ldap \
     && docker-php-ext-install -j$(nproc) \
-        mysqli \
-        pdo_mysql \
-        bcmath \
-        ldap \
-        gmp \
-        gd \
-        zip \
-        intl \
-        opcache \
-        mbstring \
-        xml \
+    mysqli \
+    pdo_mysql \
+    bcmath \
+    ldap \
+    gmp \
+    gd \
+    zip \
+    intl \
+    opcache \
+    mbstring \
+    xml \
     # Cleanup build dependencies
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
@@ -125,13 +125,13 @@ RUN mkdir -p \
     /var/log/supervisor \
     /run/nginx \
     && chown -R nginx:nginx \
-        sk \
-        files \
-        upload \
-        includes/libraries/csrfp/log \
-        /var/lib/nginx \
-        /var/log \
-        /run/nginx \
+    sk \
+    files \
+    upload \
+    includes/libraries/csrfp/log \
+    /var/lib/nginx \
+    /var/log \
+    /run/nginx \
     && chmod 700 sk \
     && chmod 750 files upload includes/libraries/csrfp/log
 
@@ -154,7 +154,8 @@ RUN echo "* * * * * php /var/www/html/sources/scheduler.php > /dev/null 2>&1" > 
 
 # Copy and set entrypoint script
 COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh \
+    && chmod +x /docker-entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
